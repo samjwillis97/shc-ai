@@ -42,6 +42,20 @@ async function main() {
       string: true,
       alias: 'p',
     })
+    .option('verbose', {
+      describe: 'Output detailed request and response information to stderr',
+      type: 'boolean',
+      default: false,
+    })
+    .option('dry-run', {
+      describe: 'Display the request that would be sent without actually sending it',
+      type: 'boolean',
+      default: false,
+    })
+    .option('exit-on-http-error', {
+      describe: 'Exit with non-zero code for specified HTTP error status codes (e.g., "4xx", "5xx", "401,403")',
+      type: 'string',
+    })
     .help()
     .alias('help', 'h')
     .version('1.0.0')
@@ -86,6 +100,9 @@ async function main() {
       config: argv.config as string | undefined,
       variables,
       profiles,
+      verbose: argv.verbose as boolean,
+      dryRun: argv['dry-run'] as boolean,
+      exitOnHttpError: argv['exit-on-http-error'] as string | undefined,
     });
   } else if (argv._.length === 0) {
     // No command provided, show help

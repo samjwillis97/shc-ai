@@ -102,15 +102,15 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 ## Phase 5: Verbose Output, Dry Run & Exit Code Control
 
 - **Goal:** Implement enhanced output options for debugging and scripting.
-- **Status:** [ ]
+- **Status:** [x]
 - **Tasks:**
-  - [ ] **T5.1:** Implement `--verbose` flag.
-  - [ ] **T5.2:** Capture request details before sending.
-  - [ ] **T5.3:** If `--verbose`, print request details to `stderr`.
-  - [ ] **T5.4:** If `--verbose`, print response details to `stderr`.
-  - [ ] **T5.5:** Implement `--dry-run` flag.
-  - [ ] **T5.6:** Implement `--exit-on-http-error <codes>` flag.
-- **Notes/Blockers:**
+  - [x] **T5.1:** Implement `--verbose` flag.
+  - [x] **T5.2:** Capture request details before sending.
+  - [x] **T5.3:** If `--verbose`, print request details to `stderr`.
+  - [x] **T5.4:** If `--verbose`, print response details to `stderr`.
+  - [x] **T5.5:** Implement `--dry-run` flag.
+  - [x] **T5.6:** Implement `--exit-on-http-error <codes>` flag.
+- **Notes/Blockers:** All tasks completed successfully. Added `--verbose`, `--dry-run`, and `--exit-on-http-error` CLI options. Verbose mode prints detailed request and response information to stderr including timing. Dry-run mode displays request details without making HTTP calls and gracefully handles unresolved variables. Exit-on-http-error supports patterns like "4xx", "5xx", and specific codes like "401,403". All Phase 5 tests passing (16 unit tests + 9 integration tests).
 
 ---
 

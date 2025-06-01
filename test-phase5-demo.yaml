@@ -1,0 +1,30 @@
+config:
+  defaultProfile: development
+
+profiles:
+  development:
+    base_url: https://jsonplaceholder.typicode.com
+    api_key: dev-key-123
+
+apis:
+  jsonplaceholder:
+    baseUrl: "{{base_url}}"
+    headers:
+      X-API-Key: "{{api_key}}"
+      User-Agent: HttpCraft/1.0
+    endpoints:
+      getTodo:
+        method: GET
+        path: /todos/{{todo_id}}
+        description: "Get a specific todo item"
+      
+      postTodo:
+        method: POST
+        path: /todos
+        headers:
+          Content-Type: application/json
+        body:
+          title: "{{title}}"
+          body: "{{description}}"
+          userId: "{{user_id}}"
+        description: "Create a new todo item" 
