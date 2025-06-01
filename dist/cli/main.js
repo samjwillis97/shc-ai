@@ -3,6 +3,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { handleRequestCommand } from './commands/request.js';
 import { handleApiCommand } from './commands/api.js';
+import { handleCompletionCommand, handleGetApiNamesCommand, handleGetEndpointNamesCommand } from './commands/completion.js';
 async function main() {
     const argv = await yargs(hideBin(process.argv))
         .scriptName('httpcraft')
@@ -15,6 +16,16 @@ async function main() {
         });
     }, async (argv) => {
         await handleRequestCommand({ url: argv.url });
+    })
+        .command('completion <shell>', 'Generate shell completion script', (yargs) => {
+        yargs.positional('shell', {
+            describe: 'Shell to generate completion for',
+            type: 'string',
+            choices: ['zsh'],
+            demandOption: true,
+        });
+    }, async (argv) => {
+        await handleCompletionCommand({ shell: argv.shell });
     })
         .command('test', 'Test command', {}, () => {
         console.log('Test command executed!');
@@ -49,12 +60,35 @@ async function main() {
         describe: 'Exit with non-zero code for specified HTTP error status codes (e.g., "4xx", "5xx", "401,403")',
         type: 'string',
     })
+        // Hidden options for completion
+        .option('get-api-names', {
+        describe: 'Get list of API names (hidden, for completion)',
+        type: 'boolean',
+        hidden: true,
+    })
+        .option('get-endpoint-names', {
+        describe: 'Get list of endpoint names for API (hidden, for completion)',
+        type: 'string',
+        hidden: true,
+    })
         .help()
         .alias('help', 'h')
         .version('1.0.0')
         .alias('version', 'v')
         .strict(false) // Allow unknown commands for API pattern
         .parse();
+    // Handle hidden completion commands first
+    if (argv['get-api-names']) {
+        await handleGetApiNamesCommand({ config: argv.config });
+        return;
+    }
+    if (argv['get-endpoint-names']) {
+        await handleGetEndpointNamesCommand({
+            apiName: argv['get-endpoint-names'],
+            config: argv.config
+        });
+        return;
+    }
     // Parse --var options into key-value pairs
     const variables = {};
     if (argv.var && Array.isArray(argv.var)) {
@@ -99,6 +133,7 @@ async function main() {
         // No command provided, show help
         console.log('Usage: httpcraft <api_name> <endpoint_name> [--config <path>] [--var key=value] [--profile <name>]');
         console.log('       httpcraft request <url>');
+        console.log('       httpcraft completion <shell>');
         console.log('       httpcraft test');
         console.log('');
         console.log('Use --help for more information.');
