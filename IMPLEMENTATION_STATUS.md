@@ -69,17 +69,17 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 ## Phase 3: Basic Variable Substitution (Environment & CLI)
 
 - **Goal:** Introduce basic variable substitution from OS environment variables and CLI arguments.
-- **Status:** [ ]
+- **Status:** [x]
 - **Tasks:**
-  - [ ] **T3.1:** Implement simple templating function for `{{variable}}`.
-  - [ ] **T3.2:** Implement support for `{{env.VAR_NAME}}`.
-  - [ ] **T3.3:** Implement support for `--var <key>=<value>` CLI option.
-  - [ ] **T3.4:** Define initial variable precedence: CLI > Environment.
-  - [ ] **T3.5:** Apply variable substitution to URL, path, headers, query params.
-  - [ ] **T3.6:** Implement substitution for path parameters.
-  - [ ] **T3.7:** Implement error handling for unresolved variables.
-  - [ ] **T3.8:** Support basic stringified body definition and variable substitution.
-- **Notes/Blockers:**
+  - [x] **T3.1:** Implement simple templating function for `{{variable}}`.
+  - [x] **T3.2:** Implement support for `{{env.VAR_NAME}}`.
+  - [x] **T3.3:** Implement support for `--var <key>=<value>` CLI option.
+  - [x] **T3.4:** Define initial variable precedence: CLI > Environment.
+  - [x] **T3.5:** Apply variable substitution to URL, path, headers, query params.
+  - [x] **T3.6:** Implement substitution for path parameters.
+  - [x] **T3.7:** Implement error handling for unresolved variables.
+  - [x] **T3.8:** Support basic stringified body definition and variable substitution.
+- **Notes/Blockers:** All tasks completed successfully. Implemented VariableResolver class with support for `{{variable}}` and `{{env.VAR_NAME}}` syntax. Added `--var key=value` CLI option with proper parsing (handles values containing '='). Implemented variable precedence (CLI > Environment) and comprehensive error handling with informative messages. Variable substitution works in URLs, paths, headers, query parameters, and request bodies (both string and object formats). Created comprehensive unit tests and integration tests covering all Phase 3 requirements. All 46 tests passing.
 
 ---
 

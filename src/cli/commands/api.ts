@@ -1,12 +1,14 @@
 import { configLoader } from '../../core/configLoader.js';
 import { urlBuilder } from '../../core/urlBuilder.js';
 import { httpClient } from '../../core/httpClient.js';
+import { variableResolver, VariableResolutionError } from '../../core/variableResolver.js';
 import type { HttpCraftConfig, ApiDefinition, EndpointDefinition } from '../../types/config.js';
 
 export interface ApiCommandArgs {
   apiName: string;
   endpointName: string;
   config?: string;
+  variables?: Record<string, string>;
 }
 
 export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
@@ -39,18 +41,25 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       process.exit(1);
     }
     
+    // Create variable context
+    const variableContext = variableResolver.createContext(args.variables || {});
+    
+    // Apply variable resolution to configuration elements
+    const resolvedApi = variableResolver.resolveValue(api, variableContext) as ApiDefinition;
+    const resolvedEndpoint = variableResolver.resolveValue(endpoint, variableContext) as EndpointDefinition;
+    
     // Build request
-    const url = urlBuilder.buildUrl(api, endpoint);
-    const headers = urlBuilder.mergeHeaders(api, endpoint);
-    const params = urlBuilder.mergeParams(api, endpoint);
+    const url = urlBuilder.buildUrl(resolvedApi, resolvedEndpoint);
+    const headers = urlBuilder.mergeHeaders(resolvedApi, resolvedEndpoint);
+    const params = urlBuilder.mergeParams(resolvedApi, resolvedEndpoint);
     
     // Execute HTTP request
     const response = await httpClient.executeRequest({
-      method: endpoint.method,
+      method: resolvedEndpoint.method,
       url,
       headers,
       params,
-      body: endpoint.body,
+      body: resolvedEndpoint.body,
     });
     
     // Output response body to stdout (as per PRD requirement)
@@ -62,7 +71,10 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     }
     
   } catch (error) {
-    if (error instanceof Error) {
+    if (error instanceof VariableResolutionError) {
+      console.error(`Variable Error: ${error.message}`);
+      process.exit(1);
+    } else if (error instanceof Error) {
       console.error(`Error: ${error.message}`);
     } else {
       console.error('Error: Unknown error occurred');

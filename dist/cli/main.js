@@ -24,12 +24,33 @@ async function main() {
         type: 'string',
         alias: 'c',
     })
+        .option('var', {
+        describe: 'Set or override a variable (can be used multiple times)',
+        type: 'array',
+        string: true,
+    })
         .help()
         .alias('help', 'h')
         .version('1.0.0')
         .alias('version', 'v')
         .strict(false) // Allow unknown commands for API pattern
         .parse();
+    // Parse --var options into key-value pairs
+    const variables = {};
+    if (argv.var && Array.isArray(argv.var)) {
+        for (const varStr of argv.var) {
+            if (typeof varStr === 'string') {
+                const [key, ...valueParts] = varStr.split('=');
+                if (key && valueParts.length > 0) {
+                    variables[key] = valueParts.join('='); // Handle values that contain '='
+                }
+                else {
+                    console.error(`Error: Invalid variable format '${varStr}'. Use --var key=value`);
+                    process.exit(1);
+                }
+            }
+        }
+    }
     // Handle API command pattern: httpcraft <api_name> <endpoint_name>
     if (argv._.length === 2 && typeof argv._[0] === 'string' && typeof argv._[1] === 'string') {
         const apiName = argv._[0];
@@ -38,11 +59,12 @@ async function main() {
             apiName,
             endpointName,
             config: argv.config,
+            variables,
         });
     }
     else if (argv._.length === 0) {
         // No command provided, show help
-        console.log('Usage: httpcraft <api_name> <endpoint_name> [--config <path>]');
+        console.log('Usage: httpcraft <api_name> <endpoint_name> [--config <path>] [--var key=value]');
         console.log('       httpcraft request <url>');
         console.log('       httpcraft test');
         console.log('');
