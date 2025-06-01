@@ -1,7 +1,7 @@
 # HttpCraft: Implementation Status
 
 **Version:** 1.0 (as per PRD)
-**Last Updated:** YYYY-MM-DD
+**Last Updated:** 2024-01-XX
 
 This document tracks the implementation progress of HttpCraft based on the [Phased Implementation Plan (PIP.md)](./PIP.md).
 
@@ -17,18 +17,18 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 ## Phase 0: Project Setup & Core Shell
 
 - **Goal:** Establish the project structure, basic CLI argument parsing, and a minimal runnable application.
-- **Status:** [ ]
+- **Status:** [x]
 - **Tasks:**
-  - [ ] **T0.1:** Initialize TypeScript project with `npm init`, install `typescript`, `ts-node`, `@types/node`.
-  - [ ] **T0.2:** Configure `tsconfig.json` for compilation options.
-  - [ ] **T0.3:** Setup basic linting and formatting (ESLint, Prettier).
-  - [ ] **T0.4:** Setup a testing framework (Vitest).
-  - [ ] **T0.5:** Create basic project directory structure.
-  - [ ] **T0.6:** Implement a CLI entry point with a shebang.
-  - [ ] **T0.7:** Integrate a CLI argument parsing library (e.g., `yargs`).
-  - [ ] **T0.8:** Implement a `--version` command.
-  - [ ] **T0.9:** Implement a basic `--help` output.
-- **Notes/Blockers:**
+  - [x] **T0.1:** Initialize TypeScript project with `npm init`, install `typescript`, `ts-node`, `@types/node`.
+  - [x] **T0.2:** Configure `tsconfig.json` for compilation options.
+  - [x] **T0.3:** Setup basic linting and formatting (ESLint, Prettier).
+  - [x] **T0.4:** Setup a testing framework (Vitest).
+  - [x] **T0.5:** Create basic project directory structure.
+  - [x] **T0.6:** Implement a CLI entry point with a shebang.
+  - [x] **T0.7:** Integrate a CLI argument parsing library (e.g., `yargs`).
+  - [x] **T0.8:** Implement a `--version` command.
+  - [x] **T0.9:** Implement a basic `--help` output.
+- **Notes/Blockers:** All tasks completed successfully. CLI is functional with basic commands.
 
 ---
 
