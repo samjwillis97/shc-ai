@@ -64,7 +64,7 @@ _httpcraft() {
             
             # Add API names to commands
             for api_name in $api_names; do
-                commands+=("$api_name:API: $api_name")
+                commands+=("$api_name")
             done
             
             _describe 'command' commands
