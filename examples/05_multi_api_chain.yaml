@@ -1,0 +1,45 @@
+# examples/05_multi_api_chain.yaml
+apis:
+  authService:
+    baseUrl: "https://auth.example.com"
+    endpoints:
+      login:
+        method: POST
+        path: "/login"
+        body: # Default body, can be overridden by chain step
+          username: "{{user}}"
+          password: "{{pass}}"
+
+  dataService:
+    baseUrl: "https://data.example.com"
+    endpoints:
+      getProtectedResource:
+        method: GET
+        path: "/resources/{{resourceId}}"
+        headers:
+          Authorization: "Bearer {{token}}" # Expects token to be provided
+
+chains:
+  loginAndFetchData:
+    vars:
+      username: "testuser"
+      password: "securepassword"
+      targetResourceId: "alpha-123"
+    steps:
+      - id: s1_login
+        call: authService.login
+        with:
+          body:
+            username: "{{chain.vars.username}}"
+            password: "{{chain.vars.password}}"
+
+      - id: s2_fetchData
+        call: dataService.getProtectedResource
+        with:
+          # Assuming login response is { "access_token": "some_jwt_token" }
+          # And getProtectedResource expects token as {{token}} and resourceId as {{resourceId}}
+          # in its definition (path or variables).
+          headers: # Overriding/setting headers for this specific call
+            Authorization: "Bearer {{steps.s1_login.response.body.access_token}}"
+          pathParams: # Providing value for path variable in dataService.getProtectedResource
+            resourceId: "{{chain.vars.targetResourceId}}"

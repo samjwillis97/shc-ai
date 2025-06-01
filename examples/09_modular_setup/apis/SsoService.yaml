@@ -1,0 +1,9 @@
+# examples/09_modular_setup/apis/SsoService.yaml
+# Defines the 'ssoService' API
+ssoService:
+  baseUrl: "{{profile.ssoBaseUrl}}"
+  endpoints:
+    login:
+      method: POST
+      path: "/auth/token"
+      # ... more details

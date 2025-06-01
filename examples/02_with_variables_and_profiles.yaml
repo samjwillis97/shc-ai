@@ -1,0 +1,50 @@
+# examples/02_with_variables_and_profiles.yaml
+config:
+  defaultProfile: "dev" # Default profile to use if --profile is not specified
+
+profiles:
+  dev:
+    apiHost: "dev.api.example.com"
+    defaultUser: "developer_001"
+    apiKey: "dev_api_key_from_profile"
+  staging:
+    apiHost: "staging.api.example.com"
+    defaultUser: "tester_007"
+    apiKey: "staging_api_key_from_profile"
+
+apis:
+  myService:
+    baseUrl: "https://{{profile.apiHost}}/v1" # Uses 'apiHost' from the active profile
+    variables:
+      # This API-level variable will be overridden by the endpoint if 'apiKey' is also defined there.
+      # It will override the profile's 'apiKey' for calls within this API unless endpoint overrides.
+      apiKey: "api_level_key_for_myService"
+      serviceVersion: "1.2.3"
+    endpoints:
+      getUser:
+        description: "Get user details for the default user of the current profile."
+        method: GET
+        path: "/users/{{profile.defaultUser}}" # Uses 'defaultUser' from active profile
+        headers:
+          X-Api-Key: "{{endpoint.apiKey}}" # Uses endpoint-specific 'apiKey'
+          X-Service-Version: "{{api.serviceVersion}}" # Uses API-level 'serviceVersion'
+        variables:
+          # This endpoint-specific variable takes highest precedence among config variables for this key.
+          apiKey: "endpoint_specific_key_for_getUser"
+
+      getConfig:
+        description: "Get service configuration, potentially using an OS environment variable for a specific setting."
+        method: GET
+        path: "/config"
+        headers:
+          X-Api-Key: "{{api.apiKey}}" # Uses API-level 'apiKey' (as endpoint doesn't define its own)
+          X-Node-Env: "{{env.NODE_ENV}}" # Uses OS environment variable 'NODE_ENV'
+
+      updateItem:
+        description: "Update an item, demonstrating variable usage in the body."
+        method: PUT
+        path: "/items/{{itemId}}" # Expects 'itemId' from CLI, chain, or higher precedence var
+        body:
+          name: "Updated Name for {{itemId}}"
+          status: "{{itemStatus | default('pending')}}" # Hypothetical default filter, future
+          updatedBy: "{{profile.defaultUser}}"

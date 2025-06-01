@@ -1,0 +1,20 @@
+# examples/01_basic_config.yaml
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getTodo:
+        description: "Fetches a single todo item."
+        method: GET
+        path: "/todos/1"
+
+      createPost:
+        description: "Creates a new post."
+        method: POST
+        path: "/posts"
+        headers:
+          Content-Type: "application/json; charset=UTF-8"
+        body:
+          title: "Default Title"
+          body: "Default body content."
+          userId: 1

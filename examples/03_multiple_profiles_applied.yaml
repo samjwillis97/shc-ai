@@ -1,0 +1,48 @@
+# examples/03_multiple_profiles_applied.yaml
+# Invoked like: httpcraft --profile env_prod --profile region_us_east --profile user_admin ...
+
+profiles:
+  env_prod:
+    baseUrl: "https://prod.example.com/api"
+    logLevel: "INFO"
+  env_dev:
+    baseUrl: "https://dev.example.com/api"
+    logLevel: "DEBUG"
+
+  region_us_east:
+    datacenter: "use1"
+    latencyTarget: "100ms"
+  region_eu_west:
+    datacenter: "euw1"
+    latencyTarget: "150ms"
+
+  user_admin:
+    role: "admin"
+    apiKey: "admin_secret_key"
+  user_viewer:
+    role: "viewer"
+    apiKey: "viewer_public_key"
+
+apis:
+  # ... API definitions here would pick up variables like {{profile.baseUrl}}, {{profile.apiKey}} etc.
+  # The effective value would depend on which profiles are active and the merge strategy.
+  # For example, if 'env_prod' and 'user_admin' are active, 'apiKey' would be "admin_secret_key".
+  # If 'env_dev' and 'user_admin' are active, 'baseUrl' would be "https://dev.example.com/api".
+  # If 'logLevel' is only defined in 'env_prod', it will be "INFO" if 'env_prod' is active.
+  # If 'datacenter' is only in region profiles, it will be set if a region profile is active.
+  # If multiple active profiles define the same key, the last specified profile on the CLI for that key wins.
+  # e.g. --profile A(key=1) --profile B(key=2) -> key=2
+  # e.g. --profile B(key=2) --profile A(key=1) -> key=1
+
+  # Example:
+  metricsService:
+    baseUrl: "{{profile.baseUrl}}" # Will be from env_prod or env_dev
+    endpoints:
+      getLogs:
+        path: "/logs"
+        params:
+          level: "{{profile.logLevel}}"
+          datacenter: "{{profile.datacenter}}" # From region_us_east or region_eu_west
+        headers:
+          X-Api-Key: "{{profile.apiKey}}" # From user_admin or user_viewer
+          X-User-Role: "{{profile.role}}"

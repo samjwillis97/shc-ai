@@ -1,0 +1,18 @@
+# examples/08_with_dynamic_variables.yaml
+# Assumes 'jsonplaceholder' API from 01_basic_config.yaml is also loaded/defined.
+
+apis:
+  jsonplaceholder:
+    endpoints:
+      createDynamicPost:
+        description: "Creates a post with dynamically generated content."
+        method: POST
+        path: "/posts"
+        headers:
+          Content-Type: "application/json; charset=UTF-8"
+          X-Request-ID: "{{$guid}}" # Unique request ID
+        body:
+          title: "Post created at {{$isoTimestamp}}"
+          body: "Random number for this post: {{$randomInt}}"
+          userId: "{{$randomInt(1,10)}}" # Random integer between 1 and 10 (hypothetical syntax)
+          correlationId: "{{correlationId | default($guid)}}" # Use provided or generate new

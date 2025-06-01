@@ -1,0 +1,17 @@
+# examples/09_modular_setup/httpcraft.yaml
+config:
+  defaultProfile: "development"
+
+# Import other configuration files
+# Paths are relative to this main config file.
+profiles:
+  - "directory:./profiles/" # Loads all .yaml files from ./profiles/
+
+variables:
+  - "./vars/global.yaml" # Loads a specific global variables file
+
+apis:
+  - "directory:./apis/" # Loads all .yaml files from ./apis/
+
+chains:
+  - "directory:./chains/" # Loads all .yaml files from ./chains/

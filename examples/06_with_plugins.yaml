@@ -1,0 +1,33 @@
+# examples/06_with_plugins.yaml
+# Assumes 'myService' API from 02_with_variables_and_profiles.yaml is also loaded/defined.
+
+plugins:
+  - path: "./examples/plugins/dummyAuthPlugin.js" # Relative path to a local dummy plugin
+    name: "dummyAuth" # Name used to reference in {{plugins.dummyAuth.*}}
+    config: # Configuration passed to the plugin's setup function
+      tokenPrefix: "DummyToken_"
+      defaultUserId: "pluginUser123"
+
+# Example dummyAuthPlugin.js (not part of YAML, but for context):
+# module.exports = {
+#   setup: (context, config) => {
+#     context.registerVariableSource('getToken', async () => `${config.tokenPrefix}SOME_DYNAMIC_VALUE_${Date.now()}`);
+#     context.registerVariableSource('getUserId', () => config.defaultUserId);
+#     context.registerPreRequestHook(async (request) => {
+#       request.headers['X-Plugin-Added'] = 'Hello from Plugin!';
+#     });
+#   }
+# };
+
+apis:
+  # This would merge with or extend any existing 'myService' definition
+  myService:
+    endpoints:
+      getSecureDataWithPlugin:
+        description: "Accesses a secure resource using a token from a plugin."
+        method: GET
+        path: "/secure-data/{{plugins.dummyAuth.getUserId}}" # Uses plugin variable in path
+        headers:
+          # Calls the async getToken() method from the dummyAuth plugin
+          Authorization: "{{plugins.dummyAuth.getToken}}"
+          # X-Plugin-Added header will be added by the pre-request hook

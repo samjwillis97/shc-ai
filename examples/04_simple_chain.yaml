@@ -1,0 +1,29 @@
+# examples/04_simple_chain.yaml
+# Assumes 'jsonplaceholder' API from 01_basic_config.yaml is also loaded or defined.
+
+chains:
+  createAndGetPost:
+    description: "Creates a new post and then immediately fetches it using the returned ID."
+    vars:
+      postTitle: "My Chain Post {{$randomInt}}" # Uses a dynamic variable
+      postUserId: 101
+    steps:
+      - id: s1_createPost
+        call: jsonplaceholder.createPost # Assumes this endpoint is defined
+        with:
+          body:
+            title: "{{chain.vars.postTitle}}"
+            body: "This post was created by a HttpCraft chain."
+            userId: "{{chain.vars.postUserId}}"
+
+      - id: s2_getCreatedPost
+        # Assuming an endpoint 'getPostById' exists like: path: "/posts/{{postId}}"
+        # For this example, we'll re-use 'getTodo' and pretend its path is /posts/{{id}}
+        # and that 'createPost' response is { "id": <new_post_id>, ... }
+        call: jsonplaceholder.getTodo # Placeholder, imagine it's getPostById
+        with:
+          # If getTodo's path was "/todos/{{idParamNameInPath}}"
+          pathParams:
+            # The key here ('idParamNameInPath') must match the variable name in the target endpoint's path.
+            # Let's assume getTodo's path is actually /todos/{{id}} for simplicity here.
+            id: "{{steps.s1_createPost.response.body.id}}"
