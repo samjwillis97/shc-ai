@@ -86,16 +86,16 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 ## Phase 4: Profiles & Expanded Variable Scopes
 
 - **Goal:** Implement profiles, variables at API/Endpoint levels, and multiple profile application.
-- **Status:** [ ]
+- **Status:** [x]
 - **Tasks:**
-  - [ ] **T4.1:** Enhance YAML config for `profiles` section.
-  - [ ] **T4.2:** Implement `--profile <name>` (multiple allowed).
-  - [ ] **T4.3:** Implement logic to load and merge variables from multiple specified profiles.
-  - [ ] **T4.4:** Implement `config.defaultProfile`.
-  - [ ] **T4.5:** Enhance YAML for API/Endpoint `variables` sections.
-  - [ ] **T4.6:** Implement updated variable precedence.
-  - [ ] **T4.7:** Support YAML objects for JSON request bodies with variable substitution.
-- **Notes/Blockers:**
+  - [x] **T4.1:** Enhance YAML config for `profiles` section.
+  - [x] **T4.2:** Implement `--profile <name>` (multiple allowed).
+  - [x] **T4.3:** Implement logic to load and merge variables from multiple specified profiles.
+  - [x] **T4.4:** Implement `config.defaultProfile`.
+  - [x] **T4.5:** Enhance YAML for API/Endpoint `variables` sections.
+  - [x] **T4.6:** Implement updated variable precedence.
+  - [x] **T4.7:** Support YAML objects for JSON request bodies with variable substitution.
+- **Notes/Blockers:** All tasks completed successfully. Enhanced configuration types to support profiles, config section, and variables at API/endpoint levels. Updated VariableResolver with new precedence order (CLI > Step with > Chain vars > Endpoint > API > Profile > Environment) and support for scoped variables ({{profile.key}}, {{api.key}}, {{endpoint.key}}). Added --profile CLI option with support for multiple profiles. Implemented profile merging with later profiles taking precedence. Added comprehensive validation for profile existence. Enhanced CLI to support default profiles from configuration. All Phase 4 tests passing (50 unit tests + 8 integration tests).
 
 ---
 

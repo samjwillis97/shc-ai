@@ -9,6 +9,7 @@ export interface ApiCommandArgs {
   endpointName: string;
   config?: string;
   variables?: Record<string, string>;
+  profiles?: string[];
 }
 
 export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
@@ -41,8 +42,46 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       process.exit(1);
     }
     
-    // Create variable context
-    const variableContext = variableResolver.createContext(args.variables || {});
+    // Determine which profiles to use
+    let profileNames: string[] = [];
+    if (args.profiles && args.profiles.length > 0) {
+      // Use profiles specified via CLI
+      profileNames = args.profiles;
+    } else if (config.config?.defaultProfile) {
+      // Use default profile(s) from config
+      if (Array.isArray(config.config.defaultProfile)) {
+        profileNames = config.config.defaultProfile;
+      } else {
+        profileNames = [config.config.defaultProfile];
+      }
+    }
+    
+    // Load and merge profile variables
+    let mergedProfileVars: Record<string, any> = {};
+    if (profileNames.length > 0) {
+      if (!config.profiles) {
+        console.error(`Error: No profiles defined in configuration, but profile(s) requested: ${profileNames.join(', ')}`);
+        process.exit(1);
+      }
+      
+      // Validate that all requested profiles exist
+      for (const profileName of profileNames) {
+        if (!config.profiles[profileName]) {
+          console.error(`Error: Profile '${profileName}' not found in configuration`);
+          process.exit(1);
+        }
+      }
+      
+      mergedProfileVars = variableResolver.mergeProfiles(profileNames, config.profiles);
+    }
+    
+    // Create variable context with Phase 4 precedence
+    const variableContext = variableResolver.createContext(
+      args.variables || {},
+      mergedProfileVars,
+      api.variables,
+      endpoint.variables
+    );
     
     // Apply variable resolution to configuration elements
     const resolvedApi = variableResolver.resolveValue(api, variableContext) as ApiDefinition;

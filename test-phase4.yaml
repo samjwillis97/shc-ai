@@ -1,0 +1,31 @@
+config:
+  defaultProfile: "dev"
+
+profiles:
+  dev:
+    apiHost: "jsonplaceholder.typicode.com"
+    userId: "1"
+  prod:
+    apiHost: "api.production.com"
+    userId: "123"
+  user_a:
+    userId: "5"
+    userType: "admin"
+
+apis:
+  jsonplaceholder:
+    baseUrl: "https://{{profile.apiHost}}"
+    variables:
+      apiVersion: "v1"
+      timeout: "5000"
+    endpoints:
+      getTodo:
+        method: GET
+        path: "/todos/{{userId}}"
+        variables:
+          timeout: "2000"  # Overrides API timeout
+        headers:
+          X-API-Version: "{{api.apiVersion}}"
+          X-Timeout: "{{endpoint.timeout}}"
+          X-User-ID: "{{profile.userId}}"
+          X-User-Type: "{{userType}}" 

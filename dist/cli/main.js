@@ -29,6 +29,12 @@ async function main() {
         type: 'array',
         string: true,
     })
+        .option('profile', {
+        describe: 'Select profile(s) to use (can be used multiple times)',
+        type: 'array',
+        string: true,
+        alias: 'p',
+    })
         .help()
         .alias('help', 'h')
         .version('1.0.0')
@@ -51,6 +57,15 @@ async function main() {
             }
         }
     }
+    // Parse --profile options into array of profile names
+    const profiles = [];
+    if (argv.profile && Array.isArray(argv.profile)) {
+        for (const profileName of argv.profile) {
+            if (typeof profileName === 'string') {
+                profiles.push(profileName);
+            }
+        }
+    }
     // Handle API command pattern: httpcraft <api_name> <endpoint_name>
     if (argv._.length === 2 && typeof argv._[0] === 'string' && typeof argv._[1] === 'string') {
         const apiName = argv._[0];
@@ -60,11 +75,12 @@ async function main() {
             endpointName,
             config: argv.config,
             variables,
+            profiles,
         });
     }
     else if (argv._.length === 0) {
         // No command provided, show help
-        console.log('Usage: httpcraft <api_name> <endpoint_name> [--config <path>] [--var key=value]');
+        console.log('Usage: httpcraft <api_name> <endpoint_name> [--config <path>] [--var key=value] [--profile <name>]');
         console.log('       httpcraft request <url>');
         console.log('       httpcraft test');
         console.log('');
