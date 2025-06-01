@@ -1,0 +1,8 @@
+# .httpcraft.yaml
+apis:
+  myapi:
+    baseUrl: "https://api.example.com"
+    endpoints:
+      get-user:
+        path: "/users/:id"
+        method: "GET"
