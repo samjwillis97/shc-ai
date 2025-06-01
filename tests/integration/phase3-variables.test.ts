@@ -39,6 +39,15 @@ apis:
             "environment": "{{env.NODE_ENV}}",
             "id": {{userId}}
           }
+
+  httpbin-dynamic:
+    baseUrl: "https://{{baseHost}}"
+    endpoints:
+      testDynamicBase:
+        method: GET
+        path: "/get"
+        headers:
+          X-Dynamic-Test: "{{testValue}}"
 `;
     await fs.writeFile(testConfigPath, testConfig);
   });
@@ -72,6 +81,25 @@ apis:
       expect(response.headers['X-Test-Header']).toBe('cli-test-value');
       expect(response.headers['X-User']).toBe('testuser');
       expect(response.headers['X-Custom']).toBe('custom-value');
+    });
+
+    it('should substitute variables in baseUrl', async () => {
+      const { stdout } = await execFile('node', [
+        cliPath,
+        'httpbin-dynamic',
+        'testDynamicBase',
+        '--config',
+        testConfigPath,
+        '--var',
+        'baseHost=httpbin.org',
+        '--var',
+        'testValue=dynamic-base-test'
+      ]);
+
+      const response = JSON.parse(stdout);
+      expect(response.headers['X-Dynamic-Test']).toBe('dynamic-base-test');
+      // Verify the request was made to the correct host (httpbin.org)
+      expect(response.headers['Host']).toBe('httpbin.org');
     });
   });
 
@@ -209,6 +237,25 @@ apis:
         expect(error.stderr).toContain('UNDEFINED_ENV_VAR');
       } finally {
         await fs.unlink(envTestConfigPath);
+      }
+    });
+
+    it('should throw error for undefined baseUrl variables', async () => {
+      try {
+        await execFile('node', [
+          cliPath,
+          'httpbin-dynamic',
+          'testDynamicBase',
+          '--config',
+          testConfigPath,
+          '--var',
+          'testValue=test'
+          // Missing baseHost variable
+        ]);
+        expect.fail('Should have thrown an error');
+      } catch (error: any) {
+        expect(error.stderr).toContain('Variable Error');
+        expect(error.stderr).toContain('baseHost');
       }
     });
   });
