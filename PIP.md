@@ -22,7 +22,7 @@
     - _Testable Outcome:_ `npx tsc` compiles successfully.
   - **T0.3:** Setup basic linting and formatting (ESLint, Prettier).
     - _Testable Outcome:_ Linting and formatting commands run successfully.
-  - **T0.4:** Setup a testing framework (Jest or Vitest).
+  - **T0.4:** Setup a testing framework (Vitest).
     - _Testable Outcome:_ A simple dummy test passes.
   - **T0.5:** Create basic project directory structure (`src/`, `src/cli/`, `src/core/`, `tests/`, `docs/`, `config_examples/`).
     - _Testable Outcome:_ Directory structure exists.
