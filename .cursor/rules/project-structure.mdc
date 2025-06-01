@@ -1,0 +1,68 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Project Structure and Organization
+
+This rule defines the expected project structure and organization for HttpCraft.
+
+## Directory Structure
+
+The project follows a strict directory structure:
+
+- `src/` - Main source code
+  - `cli/` - CLI-specific logic (argument parsing, command handlers)
+  - `core/` - Core engine (HTTP client, variable resolution, chains)
+  - `types/` - TypeScript type definitions
+  - `index.ts` - Main entry point
+
+- `tests/` - Test files
+  - `unit/` - Unit tests
+  - `integration/` - Integration tests
+  - `fixtures/` - Test data and mocks
+
+- `examples/` - Example configurations
+  - `plugins/` - Example plugins
+
+- `schemas/` - JSON Schemas for YAML validation
+
+## File Organization
+
+1. Each module should be in its own directory under `src/`
+2. Test files should mirror the source structure
+3. Configuration files should be in the root directory
+4. Documentation should be in markdown format
+
+## Import Conventions
+
+1. Use absolute imports from `src/`
+2. Group imports in the following order:
+   - External dependencies
+   - Internal modules
+   - Types
+   - Constants
+
+## Naming Conventions
+
+1. Files:
+   - Use kebab-case for file names
+   - Use `.ts` extension for TypeScript files
+   - Use `.test.ts` for test files
+
+2. Classes and Types:
+   - Use PascalCase for class names
+   - Use PascalCase for type names
+   - Use PascalCase for interface names
+
+3. Functions and Variables:
+   - Use camelCase for function names
+   - Use camelCase for variable names
+   - Use UPPER_SNAKE_CASE for constants
+
+## Code Organization
+
+1. Each file should have a single primary responsibility
+2. Keep files under 300 lines when possible
+3. Use clear and descriptive names for all exports
+4. Document public APIs with JSDoc comments
