@@ -35,15 +35,15 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 ## Phase 1: Core HTTP Request & Basic Output
 
 - **Goal:** Enable sending a single, hardcoded HTTP GET request and displaying its raw body.
-- **Status:** [ ]
+- **Status:** [x]
 - **Tasks:**
-  - [ ] **T1.1:** Integrate an HTTP client library (e.g., `axios`).
-  - [ ] **T1.2:** Create a new command (e.g., `httpcraft request <url>`).
-  - [ ] **T1.3:** Implement logic for the `request` command to make a GET request.
-  - [ ] **T1.4:** Implement basic output: print raw response body to `stdout`.
-  - [ ] **T1.5:** Implement basic error handling for network issues.
-  - [ ] **T1.6:** Implement basic error handling for HTTP error statuses.
-- **Notes/Blockers:**
+  - [x] **T1.1:** Integrate an HTTP client library (e.g., `axios`).
+  - [x] **T1.2:** Create a new command (e.g., `httpcraft request <url>`).
+  - [x] **T1.3:** Implement logic for the `request` command to make a GET request.
+  - [x] **T1.4:** Implement basic output: print raw response body to `stdout`.
+  - [x] **T1.5:** Implement basic error handling for network issues.
+  - [x] **T1.6:** Implement basic error handling for HTTP error statuses.
+- **Notes/Blockers:** All tasks completed successfully. Integrated axios v1.9.0, implemented `httpcraft request <url>` command with proper error handling. Network errors exit with code 1, HTTP errors print to stderr but exit with code 0 as specified. All tests passing.
 
 ---
 
