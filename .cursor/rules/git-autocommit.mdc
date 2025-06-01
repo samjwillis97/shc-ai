@@ -62,3 +62,16 @@ Updated some files
 - refactor: Code refactoring
 - test: Adding or modifying tests
 - chore: Maintenance tasks
+
+✅ Correct Commit Command:
+
+```
+git commit -m "feat(setup): complete Phase 0 project setup and core shell" -m "- Initialize TypeScript project with npm and dependencies" -m "- Configure tsconfig.json for Node.js CLI compilation" -m "- Setup ESLint and Prettier for code quality and formatting" -m "- Configure Vitest testing framework with dummy tests" -m "- Create project directory structure (src/, tests/, docs/, etc.)" -m "- Implement CLI entry point with shebang and executable permissions" -m "- Integrate yargs for command-line argument parsing" -m "- Add --version and --help commands with proper output" -m "- Setup build and development scripts in package.json" -m "- All Phase 0 tasks (T0.1-T0.9) are now complete and testable"
+```
+
+❌ Incorrect Commit Command:
+
+
+```
+git commit -m "feat(setup): complete Phase 0 project setup and core shell - Initialize TypeScript project with npm and dependencies - Configure tsconfig.json for Node.js CLI compilation - Setup ESLint and Prettier for code quality and formatting - Configure Vitest testing framework with dummy tests - Create project directory structure (src/, tests/, docs/, etc.) - Implement CLI entry point with shebang and executable permissions - Integrate yargs for command-line argument parsing - Add --version and --help commands with proper output - Setup build and development scripts in package.json - All Phase 0 tasks (T0.1-T0.9) are now complete and testable"
+```
