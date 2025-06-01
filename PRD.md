@@ -40,135 +40,135 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
 
 ### 5.1. Configuration Management
 
-    *   **FR1.1 (Format):** All tool configuration shall be primarily in YAML format.
-    *   **FR1.2 (Main Config File):** The tool shall support a main configuration file.
-    *   **FR1.3 (Modular Imports):**
-        *   Allow importing API definitions, chain definitions, and global variable files from specified directories or individual files.
-        *   Path resolution for imports shall be relative to the file defining the import.
-        *   Conflict resolution for merged configurations: last one loaded wins.
-    *   **FR1.4 (Structure):** The main config can contain top-level sections:
-        *   `config`: Global tool settings (e.g., `defaultProfile`).
-        *   `profiles`: Named sets of key-value variable pairs.
-        *   `variables`: List of paths to global variable files.
-        *   `secrets`: Configuration for the secret provider (default: OS environment).
-        *   `plugins`: Configuration for loading and setting up plugins.
-        *   `apis`: Definitions for different APIs.
-        *   `chains`: Definitions for multi-step request sequences.
-    *   **FR1.5 (API Definition):** Each API definition within `apis` shall support:
-        *   A unique API name.
-        *   `baseUrl`.
-        *   Default `headers` (map).
-        *   Default `queryParams` (map).
-        *   API-level `variables` (map).
-        *   A list of `endpoints`.
-    *   **FR1.6 (Endpoint Definition):** Each endpoint definition shall support:
-        *   A unique name within its API.
-        *   `method`: HTTP method (GET, POST, PUT, DELETE, etc.).
-        *   `path`: URL path, supporting `{{variable}}` substitution for path parameters (e.g., `/users/{{userId}}`).
-        *   `headers`: Endpoint-specific headers (map), overriding API defaults.
-        *   `params`: Endpoint-specific query parameters (map), overriding API defaults.
-        *   `body`: Request body (can be YAML object for JSON, string for other types).
-        *   Endpoint-level `variables` (map).
-    *   **FR1.7 (Schema):** A YAML schema for the configuration files shall be provided to aid validation and editor integration.
-    *   **FR1.8 (Descriptions):** The schema shall allow for optional `description` fields for APIs, endpoints, chains, etc., for documentation.
+- **FR1.1 (Format):** All tool configuration shall be primarily in YAML format.
+- **FR1.2 (Main Config File):** The tool shall support a main configuration file.
+- **FR1.3 (Modular Imports):**
+  - Allow importing API definitions, chain definitions, and global variable files from specified directories or individual files.
+  - Path resolution for imports shall be relative to the file defining the import.
+  - Conflict resolution for merged configurations: last one loaded wins.
+- **FR1.4 (Structure):** The main config can contain top-level sections:
+  - `config`: Global tool settings (e.g., `defaultProfile`).
+  - `profiles`: Named sets of key-value variable pairs.
+  - `variables`: List of paths to global variable files.
+  - `secrets`: Configuration for the secret provider (default: OS environment).
+  - `plugins`: Configuration for loading and setting up plugins.
+  - `apis`: Definitions for different APIs.
+  - `chains`: Definitions for multi-step request sequences.
+- **FR1.5 (API Definition):** Each API definition within `apis` shall support:
+  - A unique API name.
+  - `baseUrl`.
+  - Default `headers` (map).
+  - Default `queryParams` (map).
+  - API-level `variables` (map).
+  - A list of `endpoints`.
+- **FR1.6 (Endpoint Definition):** Each endpoint definition shall support:
+  - A unique name within its API.
+  - `method`: HTTP method (GET, POST, PUT, DELETE, etc.).
+  - `path`: URL path, supporting `{{variable}}` substitution for path parameters (e.g., `/users/{{userId}}`).
+  - `headers`: Endpoint-specific headers (map), overriding API defaults.
+  - `params`: Endpoint-specific query parameters (map), overriding API defaults.
+  - `body`: Request body (can be YAML object for JSON, string for other types).
+  - Endpoint-level `variables` (map).
+- **FR1.7 (Schema):** A YAML schema for the configuration files shall be provided to aid validation and editor integration.
+- **FR1.8 (Descriptions):** The schema shall allow for optional `description` fields for APIs, endpoints, chains, etc., for documentation.
 
 ### 5.2. CLI (Command Line Interface)
 
-    *   **FR2.1 (Invocation - Single Request):** `httpcraft [options] <api_name> <endpoint_name>`
-    *   **FR2.2 (Invocation - Chain):** `httpcraft chain <chain_name> [options]`
-    *   **FR2.3 (ZSH Tab Completion):**
-        *   Provide ZSH tab completion for commands (e.g., `chain`).
-        *   Provide ZSH tab completion for `<api_name>`.
-        *   Provide ZSH tab completion for `<endpoint_name>` (contextual to the selected `<api_name>`).
-        *   Provide ZSH tab completion for `<chain_name>`.
-        *   Provide ZSH tab completion for CLI options.
-        *   A command `httpcraft completion zsh` shall output the ZSH completion script.
-    *   **FR2.4 (Options):**
-        *   `--var <key>=<value>`: Set/override a variable from the command line.
-        *   `--profile <name>`: Select a profile to use for this invocation.
-        *   `--verbose`: Output detailed request and response information (headers, status, timing) to `stderr`.
-        *   `--dry-run`: Resolve and display the request that would be sent (to `stdout` or `stderr`), without actually sending it. Sensitive values should be masked.
-        *   `--exit-on-http-error <codes>` (or similar): Optional flag to make the tool exit with a non-zero code if specified HTTP error status codes (e.g., "4xx", "5xx", "401,403") are received.
+- **FR2.1 (Invocation - Single Request):** `httpcraft [options] <api_name> <endpoint_name>`
+- **FR2.2 (Invocation - Chain):** `httpcraft chain <chain_name> [options]`
+- **FR2.3 (ZSH Tab Completion):**
+  - Provide ZSH tab completion for commands (e.g., `chain`).
+  - Provide ZSH tab completion for `<api_name>`.
+  - Provide ZSH tab completion for `<endpoint_name>` (contextual to the selected `<api_name>`).
+  - Provide ZSH tab completion for `<chain_name>`.
+  - Provide ZSH tab completion for CLI options.
+  - A command `httpcraft completion zsh` shall output the ZSH completion script.
+- **FR2.4 (Options):**
+  - `--var <key>=<value>`: Set/override a variable from the command line.
+  - `--profile <name>`: Select a profile to use for this invocation.
+  - `--verbose`: Output detailed request and response information (headers, status, timing) to `stderr`.
+  - `--dry-run`: Resolve and display the request that would be sent (to `stdout` or `stderr`), without actually sending it. Sensitive values should be masked.
+  - `--exit-on-http-error <codes>` (or similar): Optional flag to make the tool exit with a non-zero code if specified HTTP error status codes (e.g., "4xx", "5xx", "401,403") are received.
 
 ### 5.3. Variable System
 
-    *   **FR3.1 (Syntax):** Variables shall be referenced using `{{variable_name}}` syntax within URLs, paths, headers, query parameters, and request bodies.
-    *   **FR3.2 (Precedence - Highest to Lowest):**
-        1.  CLI arguments (`--var`)
-        2.  Step `with` overrides (in chain steps)
-        3.  `chain.vars` (defined at the start of a chain definition)
-        4.  Endpoint-specific variables
-        5.  API-specific variables
-        6.  Profile variables (from the active profile)
-        7.  Dedicated/Global variable files
-        8.  `{{secret.*}}` variables
-        9.  `{{env.*}}` OS environment variables
-        10. `{{$dynamic}}` built-in dynamic variables
-    *   **FR3.3 (Resolution Failure):** If a variable cannot be resolved, the tool shall throw an error and halt execution, providing an informative error message.
-    *   **FR3.4 (Data Types):** Variables resolved from YAML can be strings, numbers, or booleans, and should be stringified appropriately for HTTP contexts or used as native types for JSON bodies.
-    *   **FR3.5 (Dynamic Variables):** Provide built-in dynamic variables (e.g., `{{$timestamp}}`, `{{$isoTimestamp}}`, `{{$randomInt}}`, `{{$guid}}`).
-    *   **FR3.6 (Environment Variables):** Access OS environment variables using `{{env.VAR_NAME}}`.
-    *   **FR3.7 (Secrets):**
-        *   Access secrets using `{{secret.SECRET_NAME}}`.
-        *   Default secrets provider shall be OS environment variables.
-        *   Secrets shall be masked in verbose logs and dry-run outputs.
-        *   The secrets provider mechanism should be extensible via plugins.
+- **FR3.1 (Syntax):** Variables shall be referenced using `{{variable_name}}` syntax within URLs, paths, headers, query parameters, and request bodies.
+- **FR3.2 (Precedence - Highest to Lowest):**
+  1.  CLI arguments (`--var`)
+  2.  Step `with` overrides (in chain steps)
+  3.  `chain.vars` (defined at the start of a chain definition)
+  4.  Endpoint-specific variables
+  5.  API-specific variables
+  6.  Profile variables (from the active profile)
+  7.  Dedicated/Global variable files
+  8.  `{{secret.*}}` variables
+  9.  `{{env.*}}` OS environment variables
+  10. `{{$dynamic}}` built-in dynamic variables
+- **FR3.3 (Resolution Failure):** If a variable cannot be resolved, the tool shall throw an error and halt execution, providing an informative error message.
+- **FR3.4 (Data Types):** Variables resolved from YAML can be strings, numbers, or booleans, and should be stringified appropriately for HTTP contexts or used as native types for JSON bodies.
+- **FR3.5 (Dynamic Variables):** Provide built-in dynamic variables (e.g., `{{$timestamp}}`, `{{$isoTimestamp}}`, `{{$randomInt}}`, `{{$guid}}`).
+- **FR3.6 (Environment Variables):** Access OS environment variables using `{{env.VAR_NAME}}`.
+- **FR3.7 (Secrets):**
+  - Access secrets using `{{secret.SECRET_NAME}}`.
+  - Default secrets provider shall be OS environment variables.
+  - Secrets shall be masked in verbose logs and dry-run outputs.
+  - The secrets provider mechanism should be extensible via plugins.
 
 ### 5.4. Chained Requests
 
-    *   **FR4.1 (Definition):** Chains shall be defined in a top-level `chains` section in the configuration.
-    *   **FR4.2 (Chain Structure):** Each chain definition shall support:
-        *   A unique chain name.
-        *   Optional `description`.
-        *   `vars`: Chain-specific variables.
-        *   `steps`: An ordered list of request steps.
-    *   **FR4.3 (Step Structure):** Each step in a chain shall support:
-        *   `id`: A unique identifier for the step within the chain.
-        *   Optional `description`.
-        *   `call`: A reference to an endpoint in the format `<api_name>.<endpoint_name>`.
-        *   `with` (optional): An object to provide or override `headers`, `params` (query), `pathParams`, or `body` for the called endpoint specifically for this step.
-    *   **FR4.4 (Data Flow - Implicit):**
-        *   Data from previous steps' requests or responses shall be accessible in subsequent steps.
-        *   Syntax examples:
-            *   `{{steps.<step_id>.response.body.<JSONPath>}}`
-            *   `{{steps.<step_id>.response.headers['<Header-Name>']}}`
-            *   `{{steps.<step_id>.response.status_code}}`
-            *   `{{steps.<step_id>.request.body.<JSONPath>}}` (for the sent request body)
-            *   `{{steps.<step_id>.request.url}}`
-        *   The tool must store the fully resolved request and full response for each step to enable this.
-    *   **FR4.5 (Error Handling):** If any step in a chain fails (e.g., HTTP error, variable resolution error, JSONPath extraction failure), the entire chain shall halt immediately, and an error reported.
+- **FR4.1 (Definition):** Chains shall be defined in a top-level `chains` section in the configuration.
+- **FR4.2 (Chain Structure):** Each chain definition shall support:
+  - A unique chain name.
+  - Optional `description`.
+  - `vars`: Chain-specific variables.
+  - `steps`: An ordered list of request steps.
+- **FR4.3 (Step Structure):** Each step in a chain shall support:
+  - `id`: A unique identifier for the step within the chain.
+  - Optional `description`.
+  - `call`: A reference to an endpoint in the format `<api_name>.<endpoint_name>`.
+  - `with` (optional): An object to provide or override `headers`, `params` (query), `pathParams`, or `body` for the called endpoint specifically for this step.
+- **FR4.4 (Data Flow - Implicit):**
+  - Data from previous steps' requests or responses shall be accessible in subsequent steps.
+  - Syntax examples:
+    - `{{steps.<step_id>.response.body.<JSONPath>}}`
+    - `{{steps.<step_id>.response.headers['<Header-Name>']}}`
+    - `{{steps.<step_id>.response.status_code}}`
+    - `{{steps.<step_id>.request.body.<JSONPath>}}` (for the sent request body)
+    - `{{steps.<step_id>.request.url}}`
+  - The tool must store the fully resolved request and full response for each step to enable this.
+- **FR4.5 (Error Handling):** If any step in a chain fails (e.g., HTTP error, variable resolution error, JSONPath extraction failure), the entire chain shall halt immediately, and an error reported.
 
 ### 5.5. Plugin System
 
-    *   **FR5.1 (Language):** Plugins shall be written in JavaScript or TypeScript (transpiled to JS).
-    *   **FR5.2 (Loading):** Plugins can be loaded from:
-        *   A configured package registry (e.g., npm).
-        *   Local filesystem paths specified in the configuration.
-    *   **FR5.3 (Hooks):** Plugins shall be able to hook into the request lifecycle:
-        *   **Pre-request:** Modify the request object (URL, headers, body, etc.) before it is sent. (e.g., for custom authentication).
-        *   **Post-response:** Access and potentially transform the response object (status, headers, body) before it's processed for output or chaining.
-    *   **FR5.4 (Custom Variables/Functions):** Plugins shall be able to expose custom functions or variables accessible via the templating engine (e.g., `{{myAuthPlugin.getToken()}}`). These functions will be executed each time they are referenced.
-    *   **FR5.5 (Configuration):** Plugins can have their own configuration sections within the main tool configuration.
-    *   **FR5.6 (Execution Order):** If multiple plugins hook into the same event, they shall execute in the order they are defined in the configuration.
-    *   **FR5.7 (Async Operations):** The plugin system and core tool must support asynchronous operations within plugins (e.g., fetching a token).
+- **FR5.1 (Language):** Plugins shall be written in JavaScript or TypeScript (transpiled to JS).
+- **FR5.2 (Loading):** Plugins can be loaded from:
+  - A configured package registry (e.g., npm).
+  - Local filesystem paths specified in the configuration.
+- **FR5.3 (Hooks):** Plugins shall be able to hook into the request lifecycle:
+  - **Pre-request:** Modify the request object (URL, headers, body, etc.) before it is sent. (e.g., for custom authentication).
+  - **Post-response:** Access and potentially transform the response object (status, headers, body) before it's processed for output or chaining.
+- **FR5.4 (Custom Variables/Functions):** Plugins shall be able to expose custom functions or variables accessible via the templating engine (e.g., `{{myAuthPlugin.getToken()}}`). These functions will be executed each time they are referenced.
+- **FR5.5 (Configuration):** Plugins can have their own configuration sections within the main tool configuration.
+- **FR5.6 (Execution Order):** If multiple plugins hook into the same event, they shall execute in the order they are defined in the configuration.
+- **FR5.7 (Async Operations):** The plugin system and core tool must support asynchronous operations within plugins (e.g., fetching a token).
 
 ### 5.6. Output & Logging
 
-    *   **FR6.1 (Default Output):** For a single successful request or the last successful step of a chain, the raw response body shall be sent to `stdout`. This output must be compatible with piping to Unix tools like `jq`.
-    *   **FR6.2 (Verbose Output):** When `--verbose` is used, additional details (request sent, response status, headers, timing) shall be printed to `stderr`.
-    *   **FR6.3 (Chain Verbose Output):** An optional flag shall allow a chain's output to be a structured JSON object sent to `stdout`, detailing the request and response of each step.
-    *   **FR6.4 (Error Reporting):**
-        *   Tool errors (config parsing, plugin loading, etc.) and chain execution errors shall be reported to `stderr`.
-        *   HTTP non-2xx responses are considered valid responses by default and their body sent to `stdout`.
-    *   **FR6.5 (Exit Codes):**
-        *   `0` for successful execution (including receiving non-2xx HTTP responses by default).
-        *   Non-zero for tool errors, configuration errors, or chain failures.
-        *   Non-zero if `--exit-on-http-error` is used and a matching HTTP error occurs.
+- **FR6.1 (Default Output):** For a single successful request or the last successful step of a chain, the raw response body shall be sent to `stdout`. This output must be compatible with piping to Unix tools like `jq`.
+- **FR6.2 (Verbose Output):** When `--verbose` is used, additional details (request sent, response status, headers, timing) shall be printed to `stderr`.
+- **FR6.3 (Chain Verbose Output):** An optional flag shall allow a chain's output to be a structured JSON object sent to `stdout`, detailing the request and response of each step.
+- **FR6.4 (Error Reporting):**
+  - Tool errors (config parsing, plugin loading, etc.) and chain execution errors shall be reported to `stderr`.
+  - HTTP non-2xx responses are considered valid responses by default and their body sent to `stdout`.
+- **FR6.5 (Exit Codes):**
+  - `0` for successful execution (including receiving non-2xx HTTP responses by default).
+  - Non-zero for tool errors, configuration errors, or chain failures.
+  - Non-zero if `--exit-on-http-error` is used and a matching HTTP error occurs.
 
 ### 5.7. Core Architecture
 
-    *   **FR7.1 (Language):** The tool shall be implemented in TypeScript, transpiling to JavaScript for Node.js execution.
-    *   **FR7.2 (Modularity):** The core "engine" or logic should be architected in a way that could potentially support other user interfaces (e.g., Neovim plugin, interactive REPL) in the future, though these are not part of V1.
+- **FR7.1 (Language):** The tool shall be implemented in TypeScript, transpiling to JavaScript for Node.js execution.
+- **FR7.2 (Modularity):** The core "engine" or logic should be architected in a way that could potentially support other user interfaces (e.g., Neovim plugin, interactive REPL) in the future, though these are not part of V1.
 
 ## 6. Non-Functional Requirements (V1)
 

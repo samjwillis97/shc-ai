@@ -1,6 +1,7 @@
 # examples/09_modular_setup/httpcraft.yaml
 config:
-  defaultProfile: "development"
+  defaultProfiles:
+    - "development"
 
 # Import other configuration files
 # Paths are relative to this main config file.
