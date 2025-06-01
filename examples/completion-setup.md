@@ -102,6 +102,12 @@ httpcraft --config <TAB>
    httpcraft --get-api-names
    ```
 
+4. Verify the completion function is loaded:
+   ```bash
+   # After running eval "$(httpcraft completion zsh)"
+   which _httpcraft
+   ```
+
 ### No API names showing
 
 - Ensure you have a valid configuration file (`.httpcraft.yaml` in current directory or specify with `--config`)
@@ -110,4 +116,11 @@ httpcraft --config <TAB>
 ### Slow completion
 
 - Completion performance depends on config file size and complexity
-- Consider using a local config file rather than a remote one 
+- Consider using a local config file rather than a remote one
+
+### Error: "_arguments:comparguments:327: can only be called from completion function"
+
+This error has been fixed in the latest version. Make sure you're using the updated completion script by running:
+
+```bash
+eval "$(httpcraft completion zsh)" 

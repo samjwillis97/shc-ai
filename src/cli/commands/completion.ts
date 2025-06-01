@@ -81,7 +81,8 @@ _httpcraft() {
     esac
 }
 
-_httpcraft "$@"`;
+# Register the completion function with compdef
+compdef _httpcraft httpcraft`;
 }
 
 /**
