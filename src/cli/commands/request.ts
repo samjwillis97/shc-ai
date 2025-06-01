@@ -1,15 +1,16 @@
-import { HttpClient, HttpError } from '../../core/httpClient.js';
+import { httpClient } from '../../core/httpClient.js';
 
 export interface RequestOptions {
   url: string;
 }
 
 export async function handleRequestCommand(options: RequestOptions): Promise<void> {
-  const httpClient = new HttpClient();
-  
   try {
     // Make the HTTP GET request
-    const response = await httpClient.makeRequest(options.url, 'GET');
+    const response = await httpClient.executeRequest({
+      method: 'GET',
+      url: options.url,
+    });
     
     // T1.4: Print raw response body to stdout
     process.stdout.write(response.body);
@@ -24,12 +25,10 @@ export async function handleRequestCommand(options: RequestOptions): Promise<voi
     
   } catch (error) {
     // T1.5: Handle network issues and other errors
-    const httpError = error as HttpError;
-    
-    if (httpError.isNetworkError) {
-      process.stderr.write(`Error: ${httpError.message}\n`);
+    if (error instanceof Error) {
+      process.stderr.write(`Error: ${error.message}\n`);
     } else {
-      process.stderr.write(`HTTP Error: ${httpError.message}\n`);
+      process.stderr.write(`Error: Unknown error occurred\n`);
     }
     
     // Exit with non-zero code for tool errors

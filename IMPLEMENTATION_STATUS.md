@@ -50,19 +50,19 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 ## Phase 2: Basic YAML Configuration & Single Endpoint Invocation
 
 - **Goal:** Load API and endpoint definitions from a YAML file and invoke a specific endpoint.
-- **Status:** [ ]
+- **Status:** [x]
 - **Tasks:**
-  - [ ] **T2.1:** Integrate a YAML parsing library.
-  - [ ] **T2.2:** Define basic YAML structure for APIs/endpoints.
-  - [ ] **T2.3:** Implement logic to load and parse a specified YAML config file.
-  - [ ] **T2.4:** Implement `httpcraft <api_name> <endpoint_name>` command structure.
-  - [ ] **T2.5:** Implement logic to find API/endpoint in loaded config.
-  - [ ] **T2.6:** Construct the full URL.
-  - [ ] **T2.7:** Execute HTTP request based on config.
-  - [ ] **T2.8:** Support static `headers` in config.
-  - [ ] **T2.9:** Support static `params` (query parameters) in config.
-  - [ ] **T2.10:** Handle errors for malformed config or not found API/endpoint.
-- **Notes/Blockers:**
+  - [x] **T2.1:** Integrate a YAML parsing library.
+  - [x] **T2.2:** Define basic YAML structure for APIs/endpoints.
+  - [x] **T2.3:** Implement logic to load and parse a specified YAML config file.
+  - [x] **T2.4:** Implement `httpcraft <api_name> <endpoint_name>` command structure.
+  - [x] **T2.5:** Implement logic to find API/endpoint in loaded config.
+  - [x] **T2.6:** Construct the full URL.
+  - [x] **T2.7:** Execute HTTP request based on config.
+  - [x] **T2.8:** Support static `headers` in config.
+  - [x] **T2.9:** Support static `params` (query parameters) in config.
+  - [x] **T2.10:** Handle errors for malformed config or not found API/endpoint.
+- **Notes/Blockers:** All tasks completed successfully. Integrated js-yaml for YAML parsing, created TypeScript types for configuration structure, implemented ConfigLoader for file loading, UrlBuilder for URL construction and header/param merging, updated HttpClient with new interface, and integrated everything into the CLI with proper error handling. The command `httpcraft <api_name> <endpoint_name> --config <path>` works correctly and can execute real HTTP requests to configured endpoints. All tests passing.
 
 ---
 

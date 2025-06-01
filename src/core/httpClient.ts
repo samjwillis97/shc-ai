@@ -1,29 +1,37 @@
 import axios from 'axios';
+import type { HttpMethod } from '../types/config.js';
+
+export interface HttpRequest {
+  method: HttpMethod;
+  url: string;
+  headers?: Record<string, string>;
+  params?: Record<string, string>;
+  body?: string | object;
+}
 
 export interface HttpResponse {
   status: number;
   statusText: string;
   headers: Record<string, string>;
   body: string;
-  url: string;
-  method: string;
-}
-
-export interface HttpError {
-  message: string;
-  status?: number;
-  statusText?: string;
-  isNetworkError: boolean;
 }
 
 export class HttpClient {
-  async makeRequest(url: string, method: string = 'GET'): Promise<HttpResponse> {
+  /**
+   * Executes an HTTP request
+   * @param request The request configuration
+   * @returns The response data
+   */
+  async executeRequest(request: HttpRequest): Promise<HttpResponse> {
     try {
       const response = await axios({
-        method: method.toUpperCase(),
-        url,
-        timeout: 30000, // 30 second timeout
-        validateStatus: () => true, // Don't throw on HTTP error status codes
+        method: request.method.toLowerCase() as any,
+        url: request.url,
+        headers: request.headers,
+        params: request.params,
+        data: request.body,
+        // Don't throw on HTTP error status codes - we'll handle them
+        validateStatus: () => true,
       });
 
       return {
@@ -31,37 +39,21 @@ export class HttpClient {
         statusText: response.statusText,
         headers: response.headers as Record<string, string>,
         body: typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
-        url: response.config.url || url,
-        method: response.config.method?.toUpperCase() || method.toUpperCase(),
       };
-    } catch (error) {
-      // Check if it's an axios error with a response (HTTP error)
-      if (error && typeof error === 'object' && 'isAxiosError' in error && error.isAxiosError) {
-        const axiosError = error as any;
-        
-        // Network error (no response received)
-        if (!axiosError.response) {
-          throw {
-            message: `Network error: ${axiosError.message}`,
-            isNetworkError: true,
-          } as HttpError;
+    } catch (error: any) {
+      if (error.isAxiosError) {
+        if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+          throw new Error(`Network error: ${error.message}`);
         }
-        
-        // Should not reach here due to validateStatus: () => true
-        // but keeping for safety
-        throw {
-          message: `HTTP error: ${axiosError.response.status} ${axiosError.response.statusText}`,
-          status: axiosError.response.status,
-          statusText: axiosError.response.statusText,
-          isNetworkError: false,
-        } as HttpError;
+        if (error.code === 'ETIMEDOUT') {
+          throw new Error(`Request timeout: ${error.message}`);
+        }
+        throw new Error(`HTTP error: ${error.message}`);
       }
-      
-      // Non-axios error
-      throw {
-        message: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-        isNetworkError: true,
-      } as HttpError;
+      throw new Error(`Unknown error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-} 
+}
+
+// Singleton instance
+export const httpClient = new HttpClient(); 

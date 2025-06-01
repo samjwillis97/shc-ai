@@ -1,2 +1,4 @@
 .direnv/
 .env
+dist/
+node_modules/

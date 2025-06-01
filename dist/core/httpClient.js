@@ -1,48 +1,42 @@
 import axios from 'axios';
 export class HttpClient {
-    async makeRequest(url, method = 'GET') {
+    /**
+     * Executes an HTTP request
+     * @param request The request configuration
+     * @returns The response data
+     */
+    async executeRequest(request) {
         try {
             const response = await axios({
-                method: method.toUpperCase(),
-                url,
-                timeout: 30000, // 30 second timeout
-                validateStatus: () => true, // Don't throw on HTTP error status codes
+                method: request.method.toLowerCase(),
+                url: request.url,
+                headers: request.headers,
+                params: request.params,
+                data: request.body,
+                // Don't throw on HTTP error status codes - we'll handle them
+                validateStatus: () => true,
             });
             return {
                 status: response.status,
                 statusText: response.statusText,
                 headers: response.headers,
                 body: typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
-                url: response.config.url || url,
-                method: response.config.method?.toUpperCase() || method.toUpperCase(),
             };
         }
         catch (error) {
-            // Check if it's an axios error with a response (HTTP error)
-            if (error && typeof error === 'object' && 'isAxiosError' in error && error.isAxiosError) {
-                const axiosError = error;
-                // Network error (no response received)
-                if (!axiosError.response) {
-                    throw {
-                        message: `Network error: ${axiosError.message}`,
-                        isNetworkError: true,
-                    };
+            if (error.isAxiosError) {
+                if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+                    throw new Error(`Network error: ${error.message}`);
                 }
-                // Should not reach here due to validateStatus: () => true
-                // but keeping for safety
-                throw {
-                    message: `HTTP error: ${axiosError.response.status} ${axiosError.response.statusText}`,
-                    status: axiosError.response.status,
-                    statusText: axiosError.response.statusText,
-                    isNetworkError: false,
-                };
+                if (error.code === 'ETIMEDOUT') {
+                    throw new Error(`Request timeout: ${error.message}`);
+                }
+                throw new Error(`HTTP error: ${error.message}`);
             }
-            // Non-axios error
-            throw {
-                message: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-                isNetworkError: true,
-            };
+            throw new Error(`Unknown error: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 }
+// Singleton instance
+export const httpClient = new HttpClient();
 //# sourceMappingURL=httpClient.js.map
