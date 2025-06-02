@@ -162,7 +162,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [ ] **T8.9:** Implement variable substitution for `{{steps.*.request...}}`.
   - [ ] **T8.10:** Chain halts on step failure.
   - [ ] **T8.11:** Default output for successful chain is last step's body.
-- **Notes/Blockers:** T8.1, T8.2, and T8.3 completed successfully. Implemented ChainExecutor class with sequential step execution, proper error handling, variable resolution integration, and comprehensive testing. Chain execution supports dry run mode, verbose output, chain variables, CLI variable overrides, and plugin integration. Chain halts on HTTP errors (4xx/5xx) and outputs last step's response body on success. All 33 chain-related tests passing. Ready to proceed with T8.4 for step.with overrides and remaining chain features.
+- **Notes/Blockers:** T8.1, T8.2, and T8.3 completed successfully. Implemented comprehensive ChainExecutor class with sequential step execution, proper error handling (halts on HTTP 4xx/5xx), variable resolution integration, and support for dry run mode, verbose output, chain variables, and CLI variable overrides. Chain execution integrates with existing plugin system for pre-request hooks and outputs last step's response body on success. Created comprehensive unit tests (14) and integration tests (8) covering all chain execution scenarios. Fixed test suite stability issues by implementing sequential test execution and increased timeouts for network-dependent integration tests. All 211 tests now passing. Ready to proceed with T8.4 for step.with overrides and remaining chain features.
 
 ---
 
