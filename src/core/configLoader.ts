@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import yaml from 'js-yaml';
 import type { HttpCraftConfig } from '../types/config.js';
 
@@ -47,14 +48,18 @@ export class ConfigLoader {
   }
   
   /**
-   * Attempts to find and load the default config file
-   * Looks for .httpcraft.yaml in the current directory
+   * Attempts to find and load the default config file using the search hierarchy:
+   * 1. ./.httpcraft.yaml or ./.httpcraft.yml in current directory
+   * 2. $HOME/.config/httpcraft/config.yaml as global default
    * Returns both the config and the path where it was found
    */
   async loadDefaultConfig(): Promise<ConfigWithPath | null> {
-    const defaultPaths = ['./.httpcraft.yaml', './.httpcraft.yml'];
+    // Search order as per T2.3 specification
+    const localPaths = ['./.httpcraft.yaml', './.httpcraft.yml'];
+    const globalPath = path.join(os.homedir(), '.config', 'httpcraft', 'config.yaml');
     
-    for (const configPath of defaultPaths) {
+    // First, try local configuration files in current directory
+    for (const configPath of localPaths) {
       try {
         const config = await this.loadConfig(configPath);
         return {
@@ -67,7 +72,17 @@ export class ConfigLoader {
       }
     }
     
-    return null;
+    // If no local config found, try global configuration
+    try {
+      const config = await this.loadConfig(globalPath);
+      return {
+        config,
+        path: globalPath
+      };
+    } catch (error) {
+      // No configuration file found in any location
+      return null;
+    }
   }
 }
 

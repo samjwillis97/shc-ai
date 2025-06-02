@@ -54,7 +54,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 - **Tasks:**
   - [x] **T2.1:** Integrate a YAML parsing library.
   - [x] **T2.2:** Define basic YAML structure for APIs/endpoints.
-  - [~] **T2.3:** Implement logic to load and parse a specified YAML config file with search hierarchy: --config override, ./.httpcraft.yaml in current directory, $HOME/.config/httpcraft/config.yaml as global default.
+  - [x] **T2.3:** Implement logic to load and parse a specified YAML config file with search hierarchy: --config override, ./.httpcraft.yaml in current directory, $HOME/.config/httpcraft/config.yaml as global default.
   - [x] **T2.4:** Implement `httpcraft <api_name> <endpoint_name>` command structure.
   - [x] **T2.5:** Implement logic to find API/endpoint in loaded config.
   - [x] **T2.6:** Construct the full URL.
@@ -62,7 +62,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [x] **T2.8:** Support static `headers` in config.
   - [x] **T2.9:** Support static `params` (query parameters) in config.
   - [x] **T2.10:** Handle errors for malformed config or not found API/endpoint.
-- **Notes/Blockers:** All tasks completed successfully. Integrated js-yaml for YAML parsing, created TypeScript types for configuration structure, implemented ConfigLoader for file loading, UrlBuilder for URL construction and header/param merging, updated HttpClient with new interface, and integrated everything into the CLI with proper error handling. The command `httpcraft <api_name> <endpoint_name> --config <path>` works correctly and can execute real HTTP requests to configured endpoints. **Note:** Configuration file search hierarchy updated to support global config at $HOME/.config/httpcraft/config.yaml with local .httpcraft.yaml taking precedence. Implementation may need updating to match new specification. All tests passing.
+- **Notes/Blockers:** All tasks completed successfully. Integrated js-yaml for YAML parsing, created TypeScript types for configuration structure, implemented ConfigLoader with complete search hierarchy for file loading (local .httpcraft.yaml/.httpcraft.yml takes precedence over global ~/.config/httpcraft/config.yaml), UrlBuilder for URL construction and header/param merging, updated HttpClient with new interface, and integrated everything into the CLI with proper error handling. The command `httpcraft <api_name> <endpoint_name> --config <path>` works correctly and can execute real HTTP requests to configured endpoints. Configuration file search hierarchy fully implemented as per T2.3 specification. All tests passing.
 
 ---
 
