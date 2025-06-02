@@ -64,8 +64,8 @@
     - _Testable Outcome:_ Can parse a simple YAML string/file in a test.
   - **T2.2:** Define a basic YAML structure for `apis.<api_name>.baseUrl` and `apis.<api_name>.endpoints.<endpoint_name>.path` and `apis.<api_name>.endpoints.<endpoint_name>.method`.
     - _Testable Outcome:_ Schema draft exists.
-  - **T2.3:** Implement logic to load and parse a specified YAML configuration file (e.g., via `--config myconfig.yaml` or a default path like `./.httpcraft.yaml`).
-    - _Testable Outcome:_ Tool can load a sample config file without errors.
+  - **T2.3:** Implement logic to load and parse a specified YAML configuration file (e.g., via `--config myconfig.yaml`). If no config is specified, search in order: 1) `./.httpcraft.yaml` or `./.httpcraft.yml` in current directory, 2) `$HOME/.config/httpcraft/config.yaml` as the default global location.
+    - _Testable Outcome:_ Tool can load a sample config file without errors and follows the correct search order.
   - **T2.4:** Implement the primary command structure: `httpcraft <api_name> <endpoint_name>`.
     - _Testable Outcome:_ CLI parser recognizes this command pattern.
   - **T2.5:** Implement logic to find the specified `api_name` and `endpoint_name` in the loaded config.

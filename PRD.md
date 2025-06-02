@@ -71,6 +71,11 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
   - Endpoint-level `variables` (map).
 - **FR1.7 (Schema):** A YAML schema for the configuration files shall be provided to aid validation and editor integration.
 - **FR1.8 (Descriptions):** The schema shall allow for optional `description` fields for APIs, endpoints, chains, etc., for documentation.
+- **FR1.9 (Configuration File Locations):** The tool shall search for configuration files in the following order of precedence:
+  1. File specified via `--config <path>` command line option (highest priority)
+  2. `.httpcraft.yaml` or `.httpcraft.yml` in the current working directory
+  3. `$HOME/.config/httpcraft/config.yaml` (default global configuration location)
+  If no configuration file is found in any of these locations, the tool shall report an error and exit.
 
 ### 5.2. CLI (Command Line Interface)
 
