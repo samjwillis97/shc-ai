@@ -4,6 +4,8 @@
  */
 
 import { VariableSource } from '../types/plugin.js';
+import { JSONPath } from 'jsonpath-plus';
+import type { StepExecutionResult } from './chainExecutor.js';
 
 export interface VariableContext {
   cli: Record<string, string>;
@@ -14,6 +16,7 @@ export interface VariableContext {
   profiles?: Record<string, any>; // Merged profile variables
   plugins?: Record<string, Record<string, VariableSource>>; // Plugin variable sources
   env: Record<string, string>;
+  steps?: StepExecutionResult[]; // T8.8 & T8.9: Step execution results for chains
 }
 
 export class VariableResolutionError extends Error {
@@ -26,7 +29,7 @@ export class VariableResolutionError extends Error {
 export class VariableResolver {
   /**
    * Resolves variables in a string using {{variable}} syntax
-   * Phase 7 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Plugins > Environment
+   * Phase 8 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Plugins > Environment
    */
   async resolve(template: string, context: VariableContext): Promise<string> {
     const variablePattern = /\{\{([^}]*)\}\}/g;
@@ -48,7 +51,7 @@ export class VariableResolver {
       
       let resolvedValue: string;
       
-      // Handle scoped variables (e.g., env.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable)
+      // Handle scoped variables (e.g., env.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable, steps.stepId.*)
       if (variableName.includes('.')) {
         resolvedValue = await this.resolveScopedVariable(variableName, context);
       } else {
@@ -72,7 +75,7 @@ export class VariableResolver {
   }
   
   /**
-   * Resolves scoped variables like env.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable
+   * Resolves scoped variables like env.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable, steps.stepId.*
    */
   private async resolveScopedVariable(variableName: string, context: VariableContext): Promise<string> {
     const [scope, ...keyParts] = variableName.split('.');
@@ -138,11 +141,104 @@ export class VariableResolver {
           variableName
         );
         
+      case 'steps':
+        // T8.8 & T8.9: Handle step variables
+        if (context.steps) {
+          return this.resolveStepVariable(keyParts, context.steps, variableName);
+        }
+        throw new VariableResolutionError(
+          `Step variable '${variableName}' is not available (no steps in context)`,
+          variableName
+        );
+        
       default:
         throw new VariableResolutionError(
           `Unknown variable scope '${scope}' in '${variableName}'`,
           variableName
         );
+    }
+  }
+  
+  /**
+   * T8.8 & T8.9: Resolves step variables like steps.stepId.response.body.field or steps.stepId.request.url
+   */
+  private resolveStepVariable(keyParts: string[], steps: StepExecutionResult[], variableName: string): string {
+    if (keyParts.length < 2) {
+      throw new VariableResolutionError(
+        `Invalid step variable format '${variableName}'. Expected: steps.stepId.response.* or steps.stepId.request.*`,
+        variableName
+      );
+    }
+    
+    const [stepId, dataType, ...pathParts] = keyParts;
+    
+    // Find the step by ID
+    const step = steps.find(s => s.stepId === stepId);
+    if (!step) {
+      throw new VariableResolutionError(
+        `Step '${stepId}' not found in executed steps`,
+        variableName
+      );
+    }
+    
+    let targetData: any;
+    
+    switch (dataType) {
+      case 'response':
+        targetData = step.response;
+        break;
+      case 'request':
+        targetData = step.request;
+        break;
+      default:
+        throw new VariableResolutionError(
+          `Invalid step data type '${dataType}' in '${variableName}'. Expected: 'response' or 'request'`,
+          variableName
+        );
+    }
+    
+    // If no path parts, return the entire object as string
+    if (pathParts.length === 0) {
+      return this.stringifyValue(targetData);
+    }
+    
+    // Special handling for response.body and request.body - parse JSON if it's a string
+    if (pathParts.length > 0 && pathParts[0].startsWith('body')) {
+      if (typeof targetData.body === 'string') {
+        try {
+          // Parse the JSON string to an object for JSONPath processing
+          targetData = { ...targetData, body: JSON.parse(targetData.body) };
+        } catch (parseError) {
+          // If it's not valid JSON, treat it as a plain string
+          // JSONPath will need to access it differently
+        }
+      }
+    }
+    
+    // Use JSONPath to extract the value
+    const jsonPath = `$.${pathParts.join('.')}`;
+    
+    try {
+      const result = JSONPath({ path: jsonPath, json: targetData });
+      
+      if (result.length === 0) {
+        throw new VariableResolutionError(
+          `JSONPath '${jsonPath}' found no matches in step '${stepId}' ${dataType}`,
+          variableName
+        );
+      }
+      
+      // Return the first match
+      return this.stringifyValue(result[0]);
+      
+    } catch (error) {
+      if (error instanceof VariableResolutionError) {
+        throw error;
+      }
+      throw new VariableResolutionError(
+        `JSONPath evaluation failed for '${variableName}': ${error instanceof Error ? error.message : String(error)}`,
+        variableName
+      );
     }
   }
   

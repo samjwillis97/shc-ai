@@ -6,6 +6,9 @@ import { variableResolver } from '../../src/core/variableResolver.js';
 import { urlBuilder } from '../../src/core/urlBuilder.js';
 import type { HttpRequest, HttpResponse } from '../../src/types/plugin.js';
 import type { HttpCraftConfig } from '../../src/types/config.js';
+import { writeFileSync, unlinkSync, existsSync } from 'fs';
+import { join } from 'path';
+import { runCli } from '../helpers/cli-runner.js';
 
 // Mock httpClient to simulate HTTP responses
 vi.mock('../../src/core/httpClient.js', () => ({
@@ -37,6 +40,8 @@ describe('Chain Execution Integration', () => {
   let consoleLogSpy: any;
   let consoleErrorSpy: any;
   let processExitSpy: any;
+  let testConfigFile: string;
+  let testChainConfigFile: string;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -126,10 +131,19 @@ describe('Chain Execution Integration', () => {
       return headers;
     });
     vi.mocked(urlBuilder.mergeParams).mockReturnValue({});
+
+    testConfigFile = join(process.cwd(), 'test-config-phase8.yaml');
+    testChainConfigFile = join(process.cwd(), 'test-chain-config-phase8.yaml');
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Clean up test files
+    [testConfigFile, testChainConfigFile].forEach(file => {
+      if (existsSync(file)) {
+        unlinkSync(file);
+      }
+    });
   });
 
   const testConfig: HttpCraftConfig = {
@@ -563,5 +577,290 @@ describe('Chain Execution Integration', () => {
 
     // Verify final output (last step's response)
     expect(consoleLogSpy).toHaveBeenCalledWith('{"id": 123, "name": "Updated User"}');
+  });
+
+  describe('T8.8 & T8.9: Step Variable Resolution', () => {
+    it('should resolve step response variables in subsequent steps', async () => {
+      // Create a test config with a chain that uses step variables
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      createPost:
+        method: POST
+        path: "/posts"
+        headers:
+          Content-Type: "application/json"
+        body:
+          title: "{{title}}"
+          body: "{{content}}"
+          userId: 1
+      getPost:
+        method: GET
+        path: "/posts/{{postId}}"
+
+chains:
+  createAndGetPost:
+    description: "Create a post and then retrieve it using the ID from the response"
+    vars:
+      title: "Test Post"
+      content: "This is a test post"
+    steps:
+      - id: createPost
+        call: jsonplaceholder.createPost
+      - id: getPost
+        call: jsonplaceholder.getPost
+        with:
+          pathParams:
+            postId: "{{steps.createPost.response.body.id}}"
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'createAndGetPost', '--config', testChainConfigFile, '--verbose']);
+
+      expect(result.exitCode).toBe(0);
+      
+      // The output should be the response body of the last step (getPost)
+      const output = JSON.parse(result.stdout);
+      expect(output).toHaveProperty('id');
+      expect(output).toHaveProperty('title');
+      expect(output).toHaveProperty('body');
+      expect(output).toHaveProperty('userId');
+      
+      // Verify verbose output shows both steps
+      expect(result.stderr).toContain('[CHAIN] Starting execution of chain: createAndGetPost');
+      expect(result.stderr).toContain('[STEP createPost]');
+      expect(result.stderr).toContain('[STEP getPost]');
+    });
+
+    it('should resolve step request variables', async () => {
+      // Create a test config that uses step request data
+      const config = `
+apis:
+  httpbin:
+    baseUrl: "https://httpbin.org"
+    endpoints:
+      post:
+        method: POST
+        path: "/post"
+        headers:
+          Content-Type: "application/json"
+        body:
+          message: "{{message}}"
+      echo:
+        method: POST
+        path: "/post"
+        headers:
+          Content-Type: "application/json"
+        body:
+          original_message: "{{steps.firstPost.request.body.message}}"
+          original_url: "{{steps.firstPost.request.url}}"
+
+chains:
+  echoRequest:
+    description: "Make a request and echo the original request data"
+    vars:
+      message: "Hello World"
+    steps:
+      - id: firstPost
+        call: httpbin.post
+      - id: echoPost
+        call: httpbin.echo
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'echoRequest', '--config', testChainConfigFile]);
+
+      expect(result.exitCode).toBe(0);
+      
+      // The output should be the response body of the last step
+      const output = JSON.parse(result.stdout);
+      expect(output.json).toHaveProperty('original_message', 'Hello World');
+      expect(output.json).toHaveProperty('original_url', 'https://httpbin.org/post');
+    });
+
+    it('should handle complex JSONPath expressions in step variables', async () => {
+      // Create a test config that uses complex JSONPath
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getUsers:
+        method: GET
+        path: "/users"
+      getFirstUserPosts:
+        method: GET
+        path: "/users/{{userId}}/posts"
+
+chains:
+  getFirstUserPosts:
+    description: "Get all users and then get posts for the first user"
+    steps:
+      - id: getUsers
+        call: jsonplaceholder.getUsers
+      - id: getUserPosts
+        call: jsonplaceholder.getFirstUserPosts
+        with:
+          pathParams:
+            userId: "{{steps.getUsers.response.body[0].id}}"
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'getFirstUserPosts', '--config', testChainConfigFile]);
+
+      expect(result.exitCode).toBe(0);
+      
+      // The output should be an array of posts
+      const output = JSON.parse(result.stdout);
+      expect(Array.isArray(output)).toBe(true);
+      if (output.length > 0) {
+        expect(output[0]).toHaveProperty('userId', 1); // First user should have ID 1
+      }
+    });
+  });
+
+  describe('T8.11: Chain Output', () => {
+    it('should output the last step response body for successful chains', async () => {
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getPost:
+        method: GET
+        path: "/posts/1"
+      getComments:
+        method: GET
+        path: "/posts/1/comments"
+
+chains:
+  getPostAndComments:
+    description: "Get a post and its comments"
+    steps:
+      - id: getPost
+        call: jsonplaceholder.getPost
+      - id: getComments
+        call: jsonplaceholder.getComments
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'getPostAndComments', '--config', testChainConfigFile]);
+
+      expect(result.exitCode).toBe(0);
+      
+      // The output should be the comments (last step), not the post
+      const output = JSON.parse(result.stdout);
+      expect(Array.isArray(output)).toBe(true);
+      if (output.length > 0) {
+        expect(output[0]).toHaveProperty('postId', 1);
+        expect(output[0]).toHaveProperty('email');
+        expect(output[0]).toHaveProperty('body');
+      }
+    });
+
+    it('should handle single-step chains correctly', async () => {
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getPost:
+        method: GET
+        path: "/posts/1"
+
+chains:
+  singleStep:
+    description: "Single step chain"
+    steps:
+      - id: getPost
+        call: jsonplaceholder.getPost
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'singleStep', '--config', testChainConfigFile]);
+
+      expect(result.exitCode).toBe(0);
+      
+      // The output should be the post data
+      const output = JSON.parse(result.stdout);
+      expect(output).toHaveProperty('id', 1);
+      expect(output).toHaveProperty('title');
+      expect(output).toHaveProperty('body');
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should fail gracefully when step variable references non-existent step', async () => {
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getPost:
+        method: GET
+        path: "/posts/{{postId}}"
+
+chains:
+  invalidStepRef:
+    description: "Chain with invalid step reference"
+    steps:
+      - id: getPost
+        call: jsonplaceholder.getPost
+        with:
+          pathParams:
+            postId: "{{steps.nonExistentStep.response.body.id}}"
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'invalidStepRef', '--config', testChainConfigFile]);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('Variable resolution failed');
+      expect(result.stderr).toContain('nonExistentStep');
+    });
+
+    it('should fail gracefully when JSONPath finds no matches', async () => {
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getPost:
+        method: GET
+        path: "/posts/1"
+      getAnotherPost:
+        method: GET
+        path: "/posts/{{postId}}"
+
+chains:
+  invalidJsonPath:
+    description: "Chain with invalid JSONPath"
+    steps:
+      - id: getPost
+        call: jsonplaceholder.getPost
+      - id: getAnotherPost
+        call: jsonplaceholder.getAnotherPost
+        with:
+          pathParams:
+            postId: "{{steps.getPost.response.body.nonExistentField}}"
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'invalidJsonPath', '--config', testChainConfigFile]);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('Variable resolution failed');
+      expect(result.stderr).toContain('JSONPath');
+      expect(result.stderr).toContain('found no matches');
+    });
   });
 }); 

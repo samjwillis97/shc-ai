@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { VariableResolver, VariableContext, VariableResolutionError } from '../../src/core/variableResolver.js';
+import type { StepExecutionResult } from '../../src/core/chainExecutor.js';
 
 describe('VariableResolver', () => {
   let resolver: VariableResolver;
@@ -517,6 +518,194 @@ describe('VariableResolver', () => {
       
       const result = await resolver.resolve('{{name}}-{{profile.env}}-v{{api.version}}', context);
       expect(result).toBe('service-dev-v1.0');
+    });
+  });
+
+  describe('T8.8 & T8.9: Step Variable Resolution', () => {
+    let mockSteps: StepExecutionResult[];
+
+    beforeEach(() => {
+      mockSteps = [
+        {
+          stepId: 'createUser',
+          request: {
+            method: 'POST',
+            url: 'https://api.test.com/users',
+            headers: { 'Content-Type': 'application/json' },
+            body: { name: 'John', email: 'john@example.com' }
+          },
+          response: {
+            status: 201,
+            statusText: 'Created',
+            headers: { 'location': '/users/456' },
+            body: '{"id": 456, "name": "John", "email": "john@example.com"}'
+          },
+          success: true
+        },
+        {
+          stepId: 'getUser',
+          request: {
+            method: 'GET',
+            url: 'https://api.test.com/users/456',
+            headers: {},
+            body: undefined
+          },
+          response: {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'content-type': 'application/json' },
+            body: '{"id": 456, "name": "John", "email": "john@example.com", "created": "2023-01-01"}'
+          },
+          success: true
+        }
+      ];
+
+      mockContext.steps = mockSteps;
+    });
+
+    describe('T8.8: Response variable resolution', () => {
+      it('should resolve step response body using JSONPath', async () => {
+        const result = await resolver.resolve('User ID: {{steps.createUser.response.body.id}}', mockContext);
+        expect(result).toBe('User ID: 456');
+      });
+
+      it('should resolve step response status', async () => {
+        const result = await resolver.resolve('Status: {{steps.createUser.response.status}}', mockContext);
+        expect(result).toBe('Status: 201');
+      });
+
+      it('should resolve step response headers', async () => {
+        const result = await resolver.resolve('Location: {{steps.createUser.response.headers.location}}', mockContext);
+        expect(result).toBe('Location: /users/456');
+      });
+
+      it('should resolve nested JSON properties from response body', async () => {
+        const result = await resolver.resolve('Name: {{steps.getUser.response.body.name}}', mockContext);
+        expect(result).toBe('Name: John');
+      });
+
+      it('should resolve entire response object when no path specified', async () => {
+        const result = await resolver.resolve('Response: {{steps.createUser.response}}', mockContext);
+        const parsed = JSON.parse(result.replace('Response: ', ''));
+        expect(parsed.status).toBe(201);
+        expect(parsed.statusText).toBe('Created');
+      });
+    });
+
+    describe('T8.9: Request variable resolution', () => {
+      it('should resolve step request method', async () => {
+        const result = await resolver.resolve('Method: {{steps.createUser.request.method}}', mockContext);
+        expect(result).toBe('Method: POST');
+      });
+
+      it('should resolve step request URL', async () => {
+        const result = await resolver.resolve('URL: {{steps.createUser.request.url}}', mockContext);
+        expect(result).toBe('URL: https://api.test.com/users');
+      });
+
+      it('should resolve step request headers', async () => {
+        const result = await resolver.resolve('Content-Type: {{steps.createUser.request.headers.Content-Type}}', mockContext);
+        expect(result).toBe('Content-Type: application/json');
+      });
+
+      it('should resolve step request body properties', async () => {
+        const result = await resolver.resolve('Email: {{steps.createUser.request.body.email}}', mockContext);
+        expect(result).toBe('Email: john@example.com');
+      });
+
+      it('should resolve entire request object when no path specified', async () => {
+        const result = await resolver.resolve('Request: {{steps.getUser.request}}', mockContext);
+        const parsed = JSON.parse(result.replace('Request: ', ''));
+        expect(parsed.method).toBe('GET');
+        expect(parsed.url).toBe('https://api.test.com/users/456');
+      });
+    });
+
+    describe('Error handling for step variables', () => {
+      it('should throw error for non-existent step ID', async () => {
+        await expect(resolver.resolve('{{steps.nonExistentStep.response.body}}', mockContext))
+          .rejects.toThrow(VariableResolutionError);
+        
+        await expect(resolver.resolve('{{steps.nonExistentStep.response.body}}', mockContext))
+          .rejects.toThrow("Step 'nonExistentStep' not found in executed steps");
+      });
+
+      it('should throw error for invalid data type', async () => {
+        await expect(resolver.resolve('{{steps.createUser.invalidType.body}}', mockContext))
+          .rejects.toThrow(VariableResolutionError);
+        
+        await expect(resolver.resolve('{{steps.createUser.invalidType.body}}', mockContext))
+          .rejects.toThrow("Invalid step data type 'invalidType'");
+      });
+
+      it('should throw error for invalid step variable format', async () => {
+        await expect(resolver.resolve('{{steps.createUser}}', mockContext))
+          .rejects.toThrow(VariableResolutionError);
+        
+        await expect(resolver.resolve('{{steps.createUser}}', mockContext))
+          .rejects.toThrow("Invalid step variable format");
+      });
+
+      it('should throw error when no steps in context', async () => {
+        const contextWithoutSteps = { ...mockContext };
+        delete contextWithoutSteps.steps;
+        
+        await expect(resolver.resolve('{{steps.createUser.response.body}}', contextWithoutSteps))
+          .rejects.toThrow(VariableResolutionError);
+        
+        await expect(resolver.resolve('{{steps.createUser.response.body}}', contextWithoutSteps))
+          .rejects.toThrow("Step variable 'steps.createUser.response.body' is not available (no steps in context)");
+      });
+
+      it('should throw error for non-existent JSONPath', async () => {
+        await expect(resolver.resolve('{{steps.createUser.response.body.nonExistentField}}', mockContext))
+          .rejects.toThrow(VariableResolutionError);
+        
+        await expect(resolver.resolve('{{steps.createUser.response.body.nonExistentField}}', mockContext))
+          .rejects.toThrow("JSONPath '$.body.nonExistentField' found no matches");
+      });
+    });
+
+    describe('Complex JSONPath expressions', () => {
+      it('should handle array access in JSONPath', async () => {
+        // Mock a step with array response
+        const stepWithArray: StepExecutionResult = {
+          stepId: 'getUsers',
+          request: { method: 'GET', url: 'https://api.test.com/users', headers: {}, body: undefined },
+          response: {
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            body: '[{"id": 1, "name": "John"}, {"id": 2, "name": "Jane"}]'
+          },
+          success: true
+        };
+        
+        const contextWithArray = { ...mockContext, steps: [stepWithArray] };
+        
+        const result = await resolver.resolve('First user: {{steps.getUsers.response.body[0].name}}', contextWithArray);
+        expect(result).toBe('First user: John');
+      });
+
+      it('should handle nested object access', async () => {
+        // Mock a step with nested response
+        const stepWithNested: StepExecutionResult = {
+          stepId: 'getProfile',
+          request: { method: 'GET', url: 'https://api.test.com/profile', headers: {}, body: undefined },
+          response: {
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            body: '{"user": {"profile": {"address": {"city": "New York"}}}}'
+          },
+          success: true
+        };
+        
+        const contextWithNested = { ...mockContext, steps: [stepWithNested] };
+        
+        const result = await resolver.resolve('City: {{steps.getProfile.response.body.user.profile.address.city}}', contextWithNested);
+        expect(result).toBe('City: New York');
+      });
     });
   });
 }); 

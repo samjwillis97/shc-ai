@@ -149,20 +149,26 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 ## Phase 8: Chains (Core Logic & Basic Data Passing)
 
 - **Goal:** Implement core functionality for chained requests, including step execution and data passing.
-- **Status:** [~]
+- **Status:** [x]
 - **Tasks:**
   - [x] **T8.1:** Define YAML structure for top-level `chains` section. Each chain has `vars` and `steps`. Each step has `id`, `call` (`api_name.endpoint_name`), and optional `with` (for `headers`, `params`, `pathParams`, `body` overrides).
   - [x] **T8.2:** Implement the `httpcraft chain <chain_name>` command.
   - [x] **T8.3:** Implement sequential execution of steps defined in a chain. For each step, resolve its `call` to an API/endpoint definition.
   - [x] **T8.4:** Implement `chain.vars` and their integration into variable resolution (precedence: CLI > Step `with` > `chain.vars` > Endpoint > ...).
   - [x] **T8.5:** Implement `step.with` overrides for `headers`, `params`, `pathParams`, and `body`. Step overrides have highest precedence and support variable resolution. PathParams enable URL parameter substitution (e.g., `{{userId}}` → actual values).
-  - [ ] **T8.6:** Store full request/response for each step.
-  - [ ] **T8.7:** Integrate a JSONPath library.
-  - [ ] **T8.8:** Implement variable substitution for `{{steps.*.response...}}`.
-  - [ ] **T8.9:** Implement variable substitution for `{{steps.*.request...}}`.
-  - [ ] **T8.10:** Chain halts on step failure.
-  - [ ] **T8.11:** Default output for successful chain is last step's body.
-- **Notes/Blockers:** T8.1-T8.5 completed successfully. Implemented comprehensive ChainExecutor class with sequential step execution, proper error handling (halts on HTTP 4xx/5xx), variable resolution integration, chain variables support, and full step.with override functionality. Step.with allows overriding headers, query parameters, path parameters, and request body with highest precedence in variable resolution. All overrides support variable substitution and are merged correctly with base endpoint/API configurations. Created comprehensive unit tests (20) and integration tests (9) covering all chain execution scenarios including step.with overrides. All 217 tests now passing. Ready to proceed with T8.6 for request/response storage and remaining chain features.
+  - [x] **T8.6:** Store full request/response for each step.
+  - [x] **T8.7:** Integrate a JSONPath library.
+  - [x] **T8.8:** Implement variable substitution for `{{steps.*.response...}}`.
+  - [x] **T8.9:** Implement variable substitution for `{{steps.*.request...}}`.
+  - [x] **T8.10:** Chain halts on step failure.
+  - [x] **T8.11:** Default output for successful chain is last step's body.
+- **Notes/Blockers:** All Phase 8 tasks completed successfully! Implemented complete chain execution system with:
+  - **JSONPath Integration (T8.7):** Added jsonpath-plus library for powerful data extraction
+  - **Step Variable Resolution (T8.8 & T8.9):** Full support for {{steps.stepId.response.*}} and {{steps.stepId.request.*}} with automatic JSON parsing
+  - **Request/Response Storage (T8.6):** Complete request and response data stored for each step for future reference
+  - **Chain Failure Handling (T8.10):** Chains halt immediately on any step failure (HTTP 4xx/5xx errors)
+  - **Chain Output (T8.11):** Successful chains output the last step's response body
+  - Enhanced ChainExecutor with step data passing to variable resolution, proper error handling, and comprehensive test coverage. Variable resolver now handles complex JSONPath expressions including array access (e.g., {{steps.getUsers.response.body[0].name}}) and nested object access. All chain functionality working correctly with 90+ tests passing. Ready to proceed to Phase 9.
 
 ---
 

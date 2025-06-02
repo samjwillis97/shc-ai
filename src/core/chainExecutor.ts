@@ -62,12 +62,14 @@ export class ChainExecutor {
         }
 
         try {
+          // T8.8 & T8.9: Pass previously executed steps to variable resolution
           const stepResult = await this.executeStep(
             step,
             config,
             cliVariables,
             profiles,
             chain.vars || {},
+            result.steps, // Pass completed steps for variable resolution
             verbose,
             dryRun
           );
@@ -132,6 +134,7 @@ export class ChainExecutor {
     cliVariables: Record<string, string>,
     profiles: Record<string, any>,
     chainVars: Record<string, any>,
+    previousSteps: StepExecutionResult[], // T8.8 & T8.9: Previous step results for variable resolution
     verbose: boolean,
     dryRun: boolean
   ): Promise<StepExecutionResult> {
@@ -151,7 +154,7 @@ export class ChainExecutor {
       throw new Error(`Endpoint '${endpointName}' not found in API '${apiName}'`);
     }
 
-    // Create variable context for this step
+    // T8.8 & T8.9: Create variable context for this step with access to previous steps
     const variableContext = variableResolver.createContext(
       cliVariables,
       profiles,
@@ -161,13 +164,16 @@ export class ChainExecutor {
     
     // Add chain variables to the context
     variableContext.chainVars = chainVars;
+    
+    // T8.8 & T8.9: Add step data to context for {{steps.*}} variable resolution
+    variableContext.steps = previousSteps;
 
     try {
       // Resolve variables in API and endpoint configurations first
       const resolvedApi = await variableResolver.resolveValue(api, variableContext) as ApiDefinition;
       const resolvedEndpoint = await variableResolver.resolveValue(endpoint, variableContext) as EndpointDefinition;
 
-      // T8.5: Resolve step.with overrides using the full variable context
+      // T8.5: Resolve step.with overrides using the full variable context (including steps)
       let resolvedStepWith: any = null;
       if (step.with) {
         resolvedStepWith = await variableResolver.resolveValue(step.with, variableContext);

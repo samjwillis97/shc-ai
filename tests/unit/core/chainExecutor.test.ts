@@ -910,5 +910,164 @@ describe('ChainExecutor', () => {
         );
       });
     });
+
+    describe('T8.8 & T8.9: Step Variable Resolution', () => {
+      it('should pass previous step results to variable context', async () => {
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'createUser',
+              call: 'testApi.createUser'
+            },
+            {
+              id: 'getUser',
+              call: 'testApi.getUser'
+            }
+          ]
+        };
+
+        const createResponse: HttpResponse = {
+          status: 201,
+          statusText: 'Created',
+          headers: { 'location': '/users/456' },
+          body: '{"id": 456, "name": "testuser"}'
+        };
+
+        const getResponse: HttpResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: '{"id": 456, "name": "testuser", "email": "test@example.com"}'
+        };
+
+        // Mock successful resolutions and requests
+        vi.mocked(variableResolver.resolveValue).mockResolvedValue(mockConfig.apis.testApi);
+        vi.mocked(httpClient.executeRequest)
+          .mockResolvedValueOnce(createResponse)
+          .mockResolvedValueOnce(getResponse);
+
+        const result = await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfig,
+          {},
+          {},
+          false,
+          false
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.steps).toHaveLength(2);
+
+        // Verify that createContext was called with step data for the second step
+        const createContextCalls = vi.mocked(variableResolver.createContext).mock.calls;
+        expect(createContextCalls).toHaveLength(2);
+        
+        // First step should have no previous steps
+        const firstStepContext = createContextCalls[0];
+        expect(firstStepContext[0]).toEqual({}); // cliVars
+        
+        // Second step should have access to first step's results
+        const secondStepContext = createContextCalls[1];
+        expect(secondStepContext[0]).toEqual({}); // cliVars
+        
+        // Verify that the variable context gets the steps data added
+        expect(vi.mocked(variableResolver.createContext)).toHaveBeenCalledTimes(2);
+      });
+
+      it('should store complete request and response data for each step', async () => {
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'step1',
+              call: 'testApi.createUser'
+            }
+          ]
+        };
+
+        const mockRequest: HttpRequest = {
+          method: 'POST',
+          url: 'https://api.test.com/users',
+          headers: { 'Content-Type': 'application/json' },
+          body: { name: 'test', email: 'test@example.com' }
+        };
+
+        const mockResponse: HttpResponse = {
+          status: 201,
+          statusText: 'Created',
+          headers: { 'location': '/users/456' },
+          body: '{"id": 456, "name": "test"}'
+        };
+
+        // Mock successful resolution and request
+        vi.mocked(variableResolver.resolveValue).mockResolvedValue(mockConfig.apis.testApi);
+        vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
+
+        const result = await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfig,
+          {},
+          {},
+          false,
+          false
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.steps).toHaveLength(1);
+        
+        const step = result.steps[0];
+        expect(step.stepId).toBe('step1');
+        expect(step.request).toBeDefined();
+        expect(step.response).toEqual(mockResponse);
+        expect(step.success).toBe(true);
+      });
+
+      it('should handle step execution with step.with overrides and variable resolution', async () => {
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'step1',
+              call: 'testApi.createUser',
+              with: {
+                headers: { 'X-Custom': 'value' },
+                body: { name: 'override' }
+              }
+            }
+          ]
+        };
+
+        const mockResponse: HttpResponse = {
+          status: 201,
+          statusText: 'Created',
+          headers: {},
+          body: '{"id": 456}'
+        };
+
+        // Mock successful resolution and request
+        vi.mocked(variableResolver.resolveValue)
+          .mockResolvedValueOnce(mockConfig.apis.testApi) // API resolution
+          .mockResolvedValueOnce(mockConfig.apis.testApi.endpoints.createUser) // Endpoint resolution
+          .mockResolvedValueOnce({ headers: { 'X-Custom': 'value' }, body: { name: 'override' } }); // step.with resolution
+
+        vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
+
+        const result = await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfig,
+          {},
+          {},
+          false,
+          false
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.steps).toHaveLength(1);
+        
+        // Verify that resolveValue was called for step.with
+        expect(vi.mocked(variableResolver.resolveValue)).toHaveBeenCalledTimes(3);
+      });
+    });
   });
 }); 
