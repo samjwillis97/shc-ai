@@ -7,6 +7,7 @@ export interface HttpCraftConfig {
   profiles?: Record<string, ProfileDefinition>;
   plugins?: PluginConfiguration[];
   apis: Record<string, ApiDefinition>;
+  chains?: Record<string, ChainDefinition>;
 }
 
 export interface ConfigSection {
@@ -41,4 +42,33 @@ export interface EndpointDefinition {
   description?: string;
 }
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS'; 
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
+
+/**
+ * Chain definition for sequential request execution
+ */
+export interface ChainDefinition {
+  description?: string;
+  vars?: Record<string, string | number | boolean>;
+  steps: ChainStep[];
+}
+
+/**
+ * Individual step within a chain
+ */
+export interface ChainStep {
+  id: string;
+  description?: string;
+  call: string; // Format: "api_name.endpoint_name"
+  with?: StepOverrides;
+}
+
+/**
+ * Step-specific overrides for endpoint configuration
+ */
+export interface StepOverrides {
+  headers?: Record<string, string>;
+  params?: Record<string, string>;
+  pathParams?: Record<string, string>;
+  body?: string | object;
+} 

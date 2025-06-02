@@ -3,6 +3,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { handleRequestCommand } from './commands/request.js';
 import { handleApiCommand } from './commands/api.js';
+import { handleChainCommand } from './commands/chain.js';
 import { handleCompletionCommand, handleGetApiNamesCommand, handleGetEndpointNamesCommand } from './commands/completion.js';
 async function main() {
     const argv = await yargs(hideBin(process.argv))
@@ -16,6 +17,48 @@ async function main() {
         });
     }, async (argv) => {
         await handleRequestCommand({ url: argv.url });
+    })
+        .command('chain <chainName>', 'Execute a chain of HTTP requests', (yargs) => {
+        yargs.positional('chainName', {
+            describe: 'The name of the chain to execute',
+            type: 'string',
+            demandOption: true,
+        });
+    }, async (argv) => {
+        // Parse --var options into key-value pairs
+        const variables = {};
+        if (argv.var && Array.isArray(argv.var)) {
+            for (const varStr of argv.var) {
+                if (typeof varStr === 'string') {
+                    const [key, ...valueParts] = varStr.split('=');
+                    if (key && valueParts.length > 0) {
+                        variables[key] = valueParts.join('=');
+                    }
+                    else {
+                        console.error(`Error: Invalid variable format '${varStr}'. Use --var key=value`);
+                        process.exit(1);
+                    }
+                }
+            }
+        }
+        // Parse --profile options into array of profile names
+        const profiles = [];
+        if (argv.profile && Array.isArray(argv.profile)) {
+            for (const profileName of argv.profile) {
+                if (typeof profileName === 'string') {
+                    profiles.push(profileName);
+                }
+            }
+        }
+        await handleChainCommand({
+            chainName: argv.chainName,
+            config: argv.config,
+            variables,
+            profiles,
+            verbose: argv.verbose,
+            dryRun: argv['dry-run'],
+            exitOnHttpError: argv['exit-on-http-error'],
+        });
     })
         .command('completion <shell>', 'Generate shell completion script', (yargs) => {
         yargs.positional('shell', {
@@ -132,6 +175,7 @@ async function main() {
     else if (argv._.length === 0) {
         // No command provided, show help
         console.log('Usage: httpcraft <api_name> <endpoint_name> [--config <path>] [--var key=value] [--profile <name>]');
+        console.log('       httpcraft chain <chain_name> [--config <path>] [--var key=value] [--profile <name>]');
         console.log('       httpcraft request <url>');
         console.log('       httpcraft completion <shell>');
         console.log('       httpcraft test');
