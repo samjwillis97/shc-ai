@@ -483,5 +483,432 @@ describe('ChainExecutor', () => {
         })
       );
     });
+
+    // T8.5: Tests for step.with overrides
+    describe('T8.5: step.with overrides', () => {
+      it('should override headers with step.with', async () => {
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'createUser',
+              call: 'testApi.createUser',
+              with: {
+                headers: {
+                  'Authorization': 'Bearer custom-token',
+                  'X-Custom': 'override-value'
+                }
+              }
+            }
+          ]
+        };
+
+        const mockResponse: HttpResponse = {
+          status: 201,
+          statusText: 'Created',
+          headers: {},
+          body: '{"id": 123}'
+        };
+
+        // Mock variableResolver.resolveValue to handle different inputs
+        vi.mocked(variableResolver.resolveValue).mockImplementation(async (value) => {
+          // Return the value as-is for API and endpoint (no variables to resolve)
+          if (value === mockConfig.apis.testApi) {
+            return mockConfig.apis.testApi;
+          }
+          if (value === mockConfig.apis.testApi.endpoints.createUser) {
+            return mockConfig.apis.testApi.endpoints.createUser;
+          }
+          // For step.with, return the resolved values
+          if (value && typeof value === 'object' && 'headers' in value) {
+            return value; // step.with headers should be returned as-is (no variables to resolve)
+          }
+          return value;
+        });
+
+        vi.mocked(urlBuilder.mergeHeaders).mockReturnValue({ 'Content-Type': 'application/json' });
+        vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
+
+        await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfig,
+          {},
+          {},
+          false,
+          false
+        );
+
+        // Verify that step.with headers were merged with base headers
+        expect(httpClient.executeRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            headers: {
+              'Content-Type': 'application/json', // From base
+              'Authorization': 'Bearer custom-token', // From step.with
+              'X-Custom': 'override-value' // From step.with
+            }
+          })
+        );
+      });
+
+      it('should override query params with step.with', async () => {
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'getUser',
+              call: 'testApi.getUser',
+              with: {
+                params: {
+                  'limit': '20',
+                  'include': 'profile'
+                }
+              }
+            }
+          ]
+        };
+
+        const mockResponse: HttpResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: '{"id": 123}'
+        };
+
+        // Mock variableResolver.resolveValue to handle different inputs
+        vi.mocked(variableResolver.resolveValue).mockImplementation(async (value) => {
+          // Return the value as-is for API and endpoint (no variables to resolve)
+          if (value === mockConfig.apis.testApi) {
+            return mockConfig.apis.testApi;
+          }
+          if (value === mockConfig.apis.testApi.endpoints.getUser) {
+            return mockConfig.apis.testApi.endpoints.getUser;
+          }
+          // For step.with, return the resolved values
+          if (value && typeof value === 'object' && 'params' in value) {
+            return value; // step.with params should be returned as-is (no variables to resolve)
+          }
+          return value;
+        });
+
+        vi.mocked(urlBuilder.mergeParams).mockReturnValue({ 'limit': '10' }); // Base params
+        vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
+
+        await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfig,
+          {},
+          {},
+          false,
+          false
+        );
+
+        // Verify that the request was made with merged parameters
+        expect(httpClient.executeRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            url: expect.stringMatching(/limit=20/), // step.with overrides base
+          })
+        );
+        expect(httpClient.executeRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            url: expect.stringMatching(/include=profile/), // step.with addition
+          })
+        );
+      });
+
+      it('should override body with step.with', async () => {
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'createUser',
+              call: 'testApi.createUser',
+              with: {
+                body: {
+                  name: 'Override Name',
+                  email: 'override@example.com',
+                  customField: 'custom-value'
+                }
+              }
+            }
+          ]
+        };
+
+        const mockResponse: HttpResponse = {
+          status: 201,
+          statusText: 'Created',
+          headers: {},
+          body: '{"id": 123}'
+        };
+
+        // Mock variableResolver.resolveValue to handle different inputs
+        vi.mocked(variableResolver.resolveValue).mockImplementation(async (value) => {
+          // Return the value as-is for API and endpoint (no variables to resolve)
+          if (value === mockConfig.apis.testApi) {
+            return mockConfig.apis.testApi;
+          }
+          if (value === mockConfig.apis.testApi.endpoints.createUser) {
+            return mockConfig.apis.testApi.endpoints.createUser;
+          }
+          // For step.with, return the resolved values
+          if (value && typeof value === 'object' && 'body' in value) {
+            return value; // step.with body should be returned as-is (no variables to resolve)
+          }
+          return value;
+        });
+
+        vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
+
+        await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfig,
+          {},
+          {},
+          false,
+          false
+        );
+
+        // Verify that step.with body completely replaced the endpoint body
+        expect(httpClient.executeRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            body: {
+              name: 'Override Name',
+              email: 'override@example.com',
+              customField: 'custom-value'
+            }
+          })
+        );
+      });
+
+      it('should apply pathParams substitution with step.with', async () => {
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'getUser',
+              call: 'testApi.getUser',
+              with: {
+                pathParams: {
+                  'userId': '456',
+                  'orgId': 'org-123'
+                }
+              }
+            }
+          ]
+        };
+
+        const mockResponse: HttpResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: '{"id": 456}'
+        };
+
+        // Mock endpoint with path parameters
+        const mockEndpoint = {
+          method: 'GET' as const,
+          path: '/users/{{userId}}/org/{{orgId}}'
+        };
+
+        const mockApiWithPathParams = {
+          ...mockConfig.apis.testApi,
+          endpoints: {
+            getUser: mockEndpoint
+          }
+        };
+
+        // Mock variableResolver.resolveValue to handle different inputs
+        vi.mocked(variableResolver.resolveValue).mockImplementation(async (value) => {
+          // Return the value as-is for API and endpoint (no variables to resolve)
+          if (value === mockConfig.apis.testApi) {
+            return mockApiWithPathParams;
+          }
+          if (value === mockConfig.apis.testApi.endpoints.getUser) {
+            return mockEndpoint;
+          }
+          // For step.with, return the resolved values
+          if (value && typeof value === 'object' && 'pathParams' in value) {
+            return value; // step.with pathParams should be returned as-is (no variables to resolve)
+          }
+          return value;
+        });
+
+        vi.mocked(urlBuilder.buildUrl).mockReturnValue('https://api.test.com/users/{{userId}}/org/{{orgId}}');
+        vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
+
+        await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfig,
+          {},
+          {},
+          false,
+          false
+        );
+
+        // Verify that pathParams were substituted in the URL
+        expect(httpClient.executeRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            url: 'https://api.test.com/users/456/org/org-123'
+          })
+        );
+      });
+
+      it('should resolve variables in step.with overrides', async () => {
+        const chain: ChainDefinition = {
+          vars: {
+            customToken: 'chain-token-123',
+            userName: 'Chain User'
+          },
+          steps: [
+            {
+              id: 'createUser',
+              call: 'testApi.createUser',
+              with: {
+                headers: {
+                  'Authorization': 'Bearer {{customToken}}'
+                },
+                body: {
+                  name: '{{userName}}',
+                  source: 'chain'
+                }
+              }
+            }
+          ]
+        };
+
+        const mockResponse: HttpResponse = {
+          status: 201,
+          statusText: 'Created',
+          headers: {},
+          body: '{"id": 123}'
+        };
+
+        vi.mocked(variableResolver.resolveValue).mockImplementation(async (value) => {
+          // Return the value as-is for API and endpoint (no variables to resolve)
+          if (value === mockConfig.apis.testApi) {
+            return mockConfig.apis.testApi;
+          }
+          if (value === mockConfig.apis.testApi.endpoints.createUser) {
+            return mockConfig.apis.testApi.endpoints.createUser;
+          }
+          // For step.with, resolve variables
+          if (value && typeof value === 'object' && ('headers' in value || 'body' in value)) {
+            const resolved: any = {};
+            for (const [key, val] of Object.entries(value)) {
+              if (typeof val === 'string') {
+                resolved[key] = val
+                  .replace('{{customToken}}', 'chain-token-123')
+                  .replace('{{userName}}', 'Chain User');
+              } else if (val && typeof val === 'object') {
+                resolved[key] = {};
+                for (const [subKey, subVal] of Object.entries(val)) {
+                  if (typeof subVal === 'string') {
+                    resolved[key][subKey] = subVal
+                      .replace('{{customToken}}', 'chain-token-123')
+                      .replace('{{userName}}', 'Chain User');
+                  } else {
+                    resolved[key][subKey] = subVal;
+                  }
+                }
+              } else {
+                resolved[key] = val;
+              }
+            }
+            return resolved;
+          }
+          return value;
+        });
+
+        vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
+
+        await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfig,
+          {},
+          {},
+          false,
+          false
+        );
+
+        // Verify that variables were resolved in step.with overrides
+        expect(httpClient.executeRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            headers: expect.objectContaining({
+              'Authorization': 'Bearer chain-token-123'
+            }),
+            body: {
+              name: 'Chain User',
+              source: 'chain'
+            }
+          })
+        );
+      });
+
+      it('should handle step.with without overriding undefined fields', async () => {
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'getUser',
+              call: 'testApi.getUser',
+              with: {
+                headers: {
+                  'X-Custom': 'custom-value'
+                }
+                // No params, pathParams, or body overrides
+              }
+            }
+          ]
+        };
+
+        const mockResponse: HttpResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: '{"id": 123}'
+        };
+
+        // Mock variableResolver.resolveValue to handle different inputs
+        vi.mocked(variableResolver.resolveValue).mockImplementation(async (value) => {
+          // Return the value as-is for API and endpoint (no variables to resolve)
+          if (value === mockConfig.apis.testApi) {
+            return mockConfig.apis.testApi;
+          }
+          if (value === mockConfig.apis.testApi.endpoints.getUser) {
+            return mockConfig.apis.testApi.endpoints.getUser;
+          }
+          // For step.with, return the resolved values
+          if (value && typeof value === 'object' && 'headers' in value) {
+            return value; // step.with headers should be returned as-is (no variables to resolve)
+          }
+          return value;
+        });
+
+        vi.mocked(urlBuilder.mergeHeaders).mockReturnValue({ 'Content-Type': 'application/json' });
+        vi.mocked(urlBuilder.mergeParams).mockReturnValue({ 'limit': '10' });
+        vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
+
+        await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfig,
+          {},
+          {},
+          false,
+          false
+        );
+
+        // Verify that only headers were overridden, other fields use defaults
+        expect(httpClient.executeRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            headers: {
+              'Content-Type': 'application/json', // From base
+              'X-Custom': 'custom-value' // From step.with
+            },
+            url: expect.stringContaining('limit=10'), // Base params preserved
+            body: undefined // No body override, uses endpoint default
+          })
+        );
+      });
+    });
   });
 }); 

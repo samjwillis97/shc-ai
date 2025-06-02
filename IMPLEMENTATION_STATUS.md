@@ -154,15 +154,15 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [x] **T8.1:** Define YAML structure for top-level `chains` section. Each chain has `vars` and `steps`. Each step has `id`, `call` (`api_name.endpoint_name`), and optional `with` (for `headers`, `params`, `pathParams`, `body` overrides).
   - [x] **T8.2:** Implement the `httpcraft chain <chain_name>` command.
   - [x] **T8.3:** Implement sequential execution of steps defined in a chain. For each step, resolve its `call` to an API/endpoint definition.
-  - [ ] **T8.4:** Implement `chain.vars` and their integration into variable resolution (precedence: CLI > Step `with` > `chain.vars` > Endpoint > ...).
-  - [ ] **T8.5:** Implement `step.with` overrides.
+  - [x] **T8.4:** Implement `chain.vars` and their integration into variable resolution (precedence: CLI > Step `with` > `chain.vars` > Endpoint > ...).
+  - [x] **T8.5:** Implement `step.with` overrides for `headers`, `params`, `pathParams`, and `body`. Step overrides have highest precedence and support variable resolution. PathParams enable URL parameter substitution (e.g., `{{userId}}` → actual values).
   - [ ] **T8.6:** Store full request/response for each step.
   - [ ] **T8.7:** Integrate a JSONPath library.
   - [ ] **T8.8:** Implement variable substitution for `{{steps.*.response...}}`.
   - [ ] **T8.9:** Implement variable substitution for `{{steps.*.request...}}`.
   - [ ] **T8.10:** Chain halts on step failure.
   - [ ] **T8.11:** Default output for successful chain is last step's body.
-- **Notes/Blockers:** T8.1, T8.2, and T8.3 completed successfully. Implemented comprehensive ChainExecutor class with sequential step execution, proper error handling (halts on HTTP 4xx/5xx), variable resolution integration, and support for dry run mode, verbose output, chain variables, and CLI variable overrides. Chain execution integrates with existing plugin system for pre-request hooks and outputs last step's response body on success. Created comprehensive unit tests (14) and integration tests (8) covering all chain execution scenarios. Fixed test suite stability issues by implementing sequential test execution and increased timeouts for network-dependent integration tests. All 211 tests now passing. Ready to proceed with T8.4 for step.with overrides and remaining chain features.
+- **Notes/Blockers:** T8.1-T8.5 completed successfully. Implemented comprehensive ChainExecutor class with sequential step execution, proper error handling (halts on HTTP 4xx/5xx), variable resolution integration, chain variables support, and full step.with override functionality. Step.with allows overriding headers, query parameters, path parameters, and request body with highest precedence in variable resolution. All overrides support variable substitution and are merged correctly with base endpoint/API configurations. Created comprehensive unit tests (20) and integration tests (9) covering all chain execution scenarios including step.with overrides. All 217 tests now passing. Ready to proceed with T8.6 for request/response storage and remaining chain features.
 
 ---
 

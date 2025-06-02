@@ -116,7 +116,15 @@ describe('Chain Execution Integration', () => {
       }
       return `${api.baseUrl}${endpoint.path}`;
     });
-    vi.mocked(urlBuilder.mergeHeaders).mockReturnValue({ 'Content-Type': 'application/json' });
+    vi.mocked(urlBuilder.mergeHeaders).mockImplementation((api, endpoint) => {
+      // Base headers from API
+      const headers = { ...api.headers };
+      // Merge endpoint headers if they exist
+      if (endpoint.headers) {
+        Object.assign(headers, endpoint.headers);
+      }
+      return headers;
+    });
     vi.mocked(urlBuilder.mergeParams).mockReturnValue({});
   });
 
@@ -430,5 +438,130 @@ describe('Chain Execution Integration', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining("Endpoint 'createUser' not found in API 'userApi'")
     );
+  });
+
+  // T8.5: Integration test for step.with overrides
+  it('should handle step.with overrides correctly', async () => {
+    const configWithStepOverrides: HttpCraftConfig = {
+      apis: {
+        userApi: {
+          baseUrl: 'https://api.users.com',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          endpoints: {
+            createUser: {
+              method: 'POST',
+              path: '/users',
+              body: {
+                name: '{{defaultName}}',
+                email: '{{defaultEmail}}'
+              }
+            },
+            updateUser: {
+              method: 'PUT',
+              path: '/users/{{userId}}',
+              headers: {
+                'X-Default': 'default-value'
+              }
+            }
+          }
+        }
+      },
+      chains: {
+        userWorkflow: {
+          vars: {
+            defaultName: 'Default User',
+            defaultEmail: 'default@example.com',
+            customToken: 'chain-token-123'
+          },
+          steps: [
+            {
+              id: 'createUser',
+              call: 'userApi.createUser',
+              with: {
+                headers: {
+                  'Authorization': 'Bearer {{customToken}}',
+                  'X-Custom': 'step-override'
+                },
+                body: {
+                  name: 'Step Override Name',
+                  email: 'step@example.com',
+                  source: 'step-with'
+                }
+              }
+            },
+            {
+              id: 'updateUser',
+              call: 'userApi.updateUser',
+              with: {
+                pathParams: {
+                  userId: '123'
+                },
+                headers: {
+                  'Authorization': 'Bearer {{customToken}}'
+                },
+                params: {
+                  'force': 'true'
+                }
+              }
+            }
+          ]
+        }
+      }
+    };
+
+    vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(configWithStepOverrides);
+
+    const createUserResponse: HttpResponse = {
+      status: 201,
+      statusText: 'Created',
+      headers: {},
+      body: '{"id": 123, "name": "Step Override Name"}'
+    };
+
+    const updateUserResponse: HttpResponse = {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      body: '{"id": 123, "name": "Updated User"}'
+    };
+
+    vi.mocked(httpClient.executeRequest)
+      .mockResolvedValueOnce(createUserResponse)
+      .mockResolvedValueOnce(updateUserResponse);
+
+    await handleChainCommand({
+      chainName: 'userWorkflow',
+      config: 'test-config.yaml'
+    });
+
+    // Verify first request (createUser) used step.with overrides
+    const firstRequest = vi.mocked(httpClient.executeRequest).mock.calls[0][0] as HttpRequest;
+    expect(firstRequest.method).toBe('POST');
+    expect(firstRequest.url).toBe('https://api.users.com/users');
+    expect(firstRequest.headers).toEqual({
+      'Content-Type': 'application/json', // From API
+      'Authorization': 'Bearer chain-token-123', // From step.with (resolved)
+      'X-Custom': 'step-override' // From step.with
+    });
+    expect(firstRequest.body).toEqual({
+      name: 'Step Override Name', // From step.with (overrides endpoint)
+      email: 'step@example.com', // From step.with (overrides endpoint)
+      source: 'step-with' // From step.with (addition)
+    });
+
+    // Verify second request (updateUser) used pathParams and other overrides
+    const secondRequest = vi.mocked(httpClient.executeRequest).mock.calls[1][0] as HttpRequest;
+    expect(secondRequest.method).toBe('PUT');
+    expect(secondRequest.url).toBe('https://api.users.com/users/123?force=true'); // pathParams + query params
+    expect(secondRequest.headers).toEqual({
+      'Content-Type': 'application/json', // From API
+      'X-Default': 'default-value', // From endpoint
+      'Authorization': 'Bearer chain-token-123' // From step.with (resolved)
+    });
+
+    // Verify final output (last step's response)
+    expect(consoleLogSpy).toHaveBeenCalledWith('{"id": 123, "name": "Updated User"}');
   });
 }); 

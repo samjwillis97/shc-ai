@@ -152,7 +152,6 @@ export class ChainExecutor {
     }
 
     // Create variable context for this step
-    // Note: stepWith overrides will be implemented in T8.5, for now we create basic context
     const variableContext = variableResolver.createContext(
       cliVariables,
       profiles,
@@ -164,20 +163,46 @@ export class ChainExecutor {
     variableContext.chainVars = chainVars;
 
     try {
-      // Resolve variables in API and endpoint configurations
+      // Resolve variables in API and endpoint configurations first
       const resolvedApi = await variableResolver.resolveValue(api, variableContext) as ApiDefinition;
       const resolvedEndpoint = await variableResolver.resolveValue(endpoint, variableContext) as EndpointDefinition;
 
-      // Build request details
-      const url = urlBuilder.buildUrl(resolvedApi, resolvedEndpoint);
-      const headers = urlBuilder.mergeHeaders(resolvedApi, resolvedEndpoint);
-      const params = urlBuilder.mergeParams(resolvedApi, resolvedEndpoint);
+      // T8.5: Resolve step.with overrides using the full variable context
+      let resolvedStepWith: any = null;
+      if (step.with) {
+        resolvedStepWith = await variableResolver.resolveValue(step.with, variableContext);
+      }
+
+      // Build request details with step.with overrides
+      let url = urlBuilder.buildUrl(resolvedApi, resolvedEndpoint);
+      
+      // T8.5: Apply pathParams substitution if provided in step.with
+      if (resolvedStepWith?.pathParams) {
+        url = this.applyPathParams(url, resolvedStepWith.pathParams);
+      }
+      
+      // T8.5: Merge headers with step.with overrides (step.with has highest precedence)
+      const baseHeaders = urlBuilder.mergeHeaders(resolvedApi, resolvedEndpoint);
+      const headers = resolvedStepWith?.headers 
+        ? { ...baseHeaders, ...resolvedStepWith.headers }
+        : baseHeaders;
+      
+      // T8.5: Merge params with step.with overrides (step.with has highest precedence)
+      const baseParams = urlBuilder.mergeParams(resolvedApi, resolvedEndpoint);
+      const params = resolvedStepWith?.params
+        ? { ...baseParams, ...resolvedStepWith.params }
+        : baseParams;
+
+      // T8.5: Use step.with body override if provided, otherwise use endpoint body
+      const body = resolvedStepWith?.body !== undefined 
+        ? resolvedStepWith.body 
+        : resolvedEndpoint.body;
 
       const request: HttpRequest = {
         method: resolvedEndpoint.method,
         url,
         headers,
-        body: resolvedEndpoint.body
+        body
       };
 
       // Add query parameters to the URL if present
@@ -241,6 +266,21 @@ export class ChainExecutor {
       }
       throw error;
     }
+  }
+
+  /**
+   * T8.5: Applies path parameter substitution to a URL
+   * Replaces {{paramName}} in the URL with the corresponding value from pathParams
+   */
+  private applyPathParams(url: string, pathParams: Record<string, string>): string {
+    let result = url;
+    
+    for (const [paramName, paramValue] of Object.entries(pathParams)) {
+      const placeholder = `{{${paramName}}}`;
+      result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), String(paramValue));
+    }
+    
+    return result;
   }
 
   /**
