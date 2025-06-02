@@ -1,5 +1,10 @@
 import { configLoader } from '../../core/configLoader.js';
+import { chainExecutor } from '../../core/chainExecutor.js';
+import { variableResolver } from '../../core/variableResolver.js';
+import { PluginManager } from '../../core/pluginManager.js';
+import { httpClient } from '../../core/httpClient.js';
 import type { HttpCraftConfig, ChainDefinition } from '../../types/config.js';
+import path from 'path';
 
 export interface ChainCommandArgs {
   chainName: string;
@@ -15,9 +20,11 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
   try {
     // Load configuration
     let config: HttpCraftConfig;
+    let configPath: string;
     
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
+      configPath = args.config;
     } else {
       const defaultConfig = await configLoader.loadDefaultConfig();
       if (!defaultConfig) {
@@ -25,6 +32,17 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
         process.exit(1);
       }
       config = defaultConfig.config;
+      configPath = defaultConfig.path;
+    }
+    
+    // Initialize and load plugins
+    const pluginManager = new PluginManager();
+    if (config.plugins && config.plugins.length > 0) {
+      const configDir = path.dirname(configPath);
+      await pluginManager.loadPlugins(config.plugins, configDir);
+      
+      // Set plugin manager on HTTP client for pre-request hooks
+      httpClient.setPluginManager(pluginManager);
     }
     
     // Find chain
@@ -39,20 +57,60 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
       process.exit(1);
     }
     
-    console.log(`Executing chain: ${args.chainName}`);
-    if (chain.description) {
-      console.log(`Description: ${chain.description}`);
+    // Determine which profiles to use
+    let profileNames: string[] = [];
+    if (args.profiles && args.profiles.length > 0) {
+      // Use profiles specified via CLI
+      profileNames = args.profiles;
+    } else if (config.config?.defaultProfile) {
+      // Use default profile(s) from config
+      if (Array.isArray(config.config.defaultProfile)) {
+        profileNames = config.config.defaultProfile;
+      } else {
+        profileNames = [config.config.defaultProfile];
+      }
     }
     
-    // For now, just show the chain structure (Phase 8, Task T8.1 and T8.2)
-    // This will be expanded in subsequent tasks
-    console.log(`Chain has ${chain.steps.length} step(s):`);
-    for (let i = 0; i < chain.steps.length; i++) {
-      const step = chain.steps[i];
-      console.log(`  ${i + 1}. ${step.id}: ${step.call}`);
-      if (step.description) {
-        console.log(`     Description: ${step.description}`);
+    // Load and merge profile variables
+    let mergedProfileVars: Record<string, any> = {};
+    if (profileNames.length > 0) {
+      if (!config.profiles) {
+        console.error(`Error: No profiles defined in configuration, but profile(s) requested: ${profileNames.join(', ')}`);
+        process.exit(1);
       }
+      
+      // Validate that all requested profiles exist
+      for (const profileName of profileNames) {
+        if (!config.profiles[profileName]) {
+          console.error(`Error: Profile '${profileName}' not found in configuration`);
+          process.exit(1);
+        }
+      }
+      
+      mergedProfileVars = variableResolver.mergeProfiles(profileNames, config.profiles);
+    }
+    
+    // Execute the chain
+    const result = await chainExecutor.executeChain(
+      args.chainName,
+      chain,
+      config,
+      args.variables || {},
+      mergedProfileVars,
+      args.verbose || false,
+      args.dryRun || false
+    );
+    
+    // Handle execution result
+    if (result.success) {
+      // Output the response body of the last successful step (T8.11)
+      if (result.steps.length > 0) {
+        const lastStep = result.steps[result.steps.length - 1];
+        console.log(lastStep.response.body);
+      }
+    } else {
+      console.error(`Chain execution failed: ${result.error}`);
+      process.exit(1);
     }
     
   } catch (error) {

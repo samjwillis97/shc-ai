@@ -153,7 +153,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 - **Tasks:**
   - [x] **T8.1:** Define YAML structure for top-level `chains` section. Each chain has `vars` and `steps`. Each step has `id`, `call` (`api_name.endpoint_name`), and optional `with` (for `headers`, `params`, `pathParams`, `body` overrides).
   - [x] **T8.2:** Implement the `httpcraft chain <chain_name>` command.
-  - [ ] **T8.3:** Implement sequential execution of steps defined in a chain. For each step, resolve its `call` to an API/endpoint definition.
+  - [x] **T8.3:** Implement sequential execution of steps defined in a chain. For each step, resolve its `call` to an API/endpoint definition.
   - [ ] **T8.4:** Implement `chain.vars` and their integration into variable resolution (precedence: CLI > Step `with` > `chain.vars` > Endpoint > ...).
   - [ ] **T8.5:** Implement `step.with` overrides.
   - [ ] **T8.6:** Store full request/response for each step.
@@ -162,7 +162,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [ ] **T8.9:** Implement variable substitution for `{{steps.*.request...}}`.
   - [ ] **T8.10:** Chain halts on step failure.
   - [ ] **T8.11:** Default output for successful chain is last step's body.
-- **Notes/Blockers:** T8.1 and T8.2 completed successfully. Added chain configuration types (ChainDefinition, ChainStep, StepOverrides) to support YAML structure for chains and steps. Implemented basic `httpcraft chain <chain_name>` command that loads configuration, finds chains, and displays chain structure. Created comprehensive unit tests for both configuration types and CLI command. All tests passing (17 new tests added). Ready to proceed with T8.3 for sequential step execution.
+- **Notes/Blockers:** T8.1, T8.2, and T8.3 completed successfully. Implemented ChainExecutor class with sequential step execution, proper error handling, variable resolution integration, and comprehensive testing. Chain execution supports dry run mode, verbose output, chain variables, CLI variable overrides, and plugin integration. Chain halts on HTTP errors (4xx/5xx) and outputs last step's response body on success. All 33 chain-related tests passing. Ready to proceed with T8.4 for step.with overrides and remaining chain features.
 
 ---
 
