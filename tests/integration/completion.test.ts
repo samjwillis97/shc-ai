@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { spawn } from 'child_process';
 import { promisify } from 'util';
-import { writeFile, unlink, mkdir } from 'fs/promises';
+import { writeFile, unlink, mkdir, readFile } from 'fs/promises';
 import { join } from 'path';
 
 const execFile = promisify(spawn);
@@ -36,8 +36,7 @@ async function runCli(args: string[]): Promise<{ stdout: string; stderr: string;
 
 // Helper function to create a test config file
 async function createTestConfig(filename: string, config: any): Promise<string> {
-  const content = `
-config:
+  const content = `config:
   defaultProfile: "dev"
 
 profiles:
@@ -47,14 +46,24 @@ profiles:
     baseUrl: "https://prod.example.com"
 
 apis:
-  ${Object.keys(config.apis || {}).map(apiName => `
-  ${apiName}:
-    baseUrl: "${config.apis[apiName].baseUrl}"
-    endpoints:${Object.keys(config.apis[apiName].endpoints || {}).map(endpointName => `
-      ${endpointName}:
-        path: "${config.apis[apiName].endpoints[endpointName].path}"
-        method: "${config.apis[apiName].endpoints[endpointName].method}"`).join('')}`).join('')}
-`.trim();
+  github-api:
+    baseUrl: "https://api.github.com"
+    endpoints:
+      get-user:
+        path: "/users/:username"
+        method: "GET"
+      list-repos:
+        path: "/users/:username/repos"
+        method: "GET"
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      get-post:
+        path: "/posts/:id"
+        method: "GET"
+      create-post:
+        path: "/posts"
+        method: "POST"`;
 
   await writeFile(filename, content);
   return filename;
@@ -156,8 +165,14 @@ describe('Completion Integration Tests', () => {
     });
 
     it('should work with default config', async () => {
+      // Use a unique filename to avoid conflicts
+      const uniqueConfigFile = `.httpcraft-test-${Date.now()}.yaml`;
+      
       // Create default config file
-      await createTestConfig('.httpcraft.yaml', testConfig);
+      await createTestConfig(uniqueConfigFile, testConfig);
+      
+      // Copy to default location
+      await writeFile('.httpcraft.yaml', await readFile(uniqueConfigFile, 'utf8'));
 
       const result = await runCli(['--get-api-names']);
 
@@ -166,7 +181,16 @@ describe('Completion Integration Tests', () => {
       expect(result.stdout).toContain('jsonplaceholder');
 
       // Cleanup
-      await unlink('.httpcraft.yaml');
+      try {
+        await unlink('.httpcraft.yaml');
+      } catch {
+        // Files might not exist
+      }
+      try {
+        await unlink(uniqueConfigFile);
+      } catch {
+        // Files might not exist
+      }
     });
   });
 
@@ -204,8 +228,14 @@ describe('Completion Integration Tests', () => {
     });
 
     it('should work with default config', async () => {
+      // Use a unique filename to avoid conflicts
+      const uniqueConfigFile = `.httpcraft-test-${Date.now()}.yaml`;
+      
       // Create default config file
-      await createTestConfig('.httpcraft.yaml', testConfig);
+      await createTestConfig(uniqueConfigFile, testConfig);
+      
+      // Copy to default location
+      await writeFile('.httpcraft.yaml', await readFile(uniqueConfigFile, 'utf8'));
 
       const result = await runCli(['--get-endpoint-names', 'jsonplaceholder']);
 
@@ -214,7 +244,16 @@ describe('Completion Integration Tests', () => {
       expect(result.stdout).toContain('create-post');
 
       // Cleanup
-      await unlink('.httpcraft.yaml');
+      try {
+        await unlink('.httpcraft.yaml');
+      } catch {
+        // Files might not exist
+      }
+      try {
+        await unlink(uniqueConfigFile);
+      } catch {
+        // Files might not exist
+      }
     });
   });
 

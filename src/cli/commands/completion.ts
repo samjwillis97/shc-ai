@@ -1,4 +1,4 @@
-import { configLoader } from '../../core/configLoader.js';
+import { configLoader, ConfigWithPath } from '../../core/configLoader.js';
 import type { HttpCraftConfig } from '../../types/config.js';
 
 export interface CompletionCommandArgs {
@@ -96,12 +96,12 @@ export async function handleGetApiNamesCommand(args: GetApiNamesArgs): Promise<v
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
     } else {
-      const defaultConfig = await configLoader.loadDefaultConfig();
-      if (!defaultConfig) {
+      const defaultConfigResult = await configLoader.loadDefaultConfig();
+      if (!defaultConfigResult) {
         // Silently exit if no config found - completion should not error
         return;
       }
-      config = defaultConfig;
+      config = defaultConfigResult.config;
     }
     
     // Output API names, one per line
@@ -126,12 +126,12 @@ export async function handleGetEndpointNamesCommand(args: GetEndpointNamesArgs):
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
     } else {
-      const defaultConfig = await configLoader.loadDefaultConfig();
-      if (!defaultConfig) {
+      const defaultConfigResult = await configLoader.loadDefaultConfig();
+      if (!defaultConfigResult) {
         // Silently exit if no config found - completion should not error
         return;
       }
-      config = defaultConfig;
+      config = defaultConfigResult.config;
     }
     
     // Find the API and output its endpoint names

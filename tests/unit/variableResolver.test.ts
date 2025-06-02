@@ -23,72 +23,70 @@ describe('VariableResolver', () => {
   });
 
   describe('T3.1: Basic templating function', () => {
-    it('should substitute simple variables', () => {
-      const result = resolver.resolve('hello {{name}}', mockContext);
+    it('should substitute simple variables', async () => {
+      const result = await resolver.resolve('hello {{name}}', mockContext);
       expect(result).toBe('hello John');
     });
 
-    it('should substitute multiple variables', () => {
-      const result = resolver.resolve('User {{name}} has ID {{userId}}', mockContext);
+    it('should substitute multiple variables', async () => {
+      const result = await resolver.resolve('User {{name}} has ID {{userId}}', mockContext);
       expect(result).toBe('User John has ID 123');
     });
 
-    it('should handle variables with whitespace', () => {
-      const result = resolver.resolve('hello {{ name }}', mockContext);
+    it('should handle variables with whitespace', async () => {
+      const result = await resolver.resolve('hello {{ name }}', mockContext);
       expect(result).toBe('hello John');
     });
 
-    it('should return original string when no variables present', () => {
-      const result = resolver.resolve('hello world', mockContext);
+    it('should return original string when no variables present', async () => {
+      const result = await resolver.resolve('hello world', mockContext);
       expect(result).toBe('hello world');
     });
   });
 
   describe('T3.2: Environment variable support', () => {
-    it('should resolve env.VAR_NAME syntax', () => {
-      const result = resolver.resolve('Current user: {{env.USER}}', mockContext);
+    it('should resolve env.VAR_NAME syntax', async () => {
+      const result = await resolver.resolve('Current user: {{env.USER}}', mockContext);
       expect(result).toBe('Current user: testuser');
     });
 
-    it('should resolve multiple environment variables', () => {
-      const result = resolver.resolve('User: {{env.USER}}, Env: {{env.NODE_ENV}}', mockContext);
+    it('should resolve multiple environment variables', async () => {
+      const result = await resolver.resolve('User: {{env.USER}}, Env: {{env.NODE_ENV}}', mockContext);
       expect(result).toBe('User: testuser, Env: test');
     });
 
-    it('should throw error for undefined environment variables', () => {
-      expect(() => {
-        resolver.resolve('Missing: {{env.UNDEFINED_VAR}}', mockContext);
-      }).toThrow(VariableResolutionError);
+    it('should throw error for undefined environment variables', async () => {
+      await expect(resolver.resolve('Missing: {{env.UNDEFINED_VAR}}', mockContext))
+        .rejects.toThrow(VariableResolutionError);
       
-      expect(() => {
-        resolver.resolve('Missing: {{env.UNDEFINED_VAR}}', mockContext);
-      }).toThrow("Environment variable 'UNDEFINED_VAR' is not defined");
+      await expect(resolver.resolve('Missing: {{env.UNDEFINED_VAR}}', mockContext))
+        .rejects.toThrow("Environment variable 'UNDEFINED_VAR' is not defined");
     });
   });
 
   describe('T3.4: Variable precedence (CLI > Environment)', () => {
-    it('should prefer CLI variables over environment variables', () => {
+    it('should prefer CLI variables over environment variables', async () => {
       // Both CLI and env have 'apiKey', CLI should win
-      const result = resolver.resolve('Key: {{apiKey}}', mockContext);
+      const result = await resolver.resolve('Key: {{apiKey}}', mockContext);
       expect(result).toBe('Key: cli-api-key');
     });
 
-    it('should fall back to environment when CLI variable not defined', () => {
-      const result = resolver.resolve('Path: {{PATH}}', mockContext);
+    it('should fall back to environment when CLI variable not defined', async () => {
+      const result = await resolver.resolve('Path: {{PATH}}', mockContext);
       expect(result).toBe('Path: /usr/bin:/bin');
     });
   });
 
   describe('T3.7: Error handling for unresolved variables', () => {
-    it('should throw VariableResolutionError for undefined variables', () => {
-      expect(() => {
-        resolver.resolve('Missing: {{undefinedVar}}', mockContext);
-      }).toThrow(VariableResolutionError);
+    it('should throw VariableResolutionError for undefined variables', async () => {
+      await expect(resolver.resolve('Missing: {{undefinedVar}}', mockContext))
+        .rejects.toThrow(VariableResolutionError);
     });
 
-    it('should provide informative error message', () => {
+    it('should provide informative error message', async () => {
       try {
-        resolver.resolve('Missing: {{undefinedVar}}', mockContext);
+        await resolver.resolve('Missing: {{undefinedVar}}', mockContext);
+        expect.fail('Should have thrown error');
       } catch (error) {
         expect(error).toBeInstanceOf(VariableResolutionError);
         expect((error as VariableResolutionError).message).toBe("Variable 'undefinedVar' could not be resolved");
@@ -96,26 +94,25 @@ describe('VariableResolver', () => {
       }
     });
 
-    it('should halt execution on first unresolved variable', () => {
-      expect(() => {
-        resolver.resolve('First: {{undefinedVar1}}, Second: {{undefinedVar2}}', mockContext);
-      }).toThrow(VariableResolutionError);
+    it('should halt execution on first unresolved variable', async () => {
+      await expect(resolver.resolve('First: {{undefinedVar1}}, Second: {{undefinedVar2}}', mockContext))
+        .rejects.toThrow(VariableResolutionError);
     });
   });
 
   describe('resolveValue method', () => {
-    it('should resolve variables in strings', () => {
-      const result = resolver.resolveValue('Hello {{name}}', mockContext);
+    it('should resolve variables in strings', async () => {
+      const result = await resolver.resolveValue('Hello {{name}}', mockContext);
       expect(result).toBe('Hello John');
     });
 
-    it('should resolve variables in object values', () => {
+    it('should resolve variables in object values', async () => {
       const input = {
         title: 'User {{name}}',
         id: '{{userId}}',
         env: '{{env.NODE_ENV}}'
       };
-      const result = resolver.resolveValue(input, mockContext);
+      const result = await resolver.resolveValue(input, mockContext);
       expect(result).toEqual({
         title: 'User John',
         id: '123',
@@ -123,13 +120,13 @@ describe('VariableResolver', () => {
       });
     });
 
-    it('should resolve variables in arrays', () => {
+    it('should resolve variables in arrays', async () => {
       const input = ['{{name}}', '{{userId}}', 'static'];
-      const result = resolver.resolveValue(input, mockContext);
+      const result = await resolver.resolveValue(input, mockContext);
       expect(result).toEqual(['John', '123', 'static']);
     });
 
-    it('should handle nested objects', () => {
+    it('should handle nested objects', async () => {
       const input = {
         user: {
           name: '{{name}}',
@@ -139,7 +136,7 @@ describe('VariableResolver', () => {
           env: '{{env.NODE_ENV}}'
         }
       };
-      const result = resolver.resolveValue(input, mockContext);
+      const result = await resolver.resolveValue(input, mockContext);
       expect(result).toEqual({
         user: {
           name: 'John',
@@ -151,14 +148,14 @@ describe('VariableResolver', () => {
       });
     });
 
-    it('should preserve non-string values', () => {
+    it('should preserve non-string values', async () => {
       const input = {
         name: '{{name}}',
         count: 42,
         active: true,
         data: null
       };
-      const result = resolver.resolveValue(input, mockContext);
+      const result = await resolver.resolveValue(input, mockContext);
       expect(result).toEqual({
         name: 'John',
         count: 42,
@@ -195,43 +192,42 @@ describe('VariableResolver', () => {
   });
 
   describe('Phase 3 Compatibility - Basic Functionality', () => {
-    it('should resolve simple variables from CLI', () => {
+    it('should resolve simple variables from CLI', async () => {
       const context = resolver.createContext({ name: 'world' });
-      const result = resolver.resolve('Hello {{name}}!', context);
+      const result = await resolver.resolve('Hello {{name}}!', context);
       expect(result).toBe('Hello world!');
     });
 
-    it('should resolve environment variables with env. prefix', () => {
+    it('should resolve environment variables with env. prefix', async () => {
       const context = resolver.createContext({}, undefined, undefined, undefined);
       context.env.TEST_VAR = 'test_value';
       
-      const result = resolver.resolve('Value: {{env.TEST_VAR}}', context);
+      const result = await resolver.resolve('Value: {{env.TEST_VAR}}', context);
       expect(result).toBe('Value: test_value');
     });
 
-    it('should handle CLI variables taking precedence over environment', () => {
+    it('should handle CLI variables taking precedence over environment', async () => {
       const context = resolver.createContext({ test: 'cli_value' });
       context.env.test = 'env_value';
       
-      const result = resolver.resolve('{{test}}', context);
+      const result = await resolver.resolve('{{test}}', context);
       expect(result).toBe('cli_value');
     });
 
-    it('should throw error for undefined variables', () => {
+    it('should throw error for undefined variables', async () => {
       const context = resolver.createContext({});
       
-      expect(() => {
-        resolver.resolve('{{undefined_var}}', context);
-      }).toThrow(VariableResolutionError);
+      await expect(resolver.resolve('{{undefined_var}}', context))
+        .rejects.toThrow(VariableResolutionError);
     });
   });
 
   describe('Phase 4 - Profile Variables', () => {
-    it('should resolve profile variables with profile. prefix', () => {
+    it('should resolve profile variables with profile. prefix', async () => {
       const profiles = { apiHost: 'dev.example.com', userId: 123 };
       const context = resolver.createContext({}, profiles);
       
-      const result = resolver.resolve('Host: {{profile.apiHost}}, User: {{profile.userId}}', context);
+      const result = await resolver.resolve('Host: {{profile.apiHost}}, User: {{profile.userId}}', context);
       expect(result).toBe('Host: dev.example.com, User: 123');
     });
 
@@ -255,51 +251,48 @@ describe('VariableResolver', () => {
       expect(merged).toEqual({ host: 'dev.example.com' });
     });
 
-    it('should throw error for undefined profile variables', () => {
+    it('should throw error for undefined profile variables', async () => {
       const context = resolver.createContext({}, { host: 'example.com' });
       
-      expect(() => {
-        resolver.resolve('{{profile.missing}}', context);
-      }).toThrow(VariableResolutionError);
+      await expect(resolver.resolve('{{profile.missing}}', context))
+        .rejects.toThrow(VariableResolutionError);
     });
   });
 
   describe('Phase 4 - API and Endpoint Variables', () => {
-    it('should resolve API variables with api. prefix', () => {
+    it('should resolve API variables with api. prefix', async () => {
       const apiVars = { version: '1.2.3', timeout: 5000 };
       const context = resolver.createContext({}, undefined, apiVars);
       
-      const result = resolver.resolve('Version: {{api.version}}, Timeout: {{api.timeout}}', context);
+      const result = await resolver.resolve('Version: {{api.version}}, Timeout: {{api.timeout}}', context);
       expect(result).toBe('Version: 1.2.3, Timeout: 5000');
     });
 
-    it('should resolve endpoint variables with endpoint. prefix', () => {
+    it('should resolve endpoint variables with endpoint. prefix', async () => {
       const endpointVars = { maxItems: 50, includeDeleted: false };
       const context = resolver.createContext({}, undefined, undefined, endpointVars);
       
-      const result = resolver.resolve('Max: {{endpoint.maxItems}}, Include: {{endpoint.includeDeleted}}', context);
+      const result = await resolver.resolve('Max: {{endpoint.maxItems}}, Include: {{endpoint.includeDeleted}}', context);
       expect(result).toBe('Max: 50, Include: false');
     });
 
-    it('should throw error for undefined API variables', () => {
+    it('should throw error for undefined API variables', async () => {
       const context = resolver.createContext({}, undefined, { version: '1.0' });
       
-      expect(() => {
-        resolver.resolve('{{api.missing}}', context);
-      }).toThrow(VariableResolutionError);
+      await expect(resolver.resolve('{{api.missing}}', context))
+        .rejects.toThrow(VariableResolutionError);
     });
 
-    it('should throw error for undefined endpoint variables', () => {
+    it('should throw error for undefined endpoint variables', async () => {
       const context = resolver.createContext({}, undefined, undefined, { limit: 10 });
       
-      expect(() => {
-        resolver.resolve('{{endpoint.missing}}', context);
-      }).toThrow(VariableResolutionError);
+      await expect(resolver.resolve('{{endpoint.missing}}', context))
+        .rejects.toThrow(VariableResolutionError);
     });
   });
 
   describe('Phase 4 - Variable Precedence', () => {
-    it('should respect full precedence order: CLI > Endpoint > API > Profile > Environment', () => {
+    it('should respect full precedence order: CLI > Endpoint > API > Profile > Environment', async () => {
       const context = resolver.createContext(
         { test: 'cli_value' },                    // CLI (highest)
         { test: 'profile_value' },                // Profile
@@ -308,11 +301,11 @@ describe('VariableResolver', () => {
       );
       context.env.test = 'env_value';            // Environment (lowest)
       
-      const result = resolver.resolve('{{test}}', context);
+      const result = await resolver.resolve('{{test}}', context);
       expect(result).toBe('cli_value');
     });
 
-    it('should fall back to endpoint when CLI is not available', () => {
+    it('should fall back to endpoint when CLI is not available', async () => {
       const context = resolver.createContext(
         {},                                       // No CLI
         { test: 'profile_value' },                // Profile
@@ -321,11 +314,11 @@ describe('VariableResolver', () => {
       );
       context.env.test = 'env_value';            // Environment
       
-      const result = resolver.resolve('{{test}}', context);
+      const result = await resolver.resolve('{{test}}', context);
       expect(result).toBe('endpoint_value');
     });
 
-    it('should fall back to API when CLI and endpoint not available', () => {
+    it('should fall back to API when CLI and endpoint not available', async () => {
       const context = resolver.createContext(
         {},                                       // No CLI
         { test: 'profile_value' },                // Profile
@@ -334,11 +327,11 @@ describe('VariableResolver', () => {
       );
       context.env.test = 'env_value';            // Environment
       
-      const result = resolver.resolve('{{test}}', context);
+      const result = await resolver.resolve('{{test}}', context);
       expect(result).toBe('api_value');
     });
 
-    it('should fall back to profile when CLI, endpoint, and API not available', () => {
+    it('should fall back to profile when CLI, endpoint, and API not available', async () => {
       const context = resolver.createContext(
         {},                                       // No CLI
         { test: 'profile_value' },                // Profile
@@ -347,11 +340,11 @@ describe('VariableResolver', () => {
       );
       context.env.test = 'env_value';            // Environment
       
-      const result = resolver.resolve('{{test}}', context);
+      const result = await resolver.resolve('{{test}}', context);
       expect(result).toBe('profile_value');
     });
 
-    it('should fall back to environment as last resort', () => {
+    it('should fall back to environment as last resort', async () => {
       const context = resolver.createContext(
         {},                                       // No CLI
         {},                                       // No profile
@@ -360,13 +353,13 @@ describe('VariableResolver', () => {
       );
       context.env.test = 'env_value';            // Environment
       
-      const result = resolver.resolve('{{test}}', context);
+      const result = await resolver.resolve('{{test}}', context);
       expect(result).toBe('env_value');
     });
   });
 
   describe('Phase 4 - Scoped Variables', () => {
-    it('should resolve scoped variables correctly', () => {
+    it('should resolve scoped variables correctly', async () => {
       const context = resolver.createContext(
         { cliVar: 'cli_val' },
         { profileVar: 'profile_val' },
@@ -376,45 +369,44 @@ describe('VariableResolver', () => {
       context.env.ENV_VAR = 'env_val';
       
       const template = 'CLI: {{cliVar}}, Profile: {{profile.profileVar}}, API: {{api.apiVar}}, Endpoint: {{endpoint.endpointVar}}, Env: {{env.ENV_VAR}}';
-      const result = resolver.resolve(template, context);
+      const result = await resolver.resolve(template, context);
       expect(result).toBe('CLI: cli_val, Profile: profile_val, API: api_val, Endpoint: endpoint_val, Env: env_val');
     });
 
-    it('should throw error for unknown scopes', () => {
+    it('should throw error for unknown scopes', async () => {
       const context = resolver.createContext({});
       
-      expect(() => {
-        resolver.resolve('{{unknown.variable}}', context);
-      }).toThrow(VariableResolutionError);
+      await expect(resolver.resolve('{{unknown.variable}}', context))
+        .rejects.toThrow(VariableResolutionError);
     });
   });
 
   describe('Data Type Handling', () => {
-    it('should stringify numbers correctly', () => {
+    it('should stringify numbers correctly', async () => {
       const context = resolver.createContext({}, { port: 8080, version: 1.5 });
       
-      const result = resolver.resolve('Port: {{profile.port}}, Version: {{profile.version}}', context);
+      const result = await resolver.resolve('Port: {{profile.port}}, Version: {{profile.version}}', context);
       expect(result).toBe('Port: 8080, Version: 1.5');
     });
 
-    it('should stringify booleans correctly', () => {
+    it('should stringify booleans correctly', async () => {
       const context = resolver.createContext({}, { debug: true, production: false });
       
-      const result = resolver.resolve('Debug: {{profile.debug}}, Prod: {{profile.production}}', context);
+      const result = await resolver.resolve('Debug: {{profile.debug}}, Prod: {{profile.production}}', context);
       expect(result).toBe('Debug: true, Prod: false');
     });
 
-    it('should handle complex objects in values', () => {
+    it('should handle complex objects in values', async () => {
       const complexValue = { nested: { key: 'value' }, array: [1, 2, 3] };
       const context = resolver.createContext({}, { complex: complexValue });
       
-      const result = resolver.resolve('Data: {{profile.complex}}', context);
+      const result = await resolver.resolve('Data: {{profile.complex}}', context);
       expect(result).toBe('Data: {"nested":{"key":"value"},"array":[1,2,3]}');
     });
   });
 
   describe('resolveValue - Complex Objects', () => {
-    it('should resolve variables in object values', () => {
+    it('should resolve variables in object values', async () => {
       const context = resolver.createContext({ name: 'test', port: '8080' });
       const obj = {
         service: '{{name}}-service',
@@ -424,7 +416,7 @@ describe('VariableResolver', () => {
         }
       };
       
-      const result = resolver.resolveValue(obj, context);
+      const result = await resolver.resolveValue(obj, context);
       expect(result).toEqual({
         service: 'test-service',
         config: {
@@ -434,15 +426,15 @@ describe('VariableResolver', () => {
       });
     });
 
-    it('should resolve variables in arrays', () => {
+    it('should resolve variables in arrays', async () => {
       const context = resolver.createContext({ env: 'dev', version: '1.0' });
       const array = ['{{env}}-environment', 'version-{{version}}', 'static-value'];
       
-      const result = resolver.resolveValue(array, context);
+      const result = await resolver.resolveValue(array, context);
       expect(result).toEqual(['dev-environment', 'version-1.0', 'static-value']);
     });
 
-    it('should handle nested arrays and objects', () => {
+    it('should handle nested arrays and objects', async () => {
       const context = resolver.createContext({ name: 'api', version: '2.0' });
       const complex = {
         services: [
@@ -453,7 +445,7 @@ describe('VariableResolver', () => {
         ]
       };
       
-      const result = resolver.resolveValue(complex, context);
+      const result = await resolver.resolveValue(complex, context);
       expect(result).toEqual({
         services: [
           {
@@ -466,65 +458,64 @@ describe('VariableResolver', () => {
   });
 
   describe('Error Handling', () => {
-    it('should provide informative error messages for variable resolution failures', () => {
+    it('should provide informative error messages for variable resolution failures', async () => {
       const context = resolver.createContext({});
       
       try {
-        resolver.resolve('{{missing_var}}', context);
+        await resolver.resolve('{{missing_var}}', context);
         expect.fail('Should have thrown error');
       } catch (error) {
         expect(error).toBeInstanceOf(VariableResolutionError);
-        expect(error.message).toContain('missing_var');
-        expect(error.variableName).toBe('missing_var');
+        expect((error as VariableResolutionError).message).toContain('missing_var');
+        expect((error as VariableResolutionError).variableName).toBe('missing_var');
       }
     });
 
-    it('should provide informative error messages for scoped variable failures', () => {
+    it('should provide informative error messages for scoped variable failures', async () => {
       const context = resolver.createContext({}, { existing: 'value' });
       
       try {
-        resolver.resolve('{{profile.missing}}', context);
+        await resolver.resolve('{{profile.missing}}', context);
         expect.fail('Should have thrown error');
       } catch (error) {
         expect(error).toBeInstanceOf(VariableResolutionError);
-        expect(error.message).toContain('missing');
-        expect(error.variableName).toBe('profile.missing');
+        expect((error as VariableResolutionError).message).toContain('missing');
+        expect((error as VariableResolutionError).variableName).toBe('profile.missing');
       }
     });
   });
 
   describe('Edge Cases', () => {
-    it('should handle empty variable names gracefully', () => {
+    it('should handle empty variable names gracefully', async () => {
       const context = resolver.createContext({});
       
-      expect(() => {
-        resolver.resolve('{{}}', context);
-      }).toThrow(VariableResolutionError);
+      await expect(resolver.resolve('{{}}', context))
+        .rejects.toThrow(VariableResolutionError);
     });
 
-    it('should handle variables with spaces in names', () => {
+    it('should handle variables with spaces in names', async () => {
       const context = resolver.createContext({ 'my var': 'value' });
       
-      const result = resolver.resolve('{{ my var }}', context);
+      const result = await resolver.resolve('{{ my var }}', context);
       expect(result).toBe('value');
     });
 
-    it('should handle variables in complex paths', () => {
+    it('should handle variables in complex paths', async () => {
       const context = resolver.createContext({}, undefined, undefined, undefined);
       context.env['COMPLEX_PATH'] = '/path/to/resource';
       
-      const result = resolver.resolve('{{env.COMPLEX_PATH}}', context);
+      const result = await resolver.resolve('{{env.COMPLEX_PATH}}', context);
       expect(result).toBe('/path/to/resource');
     });
 
-    it('should handle multiple variables in one string', () => {
+    it('should handle multiple variables in one string', async () => {
       const context = resolver.createContext(
         { name: 'service' },
         { env: 'dev' },
         { version: '1.0' }
       );
       
-      const result = resolver.resolve('{{name}}-{{profile.env}}-v{{api.version}}', context);
+      const result = await resolver.resolve('{{name}}-{{profile.env}}-v{{api.version}}', context);
       expect(result).toBe('service-dev-v1.0');
     });
   });

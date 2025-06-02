@@ -10,6 +10,7 @@ export async function handleRequestCommand(options: RequestOptions): Promise<voi
     const response = await httpClient.executeRequest({
       method: 'GET',
       url: options.url,
+      headers: {},
     });
     
     // T1.4: Print raw response body to stdout

@@ -70,7 +70,10 @@ describe('Completion Commands', () => {
     });
 
     it('should use default config when no config specified', async () => {
-      vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue(mockConfig);
+      vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue({
+        config: mockConfig,
+        path: '/test/.httpcraft.yaml'
+      });
       
       await handleGetApiNamesCommand({});
       
@@ -134,7 +137,10 @@ describe('Completion Commands', () => {
     });
 
     it('should handle API with no endpoints', async () => {
-      vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue(mockConfig);
+      vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue({
+        config: mockConfig,
+        path: '/test/.httpcraft.yaml'
+      });
       
       await handleGetEndpointNamesCommand({ apiName: 'empty-api' });
       
@@ -143,7 +149,10 @@ describe('Completion Commands', () => {
     });
 
     it('should handle non-existent API', async () => {
-      vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue(mockConfig);
+      vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue({
+        config: mockConfig,
+        path: '/test/.httpcraft.yaml'
+      });
       
       await handleGetEndpointNamesCommand({ apiName: 'non-existent' });
       

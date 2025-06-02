@@ -1,20 +1,13 @@
-import type { HttpMethod } from '../types/config.js';
-export interface HttpRequest {
-    method: HttpMethod;
-    url: string;
-    headers?: Record<string, string>;
-    params?: Record<string, string>;
-    body?: string | object;
-}
-export interface HttpResponse {
-    status: number;
-    statusText: string;
-    headers: Record<string, string>;
-    body: string;
-}
+import { HttpRequest, HttpResponse } from '../types/plugin.js';
+import { PluginManager } from './pluginManager.js';
 export declare class HttpClient {
+    private pluginManager?;
     /**
-     * Executes an HTTP request
+     * Set the plugin manager for this HTTP client
+     */
+    setPluginManager(pluginManager: PluginManager): void;
+    /**
+     * Executes an HTTP request with plugin pre-request hooks
      * @param request The request configuration
      * @returns The response data
      */

@@ -5,6 +5,7 @@ export async function handleRequestCommand(options) {
         const response = await httpClient.executeRequest({
             method: 'GET',
             url: options.url,
+            headers: {},
         });
         // T1.4: Print raw response body to stdout
         process.stdout.write(response.body);

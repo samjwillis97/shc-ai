@@ -1,8 +1,10 @@
-import { configLoader } from '../../core/configLoader.js';
+import { configLoader, ConfigWithPath } from '../../core/configLoader.js';
 import { urlBuilder } from '../../core/urlBuilder.js';
 import { httpClient } from '../../core/httpClient.js';
 import { variableResolver, VariableResolutionError } from '../../core/variableResolver.js';
+import { PluginManager } from '../../core/pluginManager.js';
 import type { HttpCraftConfig, ApiDefinition, EndpointDefinition } from '../../types/config.js';
+import path from 'path';
 
 export interface ApiCommandArgs {
   apiName: string;
@@ -19,16 +21,29 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
   try {
     // Load configuration
     let config: HttpCraftConfig;
+    let configPath: string;
     
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
+      configPath = args.config;
     } else {
       const defaultConfig = await configLoader.loadDefaultConfig();
       if (!defaultConfig) {
         console.error('Error: No configuration file found. Use --config to specify a config file or create .httpcraft.yaml');
         process.exit(1);
       }
-      config = defaultConfig;
+      config = defaultConfig.config;
+      configPath = defaultConfig.path;
+    }
+    
+    // Initialize and load plugins (T7.2 and T7.7)
+    const pluginManager = new PluginManager();
+    if (config.plugins && config.plugins.length > 0) {
+      const configDir = path.dirname(configPath);
+      await pluginManager.loadPlugins(config.plugins, configDir);
+      
+      // Set plugin manager on HTTP client for pre-request hooks
+      httpClient.setPluginManager(pluginManager);
     }
     
     // Find API
@@ -78,12 +93,16 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       mergedProfileVars = variableResolver.mergeProfiles(profileNames, config.profiles);
     }
     
-    // Create variable context with Phase 4 precedence
+    // Get plugin variable sources (T7.4 and T7.5)
+    const pluginVariableSources = pluginManager.getVariableSources();
+    
+    // Create variable context with Phase 7 precedence including plugins
     const variableContext = variableResolver.createContext(
       args.variables || {},
       mergedProfileVars,
       api.variables,
-      endpoint.variables
+      endpoint.variables,
+      pluginVariableSources
     );
     
     // Apply variable resolution to configuration elements
@@ -92,8 +111,8 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     let resolvedEndpoint: EndpointDefinition;
     
     try {
-      resolvedApi = variableResolver.resolveValue(api, variableContext) as ApiDefinition;
-      resolvedEndpoint = variableResolver.resolveValue(endpoint, variableContext) as EndpointDefinition;
+      resolvedApi = await variableResolver.resolveValue(api, variableContext) as ApiDefinition;
+      resolvedEndpoint = await variableResolver.resolveValue(endpoint, variableContext) as EndpointDefinition;
     } catch (error) {
       if (error instanceof VariableResolutionError) {
         // If it's a dry run, we still want to try to show what we can
@@ -165,7 +184,7 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       printRequestDetails(requestDetails, false);
     }
     
-    // Execute HTTP request
+    // Execute HTTP request (with pre-request hooks if plugins are loaded)
     const startTime = Date.now();
     const response = await httpClient.executeRequest(requestDetails);
     const endTime = Date.now();

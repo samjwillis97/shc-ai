@@ -3,6 +3,11 @@ import path from 'path';
 import yaml from 'js-yaml';
 import type { HttpCraftConfig } from '../types/config.js';
 
+export interface ConfigWithPath {
+  config: HttpCraftConfig;
+  path: string;
+}
+
 export class ConfigLoader {
   /**
    * Loads and parses a YAML configuration file
@@ -44,13 +49,18 @@ export class ConfigLoader {
   /**
    * Attempts to find and load the default config file
    * Looks for .httpcraft.yaml in the current directory
+   * Returns both the config and the path where it was found
    */
-  async loadDefaultConfig(): Promise<HttpCraftConfig | null> {
+  async loadDefaultConfig(): Promise<ConfigWithPath | null> {
     const defaultPaths = ['./.httpcraft.yaml', './.httpcraft.yml'];
     
     for (const configPath of defaultPaths) {
       try {
-        return await this.loadConfig(configPath);
+        const config = await this.loadConfig(configPath);
+        return {
+          config,
+          path: path.resolve(configPath)
+        };
       } catch (error) {
         // Continue to next path
         continue;

@@ -3,6 +3,8 @@
  * Supports {{variable}} syntax with precedence rules
  */
 
+import { VariableSource } from '../types/plugin.js';
+
 export interface VariableContext {
   cli: Record<string, string>;
   stepWith?: Record<string, any>; // For future chain steps
@@ -10,6 +12,7 @@ export interface VariableContext {
   endpoint?: Record<string, any>;
   api?: Record<string, any>;
   profiles?: Record<string, any>; // Merged profile variables
+  plugins?: Record<string, Record<string, VariableSource>>; // Plugin variable sources
   env: Record<string, string>;
 }
 
@@ -23,44 +26,55 @@ export class VariableResolutionError extends Error {
 export class VariableResolver {
   /**
    * Resolves variables in a string using {{variable}} syntax
-   * Phase 4 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Environment
+   * Phase 7 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Plugins > Environment
    */
-  resolve(template: string, context: VariableContext): string {
+  async resolve(template: string, context: VariableContext): Promise<string> {
     const variablePattern = /\{\{([^}]*)\}\}/g;
+    let resolvedTemplate = template;
     
-    return template.replace(variablePattern, (match, variableName: string) => {
-      const trimmedName = variableName.trim();
+    // Process variables sequentially to handle async plugin variables
+    const matches = Array.from(template.matchAll(variablePattern));
+    
+    for (const match of matches) {
+      const variableName = match[1].trim();
       
       // Validate that variable name is not empty
-      if (!trimmedName) {
+      if (!variableName) {
         throw new VariableResolutionError(
           'Variable name cannot be empty',
-          trimmedName
+          variableName
         );
       }
       
-      // Handle scoped variables (e.g., env.VAR_NAME, profile.key, api.key, endpoint.key)
-      if (trimmedName.includes('.')) {
-        return this.resolveScopedVariable(trimmedName, context);
+      let resolvedValue: string;
+      
+      // Handle scoped variables (e.g., env.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable)
+      if (variableName.includes('.')) {
+        resolvedValue = await this.resolveScopedVariable(variableName, context);
+      } else {
+        // Handle unscoped variables with precedence
+        const value = this.resolveUnscopedVariable(variableName, context);
+        if (value !== undefined) {
+          resolvedValue = this.stringifyValue(value);
+        } else {
+          throw new VariableResolutionError(
+            `Variable '${variableName}' could not be resolved`,
+            variableName
+          );
+        }
       }
       
-      // Handle unscoped variables with precedence
-      const value = this.resolveUnscopedVariable(trimmedName, context);
-      if (value !== undefined) {
-        return this.stringifyValue(value);
-      }
-      
-      throw new VariableResolutionError(
-        `Variable '${trimmedName}' could not be resolved`,
-        trimmedName
-      );
-    });
+      // Replace this specific variable match
+      resolvedTemplate = resolvedTemplate.replace(match[0], resolvedValue);
+    }
+    
+    return resolvedTemplate;
   }
   
   /**
-   * Resolves scoped variables like env.VAR_NAME, profile.key, api.key, endpoint.key
+   * Resolves scoped variables like env.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable
    */
-  private resolveScopedVariable(variableName: string, context: VariableContext): string {
+  private async resolveScopedVariable(variableName: string, context: VariableContext): Promise<string> {
     const [scope, ...keyParts] = variableName.split('.');
     const key = keyParts.join('.');
     
@@ -101,6 +115,29 @@ export class VariableResolver {
           variableName
         );
         
+      case 'plugins':
+        if (context.plugins) {
+          const [pluginName, ...variableKeyParts] = keyParts;
+          const variableKey = variableKeyParts.join('.');
+          
+          if (context.plugins[pluginName] && context.plugins[pluginName][variableKey]) {
+            const variableSource = context.plugins[pluginName][variableKey];
+            try {
+              const value = await variableSource();
+              return this.stringifyValue(value);
+            } catch (error) {
+              throw new VariableResolutionError(
+                `Plugin variable '${variableName}' failed to resolve: ${error instanceof Error ? error.message : String(error)}`,
+                variableName
+              );
+            }
+          }
+        }
+        throw new VariableResolutionError(
+          `Plugin variable '${variableName}' is not defined`,
+          variableName
+        );
+        
       default:
         throw new VariableResolutionError(
           `Unknown variable scope '${scope}' in '${variableName}'`,
@@ -111,10 +148,10 @@ export class VariableResolver {
   
   /**
    * Resolves unscoped variables using precedence order
+   * Phase 7 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Environment
+   * Note: Plugin variables require the plugins.name.variable syntax and are not available as unscoped
    */
   private resolveUnscopedVariable(variableName: string, context: VariableContext): any {
-    // Phase 4 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Environment
-    
     // 1. CLI variables (highest precedence)
     if (context.cli[variableName] !== undefined) {
       return context.cli[variableName];
@@ -171,19 +208,23 @@ export class VariableResolver {
    * For strings, applies template substitution
    * For objects/arrays, recursively processes string values
    */
-  resolveValue(value: any, context: VariableContext): any {
+  async resolveValue(value: any, context: VariableContext): Promise<any> {
     if (typeof value === 'string') {
       return this.resolve(value, context);
     }
     
     if (Array.isArray(value)) {
-      return value.map(item => this.resolveValue(item, context));
+      const resolvedArray = [];
+      for (const item of value) {
+        resolvedArray.push(await this.resolveValue(item, context));
+      }
+      return resolvedArray;
     }
     
     if (value && typeof value === 'object') {
       const resolved: any = {};
       for (const [key, val] of Object.entries(value)) {
-        resolved[key] = this.resolveValue(val, context);
+        resolved[key] = await this.resolveValue(val, context);
       }
       return resolved;
     }
@@ -193,19 +234,21 @@ export class VariableResolver {
   
   /**
    * Creates a variable context from CLI arguments and environment variables
-   * Enhanced for Phase 4 with profile, API, and endpoint support
+   * Enhanced for Phase 7 with plugin support
    */
   createContext(
     cliVars: Record<string, string>,
     profiles?: Record<string, any>,
     api?: Record<string, any>,
-    endpoint?: Record<string, any>
+    endpoint?: Record<string, any>,
+    plugins?: Record<string, Record<string, VariableSource>>
   ): VariableContext {
     return {
       cli: { ...cliVars },
       profiles: profiles ? { ...profiles } : undefined,
       api: api ? { ...api } : undefined,
       endpoint: endpoint ? { ...endpoint } : undefined,
+      plugins: plugins ? { ...plugins } : undefined,
       env: { ...process.env } as Record<string, string>
     };
   }

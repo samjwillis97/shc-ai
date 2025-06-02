@@ -26,17 +26,20 @@ describe('API Command Phase 5 Features', () => {
 
     // Default mocks
     mockConfigLoader.loadDefaultConfig.mockResolvedValue({
-      apis: {
-        testapi: {
-          baseUrl: 'https://api.test.com',
-          endpoints: {
-            getTest: {
-              method: 'GET',
-              path: '/test',
+      config: {
+        apis: {
+          testapi: {
+            baseUrl: 'https://api.test.com',
+            endpoints: {
+              getTest: {
+                method: 'GET',
+                path: '/test',
+              },
             },
           },
         },
       },
+      path: '/test/.httpcraft.yaml'
     });
 
     mockHttpClient.executeRequest.mockResolvedValue({
@@ -76,21 +79,24 @@ describe('API Command Phase 5 Features', () => {
 
     it('should print headers and params when verbose is enabled and they exist', async () => {
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
-        apis: {
-          testapi: {
-            baseUrl: 'https://api.test.com',
-            headers: { 'X-API-Key': 'test123' },
-            params: { 'version': 'v1' },
-            endpoints: {
-              getTest: {
-                method: 'GET',
-                path: '/test',
-                headers: { 'Accept': 'application/json' },
-                params: { 'limit': '10' },
+        config: {
+          apis: {
+            testapi: {
+              baseUrl: 'https://api.test.com',
+              headers: { 'X-API-Key': 'test123' },
+              params: { 'version': 'v1' },
+              endpoints: {
+                getTest: {
+                  method: 'GET',
+                  path: '/test',
+                  headers: { 'Accept': 'application/json' },
+                  params: { 'limit': '10' },
+                },
               },
             },
           },
         },
+        path: '/test/.httpcraft.yaml'
       });
 
       await handleApiCommand({
@@ -109,18 +115,21 @@ describe('API Command Phase 5 Features', () => {
 
     it('should print request body when verbose is enabled and body exists', async () => {
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
-        apis: {
-          testapi: {
-            baseUrl: 'https://api.test.com',
-            endpoints: {
-              postTest: {
-                method: 'POST',
-                path: '/test',
-                body: { name: 'test', value: 123 },
+        config: {
+          apis: {
+            testapi: {
+              baseUrl: 'https://api.test.com',
+              endpoints: {
+                postTest: {
+                  method: 'POST',
+                  path: '/test',
+                  body: { name: 'test', value: 123 },
+                },
               },
             },
           },
         },
+        path: '/test/.httpcraft.yaml'
       });
 
       await handleApiCommand({
@@ -162,22 +171,25 @@ describe('API Command Phase 5 Features', () => {
 
     it('should print headers, params, and body in dry-run mode when they exist', async () => {
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
-        apis: {
-          testapi: {
-            baseUrl: 'https://api.test.com',
-            headers: { 'X-API-Key': 'test123' },
-            params: { 'version': 'v1' },
-            endpoints: {
-              postTest: {
-                method: 'POST',
-                path: '/test',
-                headers: { 'Content-Type': 'application/json' },
-                params: { 'format': 'json' },
-                body: '{"test": true}',
+        config: {
+          apis: {
+            testapi: {
+              baseUrl: 'https://api.test.com',
+              headers: { 'X-API-Key': 'test123' },
+              params: { 'version': 'v1' },
+              endpoints: {
+                postTest: {
+                  method: 'POST',
+                  path: '/test',
+                  headers: { 'Content-Type': 'application/json' },
+                  params: { 'format': 'json' },
+                  body: '{"test": true}',
+                },
               },
             },
           },
         },
+        path: '/test/.httpcraft.yaml'
       });
 
       await handleApiCommand({
@@ -344,18 +356,21 @@ describe('API Command Phase 5 Features', () => {
 
     it('should respect variable resolution in verbose output', async () => {
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
-        apis: {
-          testapi: {
-            baseUrl: 'https://api.{{env.ENVIRONMENT}}.com',
-            headers: { 'X-API-Key': '{{api_key}}' },
-            endpoints: {
-              getTest: {
-                method: 'GET',
-                path: '/test/{{user_id}}',
+        config: {
+          apis: {
+            testapi: {
+              baseUrl: 'https://api.{{env.ENVIRONMENT}}.com',
+              headers: { 'X-API-Key': '{{api_key}}' },
+              endpoints: {
+                getTest: {
+                  method: 'GET',
+                  path: '/test/{{user_id}}',
+                },
               },
             },
           },
         },
+        path: '/test/.httpcraft.yaml'
       });
 
       // Mock environment variable

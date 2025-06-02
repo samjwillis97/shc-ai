@@ -5,6 +5,7 @@
 export interface HttpCraftConfig {
   config?: ConfigSection;
   profiles?: Record<string, ProfileDefinition>;
+  plugins?: PluginConfiguration[];
   apis: Record<string, ApiDefinition>;
 }
 
@@ -14,6 +15,12 @@ export interface ConfigSection {
 
 export interface ProfileDefinition {
   [key: string]: string | number | boolean;
+}
+
+export interface PluginConfiguration {
+  path: string;
+  name: string;
+  config?: Record<string, any>;
 }
 
 export interface ApiDefinition {
