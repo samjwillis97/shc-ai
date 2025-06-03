@@ -16,7 +16,8 @@ vi.mock('../../../src/core/httpClient.js', () => ({
 vi.mock('../../../src/core/variableResolver.js', () => ({
   variableResolver: {
     createContext: vi.fn(),
-    resolveValue: vi.fn()
+    resolveValue: vi.fn(),
+    maskSecrets: vi.fn((text: string) => text.replace(/secret/gi, '[SECRET]'))
   },
   VariableResolutionError: class VariableResolutionError extends Error {
     constructor(message: string, public variableName: string) {

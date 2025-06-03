@@ -28,6 +28,45 @@ export class VariableResolutionError extends Error {
 }
 
 export class VariableResolver {
+  private secretVariables: Set<string> = new Set(); // T9.5: Track secret variables for masking
+  private secretValues: Map<string, string> = new Map(); // T9.5: Track secret values for masking
+  
+  /**
+   * T9.5: Reset secret tracking (useful for testing or between requests)
+   */
+  resetSecretTracking(): void {
+    this.secretVariables.clear();
+    this.secretValues.clear();
+  }
+  
+  /**
+   * T9.5: Get all tracked secret variables
+   */
+  getSecretVariables(): string[] {
+    return Array.from(this.secretVariables);
+  }
+  
+  /**
+   * T9.5: Mask secret values in a string for verbose/dry-run output
+   * Replaces actual secret values with [SECRET] placeholder
+   */
+  maskSecrets(text: string): string {
+    let maskedText = text;
+    
+    // For each tracked secret value, replace it with [SECRET]
+    for (const [variableName, secretValue] of this.secretValues) {
+      if (secretValue && secretValue.length > 0) {
+        // Replace all occurrences of the actual secret value with [SECRET]
+        // Use a global regex to replace all occurrences
+        const escapedValue = secretValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escapedValue, 'g');
+        maskedText = maskedText.replace(regex, '[SECRET]');
+      }
+    }
+    
+    return maskedText;
+  }
+  
   /**
    * Resolves variables in a string using {{variable}} syntax
    * Phase 8 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Plugins > Environment
@@ -56,15 +95,20 @@ export class VariableResolver {
       if (variableName.includes('.')) {
         resolvedValue = await this.resolveScopedVariable(variableName, context);
       } else {
-        // Handle unscoped variables with precedence
-        const value = this.resolveUnscopedVariable(variableName, context);
-        if (value !== undefined) {
-          resolvedValue = this.stringifyValue(value);
+        // T9.6: Handle built-in dynamic variables first (they start with $)
+        if (variableName.startsWith('$')) {
+          resolvedValue = this.resolveDynamicVariable(variableName, '', variableName);
         } else {
-          throw new VariableResolutionError(
-            `Variable '${variableName}' could not be resolved`,
-            variableName
-          );
+          // Handle unscoped variables with precedence
+          const value = this.resolveUnscopedVariable(variableName, context);
+          if (value !== undefined) {
+            resolvedValue = this.stringifyValue(value);
+          } else {
+            throw new VariableResolutionError(
+              `Variable '${variableName}' could not be resolved`,
+              variableName
+            );
+          }
         }
       }
       
@@ -95,6 +139,8 @@ export class VariableResolver {
       case 'secret':
         // T9.4: Secret variable resolution (default provider: OS environment)
         if (context.env[key] !== undefined) {
+          this.secretVariables.add(variableName);
+          this.secretValues.set(variableName, context.env[key]);
           return context.env[key];
         }
         throw new VariableResolutionError(
@@ -163,6 +209,11 @@ export class VariableResolver {
         );
         
       default:
+        // T9.6: Handle built-in dynamic variables with $ prefix
+        if (scope.startsWith('$')) {
+          return this.resolveDynamicVariable(scope, key, variableName);
+        }
+        
         throw new VariableResolutionError(
           `Unknown variable scope '${scope}' in '${variableName}'`,
           variableName
@@ -255,8 +306,19 @@ export class VariableResolver {
   
   /**
    * Resolves unscoped variables using precedence order
-   * Phase 9 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Global Variables > Environment
+   * PRD FR3.2 precedence (Highest to Lowest):
+   * 1. CLI arguments (--var)
+   * 2. Step with overrides (in chain steps)
+   * 3. chain.vars (defined at the start of a chain definition)
+   * 4. Endpoint-specific variables
+   * 5. API-specific variables
+   * 6. Profile variables (from the active profile)
+   * 7. Dedicated/Global variable files
+   * 8. {{secret.*}} variables (scoped access only)
+   * 9. {{env.*}} OS environment variables (scoped access only)
+   * 10. {{$dynamic}} built-in dynamic variables (scoped access only)
    * Note: Plugin variables require the plugins.name.variable syntax and are not available as unscoped
+   * Note: Secret, env, and dynamic variables are only accessible via their scoped syntax
    */
   private resolveUnscopedVariable(variableName: string, context: VariableContext): any {
     // 1. CLI variables (highest precedence)
@@ -294,10 +356,9 @@ export class VariableResolver {
       return context.globalVariables[variableName];
     }
     
-    // 8. Environment variables (lowest precedence)
-    if (context.env[variableName] !== undefined) {
-      return context.env[variableName];
-    }
+    // 8-10. Secret, env, and dynamic variables are only accessible via scoped syntax
+    // (e.g., {{secret.VAR}}, {{env.VAR}}, {{$timestamp}})
+    // They are not available as unscoped variables
     
     return undefined;
   }
@@ -382,6 +443,68 @@ export class VariableResolver {
     }
     
     return merged;
+  }
+  
+  /**
+   * T9.6: Resolves built-in dynamic variables ($timestamp, $isoTimestamp, $randomInt, $guid)
+   */
+  private resolveDynamicVariable(variableName: string, params: string, fullVariableName: string): string {
+    switch (variableName) {
+      case '$timestamp':
+        // Unix timestamp in seconds
+        return Math.floor(Date.now() / 1000).toString();
+        
+      case '$isoTimestamp':
+        // ISO 8601 timestamp
+        return new Date().toISOString();
+        
+      case '$randomInt':
+        // Random integer - supports optional range parameters like $randomInt(1,100)
+        if (params) {
+          // Try to parse range parameters from parentheses
+          const rangeMatch = params.match(/^\((\d+),(\d+)\)$/);
+          if (rangeMatch) {
+            const min = parseInt(rangeMatch[1], 10);
+            const max = parseInt(rangeMatch[2], 10);
+            if (min >= max) {
+              throw new VariableResolutionError(
+                `Invalid range for ${fullVariableName}: min (${min}) must be less than max (${max})`,
+                fullVariableName
+              );
+            }
+            return (Math.floor(Math.random() * (max - min + 1)) + min).toString();
+          } else {
+            throw new VariableResolutionError(
+              `Invalid parameters for ${fullVariableName}. Use format: {{$randomInt(min,max)}}`,
+              fullVariableName
+            );
+          }
+        } else {
+          // Default range: 0 to 999999
+          return Math.floor(Math.random() * 1000000).toString();
+        }
+        
+      case '$guid':
+        // Generate a UUID v4
+        return this.generateUUID();
+        
+      default:
+        throw new VariableResolutionError(
+          `Unknown dynamic variable '${variableName}'`,
+          fullVariableName
+        );
+    }
+  }
+  
+  /**
+   * T9.6: Generates a UUID v4 (simple implementation without external dependencies)
+   */
+  private generateUUID(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
   }
 }
 

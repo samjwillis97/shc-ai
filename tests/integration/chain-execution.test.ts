@@ -23,7 +23,14 @@ vi.mock('../../src/core/variableResolver.js', () => ({
   variableResolver: {
     createContext: vi.fn(),
     resolveValue: vi.fn(),
-    mergeProfiles: vi.fn()
+    mergeProfiles: vi.fn(),
+    maskSecrets: vi.fn((text: string) => text.replace(/secret/gi, '[SECRET]'))
+  },
+  VariableResolutionError: class VariableResolutionError extends Error {
+    constructor(message: string, public variableName: string) {
+      super(message);
+      this.name = 'VariableResolutionError';
+    }
   }
 }));
 

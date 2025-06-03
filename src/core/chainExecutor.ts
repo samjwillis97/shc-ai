@@ -236,13 +236,24 @@ export class ChainExecutor {
       }
 
       if (verbose) {
-        console.error(`[STEP ${step.id}] ${request.method} ${request.url}`);
+        // T9.5: Mask secrets in verbose output
+        const maskedUrl = variableResolver.maskSecrets(request.url);
+        console.error(`[STEP ${step.id}] ${request.method} ${maskedUrl}`);
+        
         if (Object.keys(request.headers || {}).length > 0) {
-          console.error(`[STEP ${step.id}] Headers:`, request.headers);
+          // T9.5: Mask secrets in headers
+          const maskedHeaders = { ...request.headers };
+          for (const [key, value] of Object.entries(maskedHeaders)) {
+            maskedHeaders[key] = variableResolver.maskSecrets(String(value));
+          }
+          console.error(`[STEP ${step.id}] Headers:`, maskedHeaders);
         }
+        
         if (request.body) {
           const bodyStr = typeof request.body === 'string' ? request.body : JSON.stringify(request.body, null, 2);
-          console.error(`[STEP ${step.id}] Body:`, bodyStr);
+          // T9.5: Mask secrets in body
+          const maskedBodyStr = variableResolver.maskSecrets(bodyStr);
+          console.error(`[STEP ${step.id}] Body:`, maskedBodyStr);
         }
       }
 

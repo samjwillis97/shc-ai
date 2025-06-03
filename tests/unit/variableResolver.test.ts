@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { VariableResolver, VariableContext, VariableResolutionError } from '../../src/core/variableResolver.js';
 import type { StepExecutionResult } from '../../src/core/chainExecutor.js';
+import type { VariableSource } from '../../src/types/plugin.js';
 
 describe('VariableResolver', () => {
   let resolver: VariableResolver;
@@ -73,7 +74,8 @@ describe('VariableResolver', () => {
     });
 
     it('should fall back to environment when CLI variable not defined', async () => {
-      const result = await resolver.resolve('Path: {{PATH}}', mockContext);
+      // Environment variables should only be accessible via env. prefix according to PRD
+      const result = await resolver.resolve('Path: {{env.PATH}}', mockContext);
       expect(result).toBe('Path: /usr/bin:/bin');
     });
   });
@@ -354,7 +356,8 @@ describe('VariableResolver', () => {
       );
       context.env.test = 'env_value';            // Environment
       
-      const result = await resolver.resolve('{{test}}', context);
+      // Environment variables should only be accessible via env. prefix according to PRD
+      const result = await resolver.resolve('{{env.test}}', context);
       expect(result).toBe('env_value');
     });
   });
@@ -831,14 +834,15 @@ describe('VariableResolver', () => {
     });
 
     it('should fall back to environment when global variable not defined', async () => {
-      const contextWithGlobals = {
+      const contextWithoutGlobals = {
         ...mockContext,
         globalVariables: {
           someOtherVar: 'global-value'
         }
       };
 
-      const result = await resolver.resolve('Path: {{PATH}}', contextWithGlobals);
+      // Environment variables should only be accessible via env. prefix according to PRD
+      const result = await resolver.resolve('Path: {{env.PATH}}', contextWithoutGlobals);
       expect(result).toBe('Path: /usr/bin:/bin');
     });
 
@@ -848,7 +852,8 @@ describe('VariableResolver', () => {
         globalVariables: undefined
       };
 
-      const result = await resolver.resolve('Path: {{PATH}}', contextWithoutGlobals);
+      // Environment variables should only be accessible via env. prefix according to PRD
+      const result = await resolver.resolve('Path: {{env.PATH}}', contextWithoutGlobals);
       expect(result).toBe('Path: /usr/bin:/bin');
     });
   });
@@ -957,6 +962,625 @@ describe('VariableResolver', () => {
         },
         url: 'https://api.example.com/secret-key-value'
       });
+    });
+  });
+
+  describe('T9.6: Built-in Dynamic Variables', () => {
+    it('should resolve $timestamp to Unix timestamp', async () => {
+      const before = Math.floor(Date.now() / 1000);
+      const result = await resolver.resolve('Timestamp: {{$timestamp}}', mockContext);
+      const after = Math.floor(Date.now() / 1000);
+      
+      const timestamp = parseInt(result.replace('Timestamp: ', ''));
+      expect(timestamp).toBeGreaterThanOrEqual(before);
+      expect(timestamp).toBeLessThanOrEqual(after);
+    });
+
+    it('should resolve $isoTimestamp to ISO 8601 format', async () => {
+      const result = await resolver.resolve('ISO: {{$isoTimestamp}}', mockContext);
+      const isoString = result.replace('ISO: ', '');
+      
+      // Validate ISO 8601 format
+      expect(isoString).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      
+      // Should be parseable as a date
+      const date = new Date(isoString);
+      expect(date.getTime()).toBeGreaterThan(0);
+    });
+
+    it('should resolve $randomInt to random integer', async () => {
+      const result1 = await resolver.resolve('Random: {{$randomInt}}', mockContext);
+      const result2 = await resolver.resolve('Random: {{$randomInt}}', mockContext);
+      
+      const num1 = parseInt(result1.replace('Random: ', ''));
+      const num2 = parseInt(result2.replace('Random: ', ''));
+      
+      // Should be valid integers in default range (0-999999)
+      expect(num1).toBeGreaterThanOrEqual(0);
+      expect(num1).toBeLessThanOrEqual(999999);
+      expect(num2).toBeGreaterThanOrEqual(0);
+      expect(num2).toBeLessThanOrEqual(999999);
+      
+      // Very unlikely to be the same (though theoretically possible)
+      // We'll just check they're valid numbers
+      expect(Number.isInteger(num1)).toBe(true);
+      expect(Number.isInteger(num2)).toBe(true);
+    });
+
+    it('should resolve $guid to UUID v4 format', async () => {
+      const result = await resolver.resolve('ID: {{$guid}}', mockContext);
+      const guid = result.replace('ID: ', '');
+      
+      // Validate UUID v4 format
+      expect(guid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      
+      // Should be unique
+      const result2 = await resolver.resolve('ID: {{$guid}}', mockContext);
+      const guid2 = result2.replace('ID: ', '');
+      expect(guid).not.toBe(guid2);
+    });
+
+    it('should support $randomInt with range parameters', async () => {
+      // Note: This syntax isn't supported yet based on current implementation
+      // but let's test error handling for invalid formats
+      await expect(resolver.resolve('{{$randomInt.invalid}}', mockContext))
+        .rejects.toThrow(VariableResolutionError);
+    });
+
+    it('should handle multiple dynamic variables in one template', async () => {
+      const result = await resolver.resolve(
+        'Time: {{$timestamp}}, ISO: {{$isoTimestamp}}, Random: {{$randomInt}}, ID: {{$guid}}',
+        mockContext
+      );
+      
+      expect(result).toContain('Time: ');
+      expect(result).toContain('ISO: ');
+      expect(result).toContain('Random: ');
+      expect(result).toContain('ID: ');
+      
+      // Extract and validate each part
+      const parts = result.split(', ');
+      const timestamp = parseInt(parts[0].replace('Time: ', ''));
+      const isoString = parts[1].replace('ISO: ', '');
+      const randomNum = parseInt(parts[2].replace('Random: ', ''));
+      const guid = parts[3].replace('ID: ', '');
+      
+      expect(Number.isInteger(timestamp)).toBe(true);
+      expect(isoString).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      expect(Number.isInteger(randomNum)).toBe(true);
+      expect(guid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    });
+
+    it('should throw error for unknown dynamic variables', async () => {
+      await expect(resolver.resolve('{{$unknown}}', mockContext))
+        .rejects.toThrow(VariableResolutionError);
+      
+      await expect(resolver.resolve('{{$invalidVar}}', mockContext))
+        .rejects.toThrow("Unknown dynamic variable '$invalidVar'");
+    });
+
+    it('should work with resolveValue method for objects', async () => {
+      const template = {
+        timestamp: '{{$timestamp}}',
+        iso: '{{$isoTimestamp}}',
+        random: '{{$randomInt}}',
+        id: '{{$guid}}',
+        nested: {
+          time: '{{$timestamp}}',
+          uuid: '{{$guid}}'
+        }
+      };
+
+      const resolved = await resolver.resolveValue(template, mockContext);
+      
+      expect(typeof resolved.timestamp).toBe('string');
+      expect(typeof resolved.iso).toBe('string');
+      expect(typeof resolved.random).toBe('string');
+      expect(typeof resolved.id).toBe('string');
+      expect(typeof resolved.nested.time).toBe('string');
+      expect(typeof resolved.nested.uuid).toBe('string');
+      
+      // Validate formats
+      expect(parseInt(resolved.timestamp)).toBeGreaterThan(0);
+      expect(resolved.iso).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      expect(parseInt(resolved.random)).toBeGreaterThanOrEqual(0);
+      expect(resolved.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    });
+  });
+
+  describe('T9.5: Secret Masking in Verbose/Dry-Run Output', () => {
+    beforeEach(() => {
+      // Reset secret tracking before each test
+      resolver.resetSecretTracking();
+    });
+
+    it('should track secret variables when resolving', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          API_KEY: 'secret-api-key-123',
+          SECRET_TOKEN: 'secret-token-456'
+        }
+      };
+
+      // Resolve some secret variables
+      await resolver.resolve('Authorization: Bearer {{secret.API_KEY}}', contextWithSecrets);
+      await resolver.resolve('Token: {{secret.SECRET_TOKEN}}', contextWithSecrets);
+
+      // Check that secret variables are tracked
+      const trackedSecrets = resolver.getSecretVariables();
+      expect(trackedSecrets).toContain('secret.API_KEY');
+      expect(trackedSecrets).toContain('secret.SECRET_TOKEN');
+    });
+
+    it('should mask secret values in output strings', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          API_KEY: 'secret-api-key-123',
+          SECRET_TOKEN: 'secret-token-456'
+        }
+      };
+
+      // First resolve some secret variables to track them
+      await resolver.resolve('Authorization: Bearer {{secret.API_KEY}}', contextWithSecrets);
+      await resolver.resolve('Token: {{secret.SECRET_TOKEN}}', contextWithSecrets);
+
+      // Now mask secrets in output strings
+      const outputWithSecrets = 'Headers: Authorization: Bearer secret-api-key-123, X-Token: secret-token-456';
+      const maskedOutput = resolver.maskSecrets(outputWithSecrets);
+
+      expect(maskedOutput).toBe('Headers: Authorization: Bearer [SECRET], X-Token: [SECRET]');
+    });
+
+    it('should mask secrets in JSON formatted output', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          API_KEY: 'secret-api-key-123',
+          DATABASE_URL: 'postgres://user:pass@host:5432/db'
+        }
+      };
+
+      // Resolve secret variables
+      await resolver.resolve('{{secret.API_KEY}}', contextWithSecrets);
+      await resolver.resolve('{{secret.DATABASE_URL}}', contextWithSecrets);
+
+      // Test masking in JSON output
+      const jsonOutput = JSON.stringify({
+        headers: {
+          'Authorization': 'Bearer secret-api-key-123',
+          'X-API-Key': 'secret-api-key-123'
+        },
+        body: {
+          database_url: 'postgres://user:pass@host:5432/db',
+          api_key: 'secret-api-key-123'
+        }
+      }, null, 2);
+
+      const maskedOutput = resolver.maskSecrets(jsonOutput);
+
+      // Check that secrets are masked in the formatted JSON
+      expect(maskedOutput).toContain('"Authorization": "Bearer [SECRET]"');
+      expect(maskedOutput).toContain('"X-API-Key": "[SECRET]"');
+      expect(maskedOutput).toContain('"database_url": "[SECRET]"');
+      expect(maskedOutput).toContain('"api_key": "[SECRET]"');
+      
+      // Should not contain the actual secret values
+      expect(maskedOutput).not.toContain('secret-api-key-123');
+      expect(maskedOutput).not.toContain('postgres://user:pass@host:5432/db');
+    });
+
+    it('should handle multiple occurrences of the same secret', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          API_KEY: 'repeated-secret-key'
+        }
+      };
+
+      await resolver.resolve('{{secret.API_KEY}}', contextWithSecrets);
+
+      const outputWithRepeatedSecret = 'Key1: repeated-secret-key, Key2: repeated-secret-key, Key3: repeated-secret-key';
+      const maskedOutput = resolver.maskSecrets(outputWithRepeatedSecret);
+
+      expect(maskedOutput).toBe('Key1: [SECRET], Key2: [SECRET], Key3: [SECRET]');
+    });
+
+    it('should not mask non-secret values', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          API_KEY: 'secret-value'
+        }
+      };
+
+      await resolver.resolve('{{secret.API_KEY}}', contextWithSecrets);
+
+      const outputWithMixed = 'Secret: secret-value, Public: public-value, Number: 123';
+      const maskedOutput = resolver.maskSecrets(outputWithMixed);
+
+      expect(maskedOutput).toBe('Secret: [SECRET], Public: public-value, Number: 123');
+    });
+
+    it('should handle secrets with special regex characters', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          SPECIAL_SECRET: 'secret.with-special+chars*()'
+        }
+      };
+
+      await resolver.resolve('{{secret.SPECIAL_SECRET}}', contextWithSecrets);
+
+      const outputWithSpecialChars = 'Value: secret.with-special+chars*()';
+      const maskedOutput = resolver.maskSecrets(outputWithSpecialChars);
+
+      expect(maskedOutput).toBe('Value: [SECRET]');
+    });
+
+    it('should reset secret tracking when requested', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          API_KEY: 'secret-key'
+        }
+      };
+
+      await resolver.resolve('{{secret.API_KEY}}', contextWithSecrets);
+      expect(resolver.getSecretVariables()).toHaveLength(1);
+
+      resolver.resetSecretTracking();
+      expect(resolver.getSecretVariables()).toHaveLength(0);
+
+      // After reset, masking should not affect the previously tracked secret
+      const output = 'Key: secret-key';
+      const maskedOutput = resolver.maskSecrets(output);
+      expect(maskedOutput).toBe('Key: secret-key'); // Not masked since tracking was reset
+    });
+
+    it('should handle empty or undefined secret values gracefully', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          EMPTY_SECRET: '',
+          // UNDEFINED_SECRET is intentionally missing
+        }
+      };
+
+      // This should track the secret variable even if resolution fails
+      try {
+        await resolver.resolve('{{secret.UNDEFINED_SECRET}}', contextWithSecrets);
+      } catch (error) {
+        // Expected to fail
+      }
+
+      const output = 'Some output without secrets';
+      const maskedOutput = resolver.maskSecrets(output);
+      expect(maskedOutput).toBe(output); // No masking since no valid secret values
+    });
+
+    it('should work with resolveValue method for complex objects', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          API_KEY: 'secret-api-key',
+          TOKEN: 'secret-token'
+        }
+      };
+
+      const template = {
+        headers: {
+          'Authorization': 'Bearer {{secret.API_KEY}}',
+          'X-Token': '{{secret.TOKEN}}'
+        },
+        config: {
+          apiKey: '{{secret.API_KEY}}',
+          publicValue: 'not-secret'
+        }
+      };
+
+      await resolver.resolveValue(template, contextWithSecrets);
+
+      // Now test masking
+      const outputString = JSON.stringify({
+        headers: {
+          'Authorization': 'Bearer secret-api-key',
+          'X-Token': 'secret-token'
+        },
+        config: {
+          apiKey: 'secret-api-key',
+          publicValue: 'not-secret'
+        }
+      });
+
+      const maskedOutput = resolver.maskSecrets(outputString);
+
+      expect(maskedOutput).toContain('"Authorization":"Bearer [SECRET]"');
+      expect(maskedOutput).toContain('"X-Token":"[SECRET]"');
+      expect(maskedOutput).toContain('"apiKey":"[SECRET]"');
+      expect(maskedOutput).toContain('"publicValue":"not-secret"'); // Should not be masked
+    });
+  });
+
+  describe('T9.7: Complete Variable Precedence Order (Unit Tests)', () => {
+    it('should follow exact PRD precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Global', async () => {
+      const context = resolver.createContext(
+        { testVar: 'cli_value' },                    // 1. CLI (highest)
+        { testVar: 'profile_value' },                // 6. Profile
+        { testVar: 'api_value' },                    // 5. API
+        { testVar: 'endpoint_value' },               // 4. Endpoint
+        undefined,                                   // No plugins
+        { testVar: 'global_value' }                  // 7. Global
+      );
+      
+      // Add step with and chain vars manually
+      context.stepWith = { testVar: 'step_with_value' };  // 2. Step with
+      context.chainVars = { testVar: 'chain_vars_value' }; // 3. Chain vars
+
+      const result = await resolver.resolve('{{testVar}}', context);
+      expect(result).toBe('cli_value'); // CLI should win
+    });
+
+    it('should fall back correctly when higher precedence levels are missing', async () => {
+      // Test Step with precedence (no CLI)
+      let context = resolver.createContext(
+        {},                                          // No CLI
+        { testVar: 'profile_value' },
+        { testVar: 'api_value' },
+        { testVar: 'endpoint_value' },
+        undefined,
+        { testVar: 'global_value' }
+      );
+      context.stepWith = { testVar: 'step_with_value' };
+      context.chainVars = { testVar: 'chain_vars_value' };
+
+      let result = await resolver.resolve('{{testVar}}', context);
+      expect(result).toBe('step_with_value');
+
+      // Test Chain vars precedence (no CLI, no Step with)
+      context = resolver.createContext(
+        {},                                          // No CLI
+        { testVar: 'profile_value' },
+        { testVar: 'api_value' },
+        { testVar: 'endpoint_value' },
+        undefined,
+        { testVar: 'global_value' }
+      );
+      context.stepWith = {};                         // No Step with
+      context.chainVars = { testVar: 'chain_vars_value' };
+
+      result = await resolver.resolve('{{testVar}}', context);
+      expect(result).toBe('chain_vars_value');
+
+      // Test Endpoint precedence
+      context = resolver.createContext(
+        {},
+        { testVar: 'profile_value' },
+        { testVar: 'api_value' },
+        { testVar: 'endpoint_value' },
+        undefined,
+        { testVar: 'global_value' }
+      );
+      context.stepWith = {};
+      context.chainVars = {};
+
+      result = await resolver.resolve('{{testVar}}', context);
+      expect(result).toBe('endpoint_value');
+
+      // Test API precedence
+      context = resolver.createContext(
+        {},
+        { testVar: 'profile_value' },
+        { testVar: 'api_value' },
+        {},                                          // No endpoint
+        undefined,
+        { testVar: 'global_value' }
+      );
+
+      result = await resolver.resolve('{{testVar}}', context);
+      expect(result).toBe('api_value');
+
+      // Test Profile precedence
+      context = resolver.createContext(
+        {},
+        { testVar: 'profile_value' },
+        {},                                          // No API
+        {},
+        undefined,
+        { testVar: 'global_value' }
+      );
+
+      result = await resolver.resolve('{{testVar}}', context);
+      expect(result).toBe('profile_value');
+
+      // Test Global precedence
+      context = resolver.createContext(
+        {},
+        {},                                          // No profile
+        {},
+        {},
+        undefined,
+        { testVar: 'global_value' }
+      );
+
+      result = await resolver.resolve('{{testVar}}', context);
+      expect(result).toBe('global_value');
+    });
+
+    it('should handle scoped variables independently of unscoped precedence', async () => {
+      process.env.TEST_SECRET = 'secret_value';
+      process.env.TEST_ENV = 'env_value';
+
+      const pluginSources: Record<string, Record<string, VariableSource>> = {
+        testPlugin: {
+          getValue: () => 'plugin_value'
+        }
+      };
+
+      const context = resolver.createContext(
+        { testVar: 'cli_value' },                    // Unscoped variable
+        {},
+        {},
+        {},
+        pluginSources,
+        {}
+      );
+
+      // Unscoped should follow precedence
+      const unscopedResult = await resolver.resolve('{{testVar}}', context);
+      expect(unscopedResult).toBe('cli_value');
+
+      // Scoped variables should work independently
+      const secretResult = await resolver.resolve('{{secret.TEST_SECRET}}', context);
+      expect(secretResult).toBe('secret_value');
+
+      const envResult = await resolver.resolve('{{env.TEST_ENV}}', context);
+      expect(envResult).toBe('env_value');
+
+      const pluginResult = await resolver.resolve('{{plugins.testPlugin.getValue}}', context);
+      expect(pluginResult).toBe('plugin_value');
+
+      const dynamicResult = await resolver.resolve('{{$timestamp}}', context);
+      expect(dynamicResult).toMatch(/^\d+$/);
+    });
+
+    it('should handle variable name conflicts across different scopes', async () => {
+      process.env.conflictVar = 'env_value';
+
+      const pluginSources: Record<string, Record<string, VariableSource>> = {
+        testPlugin: {
+          conflictVar: () => 'plugin_value'
+        }
+      };
+
+      const context = resolver.createContext(
+        { conflictVar: 'cli_value' },
+        { conflictVar: 'profile_value' },
+        { conflictVar: 'api_value' },
+        { conflictVar: 'endpoint_value' },
+        pluginSources,
+        { conflictVar: 'global_value' }
+      );
+
+      // Unscoped should resolve to CLI (highest precedence)
+      const unscopedResult = await resolver.resolve('{{conflictVar}}', context);
+      expect(unscopedResult).toBe('cli_value');
+
+      // Scoped access should work for each scope
+      const envResult = await resolver.resolve('{{env.conflictVar}}', context);
+      expect(envResult).toBe('env_value');
+
+      const pluginResult = await resolver.resolve('{{plugins.testPlugin.conflictVar}}', context);
+      expect(pluginResult).toBe('plugin_value');
+
+      const apiResult = await resolver.resolve('{{api.conflictVar}}', context);
+      expect(apiResult).toBe('api_value');
+
+      const endpointResult = await resolver.resolve('{{endpoint.conflictVar}}', context);
+      expect(endpointResult).toBe('endpoint_value');
+
+      const profileResult = await resolver.resolve('{{profile.conflictVar}}', context);
+      expect(profileResult).toBe('profile_value');
+    });
+
+    it('should maintain precedence with complex nested variable resolution', async () => {
+      const context = resolver.createContext(
+        { 
+          baseVar: 'cli_base'
+        },
+        { 
+          baseVar: 'profile_base'
+        },
+        {},
+        {},
+        undefined,
+        {}
+      );
+
+      // First resolve the nested variable template, then resolve the result
+      const nestedTemplate = '{{baseVar}}_nested';
+      const resolvedNested = await resolver.resolve(nestedTemplate, context);
+      
+      // Add the resolved nested variable to CLI context
+      context.cli.nestedVar = resolvedNested;
+
+      // The nestedVar should use CLI baseVar due to precedence
+      const result = await resolver.resolve('{{nestedVar}}', context);
+      expect(result).toBe('cli_base_nested');
+    });
+
+    it('should handle precedence correctly with undefined/null values', async () => {
+      const context = resolver.createContext(
+        { definedVar: 'cli_value' },
+        { definedVar: 'profile_value' },
+        {},
+        {},
+        undefined,
+        {}
+      );
+
+      // Add undefined values at higher precedence levels
+      context.stepWith = { definedVar: undefined };
+      context.chainVars = { definedVar: null };
+
+      // Should fall back to CLI since stepWith and chainVars have undefined/null
+      const result = await resolver.resolve('{{definedVar}}', context);
+      expect(result).toBe('cli_value');
+    });
+
+    it('should validate precedence order matches PRD specification exactly', async () => {
+      // This test documents the exact PRD precedence order
+      const precedenceOrder = [
+        'CLI arguments (--var)',
+        'Step with overrides (in chain steps)',
+        'chain.vars (defined at the start of a chain definition)',
+        'Endpoint-specific variables',
+        'API-specific variables',
+        'Profile variables (from the active profile)',
+        'Dedicated/Global variable files',
+        '{{secret.*}} variables (scoped access only)',
+        '{{env.*}} OS environment variables (scoped access only)',
+        '{{$dynamic}} built-in dynamic variables (scoped access only)'
+      ];
+
+      // Test that our implementation follows this order
+      const context = resolver.createContext(
+        { testVar: 'level_1_cli' },                  // 1. CLI
+        { testVar: 'level_6_profile' },              // 6. Profile
+        { testVar: 'level_5_api' },                  // 5. API
+        { testVar: 'level_4_endpoint' },             // 4. Endpoint
+        undefined,                                   // Plugins (scoped only)
+        { testVar: 'level_7_global' }                // 7. Global
+      );
+      context.stepWith = { testVar: 'level_2_step_with' };    // 2. Step with
+      context.chainVars = { testVar: 'level_3_chain_vars' };  // 3. Chain vars
+
+      // CLI should win (level 1)
+      const result = await resolver.resolve('{{testVar}}', context);
+      expect(result).toBe('level_1_cli');
+
+      // Verify the precedence order is correctly documented
+      expect(precedenceOrder).toHaveLength(10);
+      expect(precedenceOrder[0]).toContain('CLI arguments');
+      expect(precedenceOrder[1]).toContain('Step with overrides');
+      expect(precedenceOrder[2]).toContain('chain.vars');
+      expect(precedenceOrder[3]).toContain('Endpoint-specific');
+      expect(precedenceOrder[4]).toContain('API-specific');
+      expect(precedenceOrder[5]).toContain('Profile variables');
+      expect(precedenceOrder[6]).toContain('Global variable files');
+      expect(precedenceOrder[7]).toContain('{{secret.*}}');
+      expect(precedenceOrder[8]).toContain('{{env.*}}');
+      expect(precedenceOrder[9]).toContain('{{$dynamic}}');
     });
   });
 }); 

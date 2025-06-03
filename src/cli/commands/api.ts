@@ -2,6 +2,7 @@ import { configLoader, ConfigWithPath } from '../../core/configLoader.js';
 import { urlBuilder } from '../../core/urlBuilder.js';
 import { httpClient } from '../../core/httpClient.js';
 import { variableResolver, VariableResolutionError } from '../../core/variableResolver.js';
+import { VariableResolver } from '../../core/variableResolver.js';
 import { PluginManager } from '../../core/pluginManager.js';
 import type { HttpCraftConfig, ApiDefinition, EndpointDefinition } from '../../types/config.js';
 import path from 'path';
@@ -136,13 +137,17 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
           const path = endpoint.path || '';
           const url = baseUrl + path;
           
-          process.stderr.write(`[DRY RUN] ${endpoint.method} ${url}\n`);
+          // T9.5: Mask secrets even in unresolved configuration
+          const maskedUrl = variableResolver.maskSecrets(url);
+          process.stderr.write(`[DRY RUN] ${endpoint.method} ${maskedUrl}\n`);
           
           if (api.headers || endpoint.headers) {
             process.stderr.write(`[DRY RUN] Headers:\n`);
             const headers = { ...(api.headers || {}), ...(endpoint.headers || {}) };
             for (const [key, value] of Object.entries(headers)) {
-              process.stderr.write(`[DRY RUN]   ${key}: ${value}\n`);
+              // T9.5: Mask secrets in header values
+              const maskedValue = variableResolver.maskSecrets(String(value));
+              process.stderr.write(`[DRY RUN]   ${key}: ${maskedValue}\n`);
             }
           }
           
@@ -150,14 +155,18 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
             process.stderr.write(`[DRY RUN] Query Parameters:\n`);
             const params = { ...(api.params || {}), ...(endpoint.params || {}) };
             for (const [key, value] of Object.entries(params)) {
-              process.stderr.write(`[DRY RUN]   ${key}: ${value}\n`);
+              // T9.5: Mask secrets in parameter values
+              const maskedValue = variableResolver.maskSecrets(String(value));
+              process.stderr.write(`[DRY RUN]   ${key}: ${maskedValue}\n`);
             }
           }
           
           if (endpoint.body) {
             process.stderr.write(`[DRY RUN] Body:\n`);
             const bodyStr = typeof endpoint.body === 'string' ? endpoint.body : JSON.stringify(endpoint.body, null, 2);
-            process.stderr.write(`[DRY RUN] ${bodyStr}\n`);
+            // T9.5: Mask secrets in body
+            const maskedBodyStr = variableResolver.maskSecrets(bodyStr);
+            process.stderr.write(`[DRY RUN] ${maskedBodyStr}\n`);
           }
           
           process.stderr.write('\n');
@@ -186,13 +195,13 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     
     // If dry-run, display request details and exit
     if (args.dryRun) {
-      printRequestDetails(requestDetails, true);
+      printRequestDetails(requestDetails, true, variableResolver);
       return;
     }
     
     // If verbose, print request details to stderr
     if (args.verbose) {
-      printRequestDetails(requestDetails, false);
+      printRequestDetails(requestDetails, false, variableResolver);
     }
     
     // Execute HTTP request (with pre-request hooks if plugins are loaded)
@@ -238,30 +247,39 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
 
 /**
  * Print request details to stderr
+ * T9.5: Added secret masking support
  */
-function printRequestDetails(request: any, isDryRun: boolean): void {
+function printRequestDetails(request: any, isDryRun: boolean, variableResolver?: VariableResolver): void {
   const prefix = isDryRun ? '[DRY RUN] ' : '[REQUEST] ';
   
-  process.stderr.write(`${prefix}${request.method} ${request.url}\n`);
+  // T9.5: Mask secrets in URL
+  const maskedUrl = variableResolver ? variableResolver.maskSecrets(request.url) : request.url;
+  process.stderr.write(`${prefix}${request.method} ${maskedUrl}\n`);
   
   if (request.headers && Object.keys(request.headers).length > 0) {
     process.stderr.write(`${prefix}Headers:\n`);
     for (const [key, value] of Object.entries(request.headers)) {
-      process.stderr.write(`${prefix}  ${key}: ${value}\n`);
+      // T9.5: Mask secrets in header values
+      const maskedValue = variableResolver ? variableResolver.maskSecrets(String(value)) : value;
+      process.stderr.write(`${prefix}  ${key}: ${maskedValue}\n`);
     }
   }
   
   if (request.params && Object.keys(request.params).length > 0) {
     process.stderr.write(`${prefix}Query Parameters:\n`);
     for (const [key, value] of Object.entries(request.params)) {
-      process.stderr.write(`${prefix}  ${key}: ${value}\n`);
+      // T9.5: Mask secrets in parameter values
+      const maskedValue = variableResolver ? variableResolver.maskSecrets(String(value)) : value;
+      process.stderr.write(`${prefix}  ${key}: ${maskedValue}\n`);
     }
   }
   
   if (request.body) {
     process.stderr.write(`${prefix}Body:\n`);
     const bodyStr = typeof request.body === 'string' ? request.body : JSON.stringify(request.body, null, 2);
-    process.stderr.write(`${prefix}${bodyStr}\n`);
+    // T9.5: Mask secrets in request body
+    const maskedBodyStr = variableResolver ? variableResolver.maskSecrets(bodyStr) : bodyStr;
+    process.stderr.write(`${prefix}${maskedBodyStr}\n`);
   }
   
   process.stderr.write('\n');

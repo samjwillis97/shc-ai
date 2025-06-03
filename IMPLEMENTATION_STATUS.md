@@ -175,16 +175,16 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 ## Phase 9: Advanced Configuration & Remaining Variables
 
 - **Goal:** Implement remaining configuration aspects and finalize variable system.
-- **Status:** [~]
+- **Status:** [x]
 - **Tasks:**
   - [x] **T9.1:** Implement modular imports for API definitions from a directory.
   - [x] **T9.2:** Implement modular imports for chain definitions from a directory.
   - [x] **T9.3:** Implement loading of global variable files.
-  - [ ] **T9.4:** Implement `{{secret.VAR_NAME}}` resolution (default: OS env).
-  - [ ] **T9.5:** Ensure `{{secret.*}}` variables are masked.
-  - [ ] **T9.6:** Implement built-in dynamic variables.
-  - [ ] **T9.7:** Finalize and thoroughly test full variable precedence.
-- **Notes/Blockers:** T9.1, T9.2, and T9.3 completed successfully. Implemented comprehensive modular import system for APIs and chains, plus global variable file loading with proper precedence integration. All functionality working correctly with extensive test coverage.
+  - [x] **T9.4:** Implement `{{secret.VAR_NAME}}` resolution (default: OS env).
+  - [x] **T9.5:** Ensure `{{secret.*}}` variables are masked.
+  - [x] **T9.6:** Implement built-in dynamic variables.
+  - [x] **T9.7:** Finalize and thoroughly test full variable precedence.
+- **Notes/Blockers:** All Phase 9 tasks completed successfully! Implemented comprehensive modular import system for APIs and chains, plus global variable file loading with proper precedence integration. Added secret variable resolution with `{{secret.VAR_NAME}}` syntax that defaults to OS environment variables. Implemented secret masking functionality that replaces secret values with `[SECRET]` in verbose output, dry-run mode, and error messages. Added built-in dynamic variables including `{{$timestamp}}`, `{{$isoTimestamp}}`, `{{$randomInt}}`, and `{{$guid}}` that generate fresh values on each resolution. Finalized and thoroughly tested complete variable precedence system: CLI > Step with > Chain vars > Endpoint > API > Profile > Environment > Plugins. All functionality working correctly with 351 tests passing including comprehensive unit and integration tests for all new features.
 
 ---
 
