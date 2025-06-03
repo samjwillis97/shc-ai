@@ -197,7 +197,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [ ] **T10.2:** Implement plugin loading from npm.
   - [x] **T10.3:** Implement chain verbose output (structured JSON).
   - [x] **T10.4:** Refine ZSH completion (chains, options).
-  - [ ] **T10.5:** Write comprehensive README.md and usage examples.
+  - [x] **T10.5:** Write comprehensive README.md and usage examples.
   - [ ] **T10.6:** Create/document YAML schema.
   - [ ] **T10.7:** Thorough end-to-end testing.
   - [ ] **T10.8:** Code review, cleanup, performance optimizations.
@@ -232,5 +232,20 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Testable Outcome Achieved:** All completion functionality working - chain names, API names, endpoint names, and CLI options are all completable
   - **Command Coverage:** All commands (chain, completion, request, API calls) have proper tab completion support
   - All ZSH completion refinements working correctly with 37 tests passing. Ready to proceed to T10.5.
+
+  T10.5 completed successfully! Created comprehensive README.md with:
+  - **Complete Documentation:** Comprehensive README.md covering all major features, installation, usage, and configuration
+  - **Quick Start Guide:** Step-by-step quick start with working examples using JSONPlaceholder API
+  - **Usage Examples:** Extensive examples covering basic API calls, profiles, chains, verbose output, dry-run mode, and scripting
+  - **Configuration Documentation:** Complete configuration structure documentation with all sections (profiles, APIs, chains, plugins, etc.)
+  - **Variable System Documentation:** Detailed explanation of variable precedence, scopes, and built-in dynamic variables
+  - **Chain Documentation:** Complete chain configuration and usage examples with step data passing
+  - **Plugin System Documentation:** Plugin development guide with pre-request and post-response hook examples
+  - **ZSH Completion Setup:** Complete setup instructions for tab completion with troubleshooting guide
+  - **Development Guide:** Project structure, building, testing, and Nix development environment setup
+  - **Troubleshooting Section:** Common issues and solutions with debugging commands
+  - **Working Examples:** All examples tested and verified to work with current implementation
+  - **Comprehensive Example Config:** Created examples/comprehensive_example.yaml demonstrating all features
+  - All README documentation complete and accurate. Ready to proceed to T10.6.
 
 ---
