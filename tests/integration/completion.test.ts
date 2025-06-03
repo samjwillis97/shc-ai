@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 import { writeFile, unlink, mkdir, readFile } from 'fs/promises';
 import { join } from 'path';
+import { writeFileSync, existsSync, unlinkSync } from 'fs';
 
 const execFile = promisify(spawn);
 
@@ -72,49 +73,52 @@ apis:
 describe('Completion Integration Tests', () => {
   const testConfigFile = 'test-completion-config.yaml';
 
-  const testConfig = {
-    apis: {
-      'github-api': {
-        baseUrl: 'https://api.github.com',
-        endpoints: {
-          'get-user': {
-            path: '/users/:username',
-            method: 'GET'
-          },
-          'list-repos': {
-            path: '/users/:username/repos',
-            method: 'GET'
-          }
-        }
-      },
-      'jsonplaceholder': {
-        baseUrl: 'https://jsonplaceholder.typicode.com',
-        endpoints: {
-          'get-post': {
-            path: '/posts/:id',
-            method: 'GET'
-          },
-          'create-post': {
-            path: '/posts',
-            method: 'POST'
-          }
-        }
-      }
-    }
-  };
+  beforeEach(async () => {
+    // Create a test config file
+    await writeFileSync(testConfigFile, `
+apis:
+  github-api:
+    baseUrl: "https://api.github.com"
+    endpoints:
+      get-user:
+        method: GET
+        path: "/users/{{username}}"
+      list-repos:
+        method: GET
+        path: "/users/{{username}}/repos"
+  
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      get-posts:
+        method: GET
+        path: "/posts"
+      get-post:
+        method: GET
+        path: "/posts/{{id}}"
 
-  // Setup and cleanup
-  async function setup() {
-    await createTestConfig(testConfigFile, testConfig);
-  }
+chains:
+  user-workflow:
+    description: "Get user and their repos"
+    steps:
+      - id: getUser
+        call: github-api.get-user
+      - id: getRepos
+        call: github-api.list-repos
+  
+  simple-test:
+    steps:
+      - id: getPost
+        call: jsonplaceholder.get-post
+`);
+  });
 
-  async function cleanup() {
-    try {
-      await unlink(testConfigFile);
-    } catch {
-      // File might not exist
+  afterEach(async () => {
+    // Clean up test config file
+    if (existsSync(testConfigFile)) {
+      unlinkSync(testConfigFile);
     }
-  }
+  });
 
   describe('completion zsh command', () => {
     it('should generate ZSH completion script', async () => {
@@ -129,8 +133,11 @@ describe('Completion Integration Tests', () => {
       expect(result.stdout).toContain('--verbose');
       expect(result.stdout).toContain('--dry-run');
       expect(result.stdout).toContain('--exit-on-http-error');
+      expect(result.stdout).toContain('--chain-output');
+      expect(result.stdout).toContain('chain:Execute a chain of HTTP requests');
       expect(result.stdout).toContain('httpcraft --get-api-names');
       expect(result.stdout).toContain('httpcraft --get-endpoint-names');
+      expect(result.stdout).toContain('httpcraft --get-chain-names');
     });
 
     it('should error for unsupported shells', async () => {
@@ -145,114 +152,183 @@ describe('Completion Integration Tests', () => {
 
   describe('--get-api-names command', () => {
     it('should list API names from config file', async () => {
-      await setup();
-
       const result = await runCli(['--get-api-names', '--config', testConfigFile]);
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('github-api');
-      expect(result.stdout).toContain('jsonplaceholder');
-
-      await cleanup();
+      const lines = result.stdout.trim().split('\n');
+      expect(lines).toContain('github-api');
+      expect(lines).toContain('jsonplaceholder');
+      expect(lines).toHaveLength(2);
     });
 
-    it('should handle missing config file gracefully', async () => {
-      const result = await runCli(['--get-api-names', '--config', 'non-existent.yaml']);
+    it('should silently exit when config file does not exist', async () => {
+      const result = await runCli(['--get-api-names', '--config', 'nonexistent.yaml']);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toBe('');
       expect(result.stderr).toBe('');
     });
 
-    it('should work with default config', async () => {
-      // Use a unique filename to avoid conflicts
-      const uniqueConfigFile = `.httpcraft-test-${Date.now()}.yaml`;
-      
-      // Create default config file
-      await createTestConfig(uniqueConfigFile, testConfig);
-      
-      // Copy to default location
-      await writeFile('.httpcraft.yaml', await readFile(uniqueConfigFile, 'utf8'));
+    it('should use default config when no config specified', async () => {
+      // Create a default config file
+      await writeFileSync('.httpcraft.yaml', `
+apis:
+  default-api:
+    baseUrl: "https://api.default.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+`);
 
+      try {
+        const result = await runCli(['--get-api-names']);
+
+        expect(result.exitCode).toBe(0);
+        const lines = result.stdout.trim().split('\n');
+        expect(lines).toContain('default-api');
+      } finally {
+        // Clean up
+        if (existsSync('.httpcraft.yaml')) {
+          unlinkSync('.httpcraft.yaml');
+        }
+      }
+    });
+
+    it('should silently exit when no default config exists', async () => {
       const result = await runCli(['--get-api-names']);
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('github-api');
-      expect(result.stdout).toContain('jsonplaceholder');
-
-      // Cleanup
-      try {
-        await unlink('.httpcraft.yaml');
-      } catch {
-        // Files might not exist
-      }
-      try {
-        await unlink(uniqueConfigFile);
-      } catch {
-        // Files might not exist
-      }
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toBe('');
     });
   });
 
   describe('--get-endpoint-names command', () => {
     it('should list endpoint names for specified API', async () => {
-      await setup();
-
       const result = await runCli(['--get-endpoint-names', 'github-api', '--config', testConfigFile]);
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('get-user');
-      expect(result.stdout).toContain('list-repos');
-
-      await cleanup();
+      const lines = result.stdout.trim().split('\n');
+      expect(lines).toContain('get-user');
+      expect(lines).toContain('list-repos');
+      expect(lines).toHaveLength(2);
     });
 
-    it('should handle non-existent API gracefully', async () => {
-      await setup();
-
-      const result = await runCli(['--get-endpoint-names', 'non-existent-api', '--config', testConfigFile]);
-
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toBe('');
-      expect(result.stderr).toBe('');
-
-      await cleanup();
-    });
-
-    it('should handle missing config file gracefully', async () => {
-      const result = await runCli(['--get-endpoint-names', 'github-api', '--config', 'non-existent.yaml']);
+    it('should handle non-existent API silently', async () => {
+      const result = await runCli(['--get-endpoint-names', 'nonexistent-api', '--config', testConfigFile]);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toBe('');
       expect(result.stderr).toBe('');
     });
 
-    it('should work with default config', async () => {
-      // Use a unique filename to avoid conflicts
-      const uniqueConfigFile = `.httpcraft-test-${Date.now()}.yaml`;
-      
-      // Create default config file
-      await createTestConfig(uniqueConfigFile, testConfig);
-      
-      // Copy to default location
-      await writeFile('.httpcraft.yaml', await readFile(uniqueConfigFile, 'utf8'));
-
-      const result = await runCli(['--get-endpoint-names', 'jsonplaceholder']);
+    it('should silently exit when config file does not exist', async () => {
+      const result = await runCli(['--get-endpoint-names', 'github-api', '--config', 'nonexistent.yaml']);
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('get-post');
-      expect(result.stdout).toContain('create-post');
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toBe('');
+    });
 
-      // Cleanup
+    it('should list endpoints for different APIs', async () => {
+      const githubResult = await runCli(['--get-endpoint-names', 'github-api', '--config', testConfigFile]);
+      const jsonResult = await runCli(['--get-endpoint-names', 'jsonplaceholder', '--config', testConfigFile]);
+
+      expect(githubResult.exitCode).toBe(0);
+      expect(jsonResult.exitCode).toBe(0);
+
+      const githubLines = githubResult.stdout.trim().split('\n');
+      const jsonLines = jsonResult.stdout.trim().split('\n');
+
+      expect(githubLines).toContain('get-user');
+      expect(githubLines).toContain('list-repos');
+      expect(jsonLines).toContain('get-posts');
+      expect(jsonLines).toContain('get-post');
+    });
+  });
+
+  describe('--get-chain-names command', () => {
+    it('should list chain names from config file', async () => {
+      const result = await runCli(['--get-chain-names', '--config', testConfigFile]);
+
+      expect(result.exitCode).toBe(0);
+      const lines = result.stdout.trim().split('\n');
+      expect(lines).toContain('user-workflow');
+      expect(lines).toContain('simple-test');
+      expect(lines).toHaveLength(2);
+    });
+
+    it('should silently exit when config file does not exist', async () => {
+      const result = await runCli(['--get-chain-names', '--config', 'nonexistent.yaml']);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toBe('');
+    });
+
+    it('should use default config when no config specified', async () => {
+      // Create a default config file with chains
+      await writeFileSync('.httpcraft.yaml', `
+apis:
+  test-api:
+    baseUrl: "https://api.test.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+
+chains:
+  default-chain:
+    steps:
+      - id: test
+        call: test-api.test
+`);
+
       try {
-        await unlink('.httpcraft.yaml');
-      } catch {
-        // Files might not exist
+        const result = await runCli(['--get-chain-names']);
+
+        expect(result.exitCode).toBe(0);
+        const lines = result.stdout.trim().split('\n');
+        expect(lines).toContain('default-chain');
+      } finally {
+        // Clean up
+        if (existsSync('.httpcraft.yaml')) {
+          unlinkSync('.httpcraft.yaml');
+        }
       }
+    });
+
+    it('should silently exit when no default config exists', async () => {
+      const result = await runCli(['--get-chain-names']);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toBe('');
+    });
+
+    it('should handle config with no chains', async () => {
+      await writeFileSync('no-chains-config.yaml', `
+apis:
+  test-api:
+    baseUrl: "https://api.test.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+`);
+
       try {
-        await unlink(uniqueConfigFile);
-      } catch {
-        // Files might not exist
+        const result = await runCli(['--get-chain-names', '--config', 'no-chains-config.yaml']);
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toBe('');
+      } finally {
+        // Clean up
+        if (existsSync('no-chains-config.yaml')) {
+          unlinkSync('no-chains-config.yaml');
+        }
       }
     });
   });
@@ -273,6 +349,23 @@ describe('Completion Integration Tests', () => {
       expect(result.stdout).toContain('completion <shell>');
       expect(result.stdout).toContain('Shell to generate completion for');
       expect(result.stdout).toContain('[choices: "zsh"]');
+    });
+
+    it('should show chain command in help', async () => {
+      const result = await runCli(['--help']);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('chain <chainName>');
+      expect(result.stdout).toContain('Execute a chain of HTTP requests');
+    });
+
+    it('should show chain-output option in help', async () => {
+      const result = await runCli(['--help']);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('--chain-output');
+      expect(result.stdout).toContain('Output format for chains');
+      expect(result.stdout).toContain('[choices: "default", "full"]');
     });
   });
 }); 

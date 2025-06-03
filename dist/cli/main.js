@@ -4,7 +4,7 @@ import { hideBin } from 'yargs/helpers';
 import { handleRequestCommand } from './commands/request.js';
 import { handleApiCommand } from './commands/api.js';
 import { handleChainCommand } from './commands/chain.js';
-import { handleCompletionCommand, handleGetApiNamesCommand, handleGetEndpointNamesCommand } from './commands/completion.js';
+import { handleCompletionCommand, handleGetApiNamesCommand, handleGetEndpointNamesCommand, handleGetChainNamesCommand } from './commands/completion.js';
 async function main() {
     const argv = await yargs(hideBin(process.argv))
         .scriptName('httpcraft')
@@ -121,6 +121,11 @@ async function main() {
         type: 'string',
         hidden: true,
     })
+        .option('get-chain-names', {
+        describe: 'Get list of chain names (hidden, for completion)',
+        type: 'boolean',
+        hidden: true,
+    })
         .help()
         .alias('help', 'h')
         .version('1.0.0')
@@ -137,6 +142,10 @@ async function main() {
             apiName: argv['get-endpoint-names'],
             config: argv.config
         });
+        return;
+    }
+    if (argv['get-chain-names']) {
+        await handleGetChainNamesCommand({ config: argv.config });
         return;
     }
     // Parse --var options into key-value pairs

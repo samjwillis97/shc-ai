@@ -8,7 +8,8 @@ import { handleChainCommand } from './commands/chain.js';
 import { 
   handleCompletionCommand, 
   handleGetApiNamesCommand, 
-  handleGetEndpointNamesCommand 
+  handleGetEndpointNamesCommand,
+  handleGetChainNamesCommand 
 } from './commands/completion.js';
 
 async function main() {
@@ -143,6 +144,11 @@ async function main() {
       type: 'string',
       hidden: true,
     })
+    .option('get-chain-names', {
+      describe: 'Get list of chain names (hidden, for completion)',
+      type: 'boolean',
+      hidden: true,
+    })
     .help()
     .alias('help', 'h')
     .version('1.0.0')
@@ -161,6 +167,11 @@ async function main() {
       apiName: argv['get-endpoint-names'] as string,
       config: argv.config as string | undefined 
     });
+    return;
+  }
+
+  if (argv['get-chain-names']) {
+    await handleGetChainNamesCommand({ config: argv.config as string | undefined });
     return;
   }
 

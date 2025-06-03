@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { 
   handleCompletionCommand, 
   handleGetApiNamesCommand, 
-  handleGetEndpointNamesCommand 
+  handleGetEndpointNamesCommand,
+  handleGetChainNamesCommand 
 } from '../../src/cli/commands/completion.js';
 import { configLoader } from '../../src/core/configLoader.js';
 import type { HttpCraftConfig } from '../../src/types/config.js';
@@ -34,6 +35,9 @@ describe('Completion Commands', () => {
       expect(output).toContain('--verbose');
       expect(output).toContain('--dry-run');
       expect(output).toContain('--exit-on-http-error');
+      expect(output).toContain('--chain-output');
+      expect(output).toContain('chain:Execute a chain of HTTP requests');
+      expect(output).toContain('httpcraft --get-chain-names');
     });
 
     it('should error for non-zsh shells', async () => {
@@ -47,134 +51,269 @@ describe('Completion Commands', () => {
   describe('handleGetApiNamesCommand', () => {
     const mockConfig: HttpCraftConfig = {
       apis: {
-        'test-api': {
-          baseUrl: 'http://test.com',
-          endpoints: {}
+        'github-api': {
+          baseUrl: 'https://api.github.com',
+          endpoints: {
+            'get-user': {
+              method: 'GET',
+              path: '/users/{{username}}'
+            }
+          }
         },
-        'another-api': {
-          baseUrl: 'http://another.com',
-          endpoints: {}
+        'jsonplaceholder': {
+          baseUrl: 'https://jsonplaceholder.typicode.com',
+          endpoints: {
+            'get-posts': {
+              method: 'GET',
+              path: '/posts'
+            }
+          }
         }
       }
     };
 
-    it('should output API names from config', async () => {
+    it('should output API names from config file', async () => {
       vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
-      
-      await handleGetApiNamesCommand({ config: 'test.yaml' });
-      
-      expect(configLoader.loadConfig).toHaveBeenCalledWith('test.yaml');
+
+      await handleGetApiNamesCommand({ config: 'test-config.yaml' });
+
+      expect(configLoader.loadConfig).toHaveBeenCalledWith('test-config.yaml');
       expect(mockConsoleLog).toHaveBeenCalledTimes(2);
-      expect(mockConsoleLog).toHaveBeenCalledWith('test-api');
-      expect(mockConsoleLog).toHaveBeenCalledWith('another-api');
+      expect(mockConsoleLog).toHaveBeenCalledWith('github-api');
+      expect(mockConsoleLog).toHaveBeenCalledWith('jsonplaceholder');
     });
 
     it('should use default config when no config specified', async () => {
       vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue({
         config: mockConfig,
-        path: '/test/.httpcraft.yaml'
+        path: '.httpcraft.yaml'
       });
-      
+
       await handleGetApiNamesCommand({});
-      
+
       expect(configLoader.loadDefaultConfig).toHaveBeenCalled();
       expect(mockConsoleLog).toHaveBeenCalledTimes(2);
-      expect(mockConsoleLog).toHaveBeenCalledWith('test-api');
-      expect(mockConsoleLog).toHaveBeenCalledWith('another-api');
+      expect(mockConsoleLog).toHaveBeenCalledWith('github-api');
+      expect(mockConsoleLog).toHaveBeenCalledWith('jsonplaceholder');
     });
 
-    it('should silently exit when no default config found', async () => {
+    it('should silently exit when no config found', async () => {
       vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue(null);
-      
+
       await handleGetApiNamesCommand({});
-      
+
       expect(configLoader.loadDefaultConfig).toHaveBeenCalled();
       expect(mockConsoleLog).not.toHaveBeenCalled();
     });
 
-    it('should silently handle errors', async () => {
-      vi.mocked(configLoader.loadConfig).mockRejectedValue(new Error('Config error'));
-      
-      await handleGetApiNamesCommand({ config: 'bad.yaml' });
-      
+    it('should silently fail on config loading errors', async () => {
+      vi.mocked(configLoader.loadConfig).mockRejectedValue(new Error('Config not found'));
+
+      await handleGetApiNamesCommand({ config: 'nonexistent.yaml' });
+
       expect(mockConsoleLog).not.toHaveBeenCalled();
       expect(mockConsoleError).not.toHaveBeenCalled();
+    });
+
+    it('should handle config with no APIs', async () => {
+      vi.mocked(configLoader.loadConfig).mockResolvedValue({ apis: {} });
+
+      await handleGetApiNamesCommand({ config: 'empty-config.yaml' });
+
+      expect(mockConsoleLog).not.toHaveBeenCalled();
     });
   });
 
   describe('handleGetEndpointNamesCommand', () => {
     const mockConfig: HttpCraftConfig = {
       apis: {
-        'test-api': {
-          baseUrl: 'http://test.com',
+        'github-api': {
+          baseUrl: 'https://api.github.com',
           endpoints: {
             'get-user': {
-              path: '/users/:id',
-              method: 'GET'
+              method: 'GET',
+              path: '/users/{{username}}'
             },
-            'create-user': {
-              path: '/users',
-              method: 'POST'
+            'list-repos': {
+              method: 'GET',
+              path: '/users/{{username}}/repos'
             }
           }
-        },
-        'empty-api': {
-          baseUrl: 'http://empty.com',
-          endpoints: {}
         }
       }
     };
 
     it('should output endpoint names for specified API', async () => {
       vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
-      
-      await handleGetEndpointNamesCommand({ apiName: 'test-api', config: 'test.yaml' });
-      
-      expect(configLoader.loadConfig).toHaveBeenCalledWith('test.yaml');
+
+      await handleGetEndpointNamesCommand({ 
+        apiName: 'github-api',
+        config: 'test-config.yaml'
+      });
+
+      expect(configLoader.loadConfig).toHaveBeenCalledWith('test-config.yaml');
       expect(mockConsoleLog).toHaveBeenCalledTimes(2);
       expect(mockConsoleLog).toHaveBeenCalledWith('get-user');
-      expect(mockConsoleLog).toHaveBeenCalledWith('create-user');
+      expect(mockConsoleLog).toHaveBeenCalledWith('list-repos');
     });
 
-    it('should handle API with no endpoints', async () => {
+    it('should use default config when no config specified', async () => {
       vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue({
         config: mockConfig,
-        path: '/test/.httpcraft.yaml'
+        path: '.httpcraft.yaml'
       });
-      
-      await handleGetEndpointNamesCommand({ apiName: 'empty-api' });
-      
+
+      await handleGetEndpointNamesCommand({ apiName: 'github-api' });
+
+      expect(configLoader.loadDefaultConfig).toHaveBeenCalled();
+      expect(mockConsoleLog).toHaveBeenCalledTimes(2);
+      expect(mockConsoleLog).toHaveBeenCalledWith('get-user');
+      expect(mockConsoleLog).toHaveBeenCalledWith('list-repos');
+    });
+
+    it('should silently exit when no config found', async () => {
+      vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue(null);
+
+      await handleGetEndpointNamesCommand({ apiName: 'github-api' });
+
       expect(configLoader.loadDefaultConfig).toHaveBeenCalled();
       expect(mockConsoleLog).not.toHaveBeenCalled();
     });
 
     it('should handle non-existent API', async () => {
-      vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue({
-        config: mockConfig,
-        path: '/test/.httpcraft.yaml'
+      vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
+
+      await handleGetEndpointNamesCommand({ 
+        apiName: 'nonexistent-api',
+        config: 'test-config.yaml'
       });
-      
-      await handleGetEndpointNamesCommand({ apiName: 'non-existent' });
-      
-      expect(configLoader.loadDefaultConfig).toHaveBeenCalled();
+
       expect(mockConsoleLog).not.toHaveBeenCalled();
     });
 
-    it('should silently handle errors', async () => {
-      vi.mocked(configLoader.loadConfig).mockRejectedValue(new Error('Config error'));
-      
-      await handleGetEndpointNamesCommand({ apiName: 'test-api', config: 'bad.yaml' });
-      
+    it('should silently fail on config loading errors', async () => {
+      vi.mocked(configLoader.loadConfig).mockRejectedValue(new Error('Config not found'));
+
+      await handleGetEndpointNamesCommand({ 
+        apiName: 'github-api',
+        config: 'nonexistent.yaml'
+      });
+
       expect(mockConsoleLog).not.toHaveBeenCalled();
       expect(mockConsoleError).not.toHaveBeenCalled();
     });
 
-    it('should silently exit when no default config found', async () => {
-      vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue(null);
-      
-      await handleGetEndpointNamesCommand({ apiName: 'test-api' });
-      
+    it('should handle API with no endpoints', async () => {
+      const configWithNoEndpoints: HttpCraftConfig = {
+        apis: {
+          'empty-api': {
+            baseUrl: 'https://api.empty.com',
+            endpoints: {}
+          }
+        }
+      };
+
+      vi.mocked(configLoader.loadConfig).mockResolvedValue(configWithNoEndpoints);
+
+      await handleGetEndpointNamesCommand({ 
+        apiName: 'empty-api',
+        config: 'test-config.yaml'
+      });
+
+      expect(mockConsoleLog).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleGetChainNamesCommand', () => {
+    const mockConfig: HttpCraftConfig = {
+      apis: {
+        'test-api': {
+          baseUrl: 'https://api.test.com',
+          endpoints: {
+            'get-data': {
+              method: 'GET',
+              path: '/data'
+            }
+          }
+        }
+      },
+      chains: {
+        'user-workflow': {
+          description: 'Create and get user',
+          steps: [
+            { id: 'step1', call: 'test-api.get-data' }
+          ]
+        },
+        'simple-chain': {
+          steps: [
+            { id: 'step1', call: 'test-api.get-data' }
+          ]
+        }
+      }
+    };
+
+    it('should output chain names from config file', async () => {
+      vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
+
+      await handleGetChainNamesCommand({ config: 'test-config.yaml' });
+
+      expect(configLoader.loadConfig).toHaveBeenCalledWith('test-config.yaml');
+      expect(mockConsoleLog).toHaveBeenCalledTimes(2);
+      expect(mockConsoleLog).toHaveBeenCalledWith('user-workflow');
+      expect(mockConsoleLog).toHaveBeenCalledWith('simple-chain');
+    });
+
+    it('should use default config when no config specified', async () => {
+      vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue({
+        config: mockConfig,
+        path: '.httpcraft.yaml'
+      });
+
+      await handleGetChainNamesCommand({});
+
       expect(configLoader.loadDefaultConfig).toHaveBeenCalled();
+      expect(mockConsoleLog).toHaveBeenCalledTimes(2);
+      expect(mockConsoleLog).toHaveBeenCalledWith('user-workflow');
+      expect(mockConsoleLog).toHaveBeenCalledWith('simple-chain');
+    });
+
+    it('should silently exit when no config found', async () => {
+      vi.mocked(configLoader.loadDefaultConfig).mockResolvedValue(null);
+
+      await handleGetChainNamesCommand({});
+
+      expect(configLoader.loadDefaultConfig).toHaveBeenCalled();
+      expect(mockConsoleLog).not.toHaveBeenCalled();
+    });
+
+    it('should silently fail on config loading errors', async () => {
+      vi.mocked(configLoader.loadConfig).mockRejectedValue(new Error('Config not found'));
+
+      await handleGetChainNamesCommand({ config: 'nonexistent.yaml' });
+
+      expect(mockConsoleLog).not.toHaveBeenCalled();
+      expect(mockConsoleError).not.toHaveBeenCalled();
+    });
+
+    it('should handle config with no chains', async () => {
+      const configWithoutChains: HttpCraftConfig = {
+        apis: {
+          'test-api': {
+            baseUrl: 'https://api.test.com',
+            endpoints: {
+              'get-data': {
+                method: 'GET',
+                path: '/data'
+              }
+            }
+          }
+        }
+      };
+
+      vi.mocked(configLoader.loadConfig).mockResolvedValue(configWithoutChains);
+
+      await handleGetChainNamesCommand({ config: 'no-chains-config.yaml' });
+
       expect(mockConsoleLog).not.toHaveBeenCalled();
     });
   });

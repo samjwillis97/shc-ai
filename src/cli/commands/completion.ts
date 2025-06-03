@@ -14,6 +14,10 @@ export interface GetEndpointNamesArgs {
   config?: string;
 }
 
+export interface GetChainNamesArgs {
+  config?: string;
+}
+
 /**
  * Handle the completion zsh command that outputs the ZSH completion script
  */
@@ -39,13 +43,14 @@ _httpcraft() {
 
     _arguments -C \\
         '1: :->command' \\
-        '2: :->endpoint' \\
+        '2: :->subcommand' \\
         '--config[Path to configuration file]:config file:_files -g "*.yaml"' \\
         '--var[Set or override a variable]:variable:' \\
         '--profile[Select profile(s) to use]:profile:' \\
         '--verbose[Output detailed request and response information]' \\
         '--dry-run[Display the request without sending it]' \\
         '--exit-on-http-error[Exit with non-zero code for HTTP errors]:error pattern:' \\
+        '--chain-output[Output format for chains]:output format:(default full)' \\
         '--help[Show help]' \\
         '--version[Show version]' \\
         '*: :->args' && return 0
@@ -55,6 +60,7 @@ _httpcraft() {
             local -a commands
             commands=(
                 'request:Make an HTTP GET request to the specified URL'
+                'chain:Execute a chain of HTTP requests'
                 'completion:Generate shell completion script'
             )
             
@@ -69,14 +75,31 @@ _httpcraft() {
             
             _describe 'command' commands
             ;;
-        endpoint)
-            local api_name=$line[1]
+        subcommand)
+            local cmd=$line[1]
             
-            # Get endpoint names for the selected API
-            local -a endpoint_names
-            endpoint_names=($(httpcraft --get-endpoint-names "$api_name" 2>/dev/null))
-            
-            _describe 'endpoint' endpoint_names
+            case $cmd in
+                chain)
+                    # Complete chain names after 'httpcraft chain'
+                    local -a chain_names
+                    chain_names=($(httpcraft --get-chain-names 2>/dev/null))
+                    _describe 'chain name' chain_names
+                    ;;
+                completion)
+                    # Complete shell types for completion command
+                    _describe 'shell' '(zsh)'
+                    ;;
+                request)
+                    # Complete URLs - just show a placeholder message
+                    _message 'URL to request'
+                    ;;
+                *)
+                    # For API names, complete endpoint names
+                    local -a endpoint_names
+                    endpoint_names=($(httpcraft --get-endpoint-names "$cmd" 2>/dev/null))
+                    _describe 'endpoint' endpoint_names
+                    ;;
+            esac
             ;;
     esac
 }
@@ -141,6 +164,36 @@ export async function handleGetEndpointNamesCommand(args: GetEndpointNamesArgs):
       for (const endpointName of endpointNames) {
         console.log(endpointName);
       }
+    }
+  } catch (error) {
+    // Silently fail for completion - errors would break tab completion
+    // User can use regular commands to see actual errors
+  }
+}
+
+/**
+ * Handle the hidden --get-chain-names command
+ */
+export async function handleGetChainNamesCommand(args: GetChainNamesArgs): Promise<void> {
+  try {
+    // Load configuration
+    let config: HttpCraftConfig;
+    
+    if (args.config) {
+      config = await configLoader.loadConfig(args.config);
+    } else {
+      const defaultConfigResult = await configLoader.loadDefaultConfig();
+      if (!defaultConfigResult) {
+        // Silently exit if no config found - completion should not error
+        return;
+      }
+      config = defaultConfigResult.config;
+    }
+    
+    // Output chain names, one per line
+    const chainNames = Object.keys(config.chains || {});
+    for (const chainName of chainNames) {
+      console.log(chainName);
     }
   } catch (error) {
     // Silently fail for completion - errors would break tab completion
