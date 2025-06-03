@@ -191,9 +191,9 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 ## Phase 10: Polish & Remaining V1 Features
 
 - **Goal:** Complete all remaining V1 features, refine documentation, and improve overall polish.
-- **Status:** [ ]
+- **Status:** [~]
 - **Tasks:**
-  - [ ] **T10.1:** Implement "post-response" plugin hook.
+  - [x] **T10.1:** Implement "post-response" plugin hook.
   - [ ] **T10.2:** Implement plugin loading from npm.
   - [ ] **T10.3:** Implement chain verbose output (structured JSON).
   - [ ] **T10.4:** Refine ZSH completion (chains, options).
@@ -202,6 +202,14 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [ ] **T10.7:** Thorough end-to-end testing.
   - [ ] **T10.8:** Code review, cleanup, performance optimizations.
   - [ ] **T10.9:** Prepare for V1 release.
-- **Notes/Blockers:**
+- **Notes/Blockers:** T10.1 completed successfully! Implemented complete post-response hook system with:
+  - **PostResponseHook Type:** Added PostResponseHook type definition and support in PluginInstance interface
+  - **PluginManager Integration:** Updated PluginManager to register and execute post-response hooks in sequence
+  - **HttpClient Integration:** Integrated post-response hooks into HttpClient after response received but before returning
+  - **Comprehensive Testing:** Added 5 unit tests and 4 integration tests covering all post-response hook scenarios
+  - **XML to JSON Plugin:** Created working xmlToJsonPlugin.js example using xml2js library for real XML conversion
+  - **Example Configuration:** Added xml-api-example.yaml demonstrating post-response hook usage
+  - **Testable Outcome Achieved:** Plugin successfully converts XML response bodies to JSON format as required
+  - All post-response hook functionality working correctly with error handling and sequential execution. Ready to proceed to T10.2.
 
 ---
