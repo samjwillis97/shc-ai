@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import yaml from 'js-yaml';
-import type { HttpCraftConfig, RawHttpCraftConfig, ApiDefinition } from '../types/config.js';
+import type { HttpCraftConfig, RawHttpCraftConfig, ApiDefinition, ChainDefinition } from '../types/config.js';
 
 export interface ConfigWithPath {
   config: HttpCraftConfig;
@@ -39,10 +39,16 @@ export class ConfigLoader {
         ? await this.loadModularApis(rawConfig.apis, path.dirname(fullPath))
         : {};
 
+      // Load modular imports for chains (T9.2)
+      const processedChains = rawConfig.chains 
+        ? await this.loadModularChains(rawConfig.chains, path.dirname(fullPath))
+        : {};
+
       // Convert to processed config
       const config: HttpCraftConfig = {
         ...rawConfig,
-        apis: processedApis
+        apis: processedApis,
+        chains: processedChains
       };
       
       return config;
@@ -206,6 +212,132 @@ export class ConfigLoader {
     } catch (error) {
       // No configuration file found in any location
       return null;
+    }
+  }
+
+  /**
+   * Loads chain definitions from modular imports
+   * Supports both direct definitions and import specifications
+   * T9.2: Implement modular imports for chain definitions from a directory
+   */
+  async loadModularChains(
+    chainsConfig: Record<string, ChainDefinition> | string[],
+    basePath: string
+  ): Promise<Record<string, ChainDefinition>> {
+    const mergedChains: Record<string, ChainDefinition> = {};
+
+    // If it's a direct definition object, return as-is
+    if (!Array.isArray(chainsConfig)) {
+      return chainsConfig;
+    }
+
+    // Process import specifications
+    for (const importSpec of chainsConfig) {
+      if (typeof importSpec !== 'string') {
+        throw new Error('Chain import specification must be a string');
+      }
+
+      let loadedChains: Record<string, ChainDefinition>;
+
+      if (importSpec.startsWith('directory:')) {
+        // Load from directory
+        const dirPath = importSpec.substring(10); // Remove "directory:" prefix
+        loadedChains = await this.loadChainsFromDirectory(dirPath, basePath);
+      } else {
+        // Load from individual file
+        loadedChains = await this.loadChainsFromFile(importSpec, basePath);
+      }
+
+      // Merge with existing chains (last one loaded wins for conflicts)
+      Object.assign(mergedChains, loadedChains);
+    }
+
+    return mergedChains;
+  }
+
+  /**
+   * Loads chain definitions from all .yaml/.yml files in a directory
+   */
+  async loadChainsFromDirectory(
+    dirPath: string,
+    basePath: string
+  ): Promise<Record<string, ChainDefinition>> {
+    const fullDirPath = path.resolve(basePath, dirPath);
+    const mergedChains: Record<string, ChainDefinition> = {};
+
+    try {
+      const files = await fs.readdir(fullDirPath);
+      
+      // Filter for YAML files and sort for deterministic order
+      const yamlFiles = files
+        .filter(file => file.endsWith('.yaml') || file.endsWith('.yml'))
+        .sort();
+
+      for (const file of yamlFiles) {
+        const filePath = path.join(fullDirPath, file);
+        try {
+          const fileChains = await this.loadChainsFromFile(filePath, '');
+          // Merge chains (last loaded wins for conflicts)
+          Object.assign(mergedChains, fileChains);
+        } catch (error) {
+          throw new Error(`Failed to load chain file ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      return mergedChains;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('ENOENT')) {
+        throw new Error(`Chain directory not found: ${fullDirPath}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Loads chain definitions from a single file
+   */
+  async loadChainsFromFile(
+    filePath: string,
+    basePath: string
+  ): Promise<Record<string, ChainDefinition>> {
+    const fullFilePath = basePath ? path.resolve(basePath, filePath) : filePath;
+
+    try {
+      const fileContent = await fs.readFile(fullFilePath, 'utf-8');
+      const fileConfig = yaml.load(fileContent) as Record<string, ChainDefinition>;
+
+      if (!fileConfig || typeof fileConfig !== 'object') {
+        throw new Error('Invalid chain file: must contain an object');
+      }
+
+      // Validate that all top-level keys are valid chain definitions
+      for (const [chainName, chainDef] of Object.entries(fileConfig)) {
+        if (!chainDef || typeof chainDef !== 'object') {
+          throw new Error(`Invalid chain definition for '${chainName}': must be an object`);
+        }
+        if (!chainDef.steps || !Array.isArray(chainDef.steps)) {
+          throw new Error(`Invalid chain definition for '${chainName}': steps array is required`);
+        }
+        // Validate each step
+        for (const [index, step] of chainDef.steps.entries()) {
+          if (!step || typeof step !== 'object') {
+            throw new Error(`Invalid step ${index} in chain '${chainName}': must be an object`);
+          }
+          if (!step.id || typeof step.id !== 'string') {
+            throw new Error(`Invalid step ${index} in chain '${chainName}': id is required`);
+          }
+          if (!step.call || typeof step.call !== 'string') {
+            throw new Error(`Invalid step ${index} in chain '${chainName}': call is required`);
+          }
+        }
+      }
+
+      return fileConfig;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to load chain file ${fullFilePath}: ${error.message}`);
+      }
+      throw new Error(`Failed to load chain file ${fullFilePath}: Unknown error`);
     }
   }
 }

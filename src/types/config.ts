@@ -20,7 +20,7 @@ export interface RawHttpCraftConfig {
   profiles?: Record<string, ProfileDefinition>;
   plugins?: PluginConfiguration[];
   apis: Record<string, ApiDefinition> | string[];
-  chains?: Record<string, ChainDefinition>;
+  chains?: Record<string, ChainDefinition> | string[];
   variables?: string[]; // T9.3: Global variable file paths
 }
 

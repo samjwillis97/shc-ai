@@ -321,4 +321,411 @@ apis:
       expect(config.apis.conflictApi.endpoints.test.path).toBe('/second');
     });
   });
+});
+
+describe('ConfigLoader - Modular Chain Imports (T9.2)', () => {
+  let tempDir: string;
+  let configLoader: ConfigLoader;
+
+  beforeEach(async () => {
+    configLoader = new ConfigLoader();
+    // Create a temporary directory for test files
+    tempDir = path.join(process.cwd(), 'test-temp-chains-' + Date.now());
+    await fs.mkdir(tempDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    // Clean up temp directory
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+  });
+
+  describe('Directory Import Support', () => {
+    it('should load chains from directory using "directory:" syntax', async () => {
+      // Create test directory structure
+      const chainsDir = path.join(tempDir, 'chains');
+      await fs.mkdir(chainsDir, { recursive: true });
+
+      // Create API for the chain to reference
+      const apiFile = path.join(tempDir, 'api.yaml');
+      await fs.writeFile(apiFile, `
+testApi:
+  baseUrl: "https://httpbin.org"
+  endpoints:
+    get:
+      method: GET
+      path: "/get"
+    post:
+      method: POST
+      path: "/post"
+`);
+
+      // Create chain files
+      await fs.writeFile(path.join(chainsDir, 'workflow1.yaml'), `
+workflow1:
+  description: "First workflow"
+  steps:
+    - id: step1
+      call: "testApi.get"
+    - id: step2
+      call: "testApi.post"
+`);
+
+      await fs.writeFile(path.join(chainsDir, 'workflow2.yaml'), `
+workflow2:
+  description: "Second workflow"
+  vars:
+    baseId: "123"
+  steps:
+    - id: getData
+      call: "testApi.get"
+`);
+
+      // Create main config file
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  - "${apiFile}"
+chains:
+  - "directory:./chains/"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.chains).toHaveProperty('workflow1');
+      expect(config.chains).toHaveProperty('workflow2');
+      expect(config.chains!.workflow1.description).toBe('First workflow');
+      expect(config.chains!.workflow2.vars).toEqual({ baseId: '123' });
+      expect(config.chains!.workflow1.steps).toHaveLength(2);
+      expect(config.chains!.workflow2.steps).toHaveLength(1);
+    });
+
+    it('should handle both .yaml and .yml files in directory', async () => {
+      const chainsDir = path.join(tempDir, 'chains');
+      await fs.mkdir(chainsDir, { recursive: true });
+
+      await fs.writeFile(path.join(chainsDir, 'chain1.yaml'), `
+chain1:
+  steps:
+    - id: step1
+      call: "api.endpoint"
+`);
+
+      await fs.writeFile(path.join(chainsDir, 'chain2.yml'), `
+chain2:
+  steps:
+    - id: step1
+      call: "api.endpoint"
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  api:
+    baseUrl: "https://example.com"
+    endpoints:
+      endpoint:
+        method: GET
+        path: "/test"
+chains:
+  - "directory:./chains/"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.chains).toHaveProperty('chain1');
+      expect(config.chains).toHaveProperty('chain2');
+    });
+
+    it('should load files in alphabetical order for deterministic merging', async () => {
+      const chainsDir = path.join(tempDir, 'chains');
+      await fs.mkdir(chainsDir, { recursive: true });
+
+      // Create files with same chain name but different values
+      await fs.writeFile(path.join(chainsDir, 'a-first.yaml'), `
+testChain:
+  description: "First description"
+  steps:
+    - id: step1
+      call: "api.endpoint1"
+`);
+
+      await fs.writeFile(path.join(chainsDir, 'z-last.yaml'), `
+testChain:
+  description: "Last description"
+  steps:
+    - id: step1
+      call: "api.endpoint2"
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  api:
+    baseUrl: "https://example.com"
+    endpoints:
+      endpoint1:
+        method: GET
+        path: "/test1"
+      endpoint2:
+        method: GET
+        path: "/test2"
+chains:
+  - "directory:./chains/"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      // Last loaded should win (z-last.yaml loads after a-first.yaml)
+      expect(config.chains!.testChain.description).toBe('Last description');
+      expect(config.chains!.testChain.steps[0].call).toBe('api.endpoint2');
+    });
+  });
+
+  describe('Individual File Import Support', () => {
+    it('should load chains from individual files', async () => {
+      // Create chain file
+      const chainFile = path.join(tempDir, 'my-chain.yaml');
+      await fs.writeFile(chainFile, `
+myChain:
+  description: "My test chain"
+  vars:
+    userId: "123"
+  steps:
+    - id: getUser
+      call: "api.getUser"
+    - id: updateUser
+      call: "api.updateUser"
+`);
+
+      // Create main config file
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  api:
+    baseUrl: "https://example.com"
+    endpoints:
+      getUser:
+        method: GET
+        path: "/users/{{userId}}"
+      updateUser:
+        method: PUT
+        path: "/users/{{userId}}"
+chains:
+  - "./my-chain.yaml"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.chains).toHaveProperty('myChain');
+      expect(config.chains!.myChain.description).toBe('My test chain');
+      expect(config.chains!.myChain.vars).toEqual({ userId: '123' });
+    });
+  });
+
+  describe('Mixed Import Types', () => {
+    it('should handle mixed directory and file imports', async () => {
+      // Create directory with chains
+      const chainsDir = path.join(tempDir, 'chains');
+      await fs.mkdir(chainsDir, { recursive: true });
+
+      await fs.writeFile(path.join(chainsDir, 'dir-chain.yaml'), `
+dirChain:
+  description: "From directory"
+  steps:
+    - id: step1
+      call: "api.endpoint"
+`);
+
+      // Create individual chain file
+      const chainFile = path.join(tempDir, 'extra-chain.yaml');
+      await fs.writeFile(chainFile, `
+extraChain:
+  description: "Individual file"
+  steps:
+    - id: step1
+      call: "api.endpoint"
+`);
+
+      // Create main config file
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  api:
+    baseUrl: "https://example.com"
+    endpoints:
+      endpoint:
+        method: GET
+        path: "/test"
+chains:
+  - "directory:./chains/"
+  - "./extra-chain.yaml"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.chains).toHaveProperty('dirChain');
+      expect(config.chains).toHaveProperty('extraChain');
+      expect(config.chains!.dirChain.description).toBe('From directory');
+      expect(config.chains!.extraChain.description).toBe('Individual file');
+    });
+  });
+
+  describe('Direct Chain Definitions (Backward Compatibility)', () => {
+    it('should still support direct chain definitions in config', async () => {
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  api:
+    baseUrl: "https://example.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+chains:
+  directChain:
+    description: "Direct definition"
+    steps:
+      - id: test
+        call: "api.test"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.chains).toHaveProperty('directChain');
+      expect(config.chains!.directChain.description).toBe('Direct definition');
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should throw error for non-existent directory', async () => {
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+chains:
+  - "directory:./non-existent/"
+`);
+
+      await expect(configLoader.loadConfig(configFile)).rejects.toThrow(
+        'Chain directory not found'
+      );
+    });
+
+    it('should throw error for non-existent file', async () => {
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+chains:
+  - "./non-existent.yaml"
+`);
+
+      await expect(configLoader.loadConfig(configFile)).rejects.toThrow(
+        'Failed to load chain file'
+      );
+    });
+
+    it('should throw error for invalid chain file content', async () => {
+      const chainFile = path.join(tempDir, 'invalid.yaml');
+      await fs.writeFile(chainFile, `
+invalidChain:
+  # Missing required steps
+  description: "Invalid chain"
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+chains:
+  - "./invalid.yaml"
+`);
+
+      await expect(configLoader.loadConfig(configFile)).rejects.toThrow(
+        'steps array is required'
+      );
+    });
+
+    it('should throw error for chain with invalid step', async () => {
+      const chainFile = path.join(tempDir, 'invalid-step.yaml');
+      await fs.writeFile(chainFile, `
+invalidStepChain:
+  steps:
+    - id: "valid"
+      call: "api.endpoint"
+    - # Missing id and call
+      description: "Invalid step"
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+chains:
+  - "./invalid-step.yaml"
+`);
+
+      await expect(configLoader.loadConfig(configFile)).rejects.toThrow(
+        'id is required'
+      );
+    });
+
+    it('should throw error for malformed YAML in chain file', async () => {
+      const chainFile = path.join(tempDir, 'malformed.yaml');
+      await fs.writeFile(chainFile, `
+invalidYaml: [
+  unclosed bracket
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+chains:
+  - "./malformed.yaml"
+`);
+
+      await expect(configLoader.loadConfig(configFile)).rejects.toThrow();
+    });
+  });
+
+  describe('Conflict Resolution', () => {
+    it('should follow "last loaded wins" for chain name conflicts', async () => {
+      // Create first chain file
+      const chain1File = path.join(tempDir, 'chain1.yaml');
+      await fs.writeFile(chain1File, `
+conflictChain:
+  description: "First chain"
+  steps:
+    - id: step1
+      call: "api.endpoint1"
+`);
+
+      // Create second chain file
+      const chain2File = path.join(tempDir, 'chain2.yaml');
+      await fs.writeFile(chain2File, `
+conflictChain:
+  description: "Second chain"
+  steps:
+    - id: step1
+      call: "api.endpoint2"
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  api:
+    baseUrl: "https://example.com"
+    endpoints:
+      endpoint1:
+        method: GET
+        path: "/test1"
+      endpoint2:
+        method: GET
+        path: "/test2"
+chains:
+  - "./chain1.yaml"
+  - "./chain2.yaml"  # This should win
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.chains!.conflictChain.description).toBe('Second chain');
+      expect(config.chains!.conflictChain.steps[0].call).toBe('api.endpoint2');
+    });
+  });
 }); 
