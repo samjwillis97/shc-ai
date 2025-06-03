@@ -29,7 +29,7 @@
 
           src = ./.;
 
-          npmDepsHash = "sha256-ZoHdwgsuh5fbY2xSf7mzEO8zYR2xWM2O7paziTAhu7M=";
+          npmDepsHash = "sha256-fIjbMqXFj3f+JsA9osSXzl1ttOhit1+ULMfHb+pfv9o=";
 
           # Build script
           buildPhase = ''
@@ -75,6 +75,8 @@ EOF
           default = httpcraft;
           httpcraft = httpcraft;
         };
+
+        homeManagerModules.httpcraft = ./modules/httpcraft-home.nix;
 
         devShells = {
           default = pkgs.mkShell {
