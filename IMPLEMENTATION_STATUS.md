@@ -198,7 +198,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [x] **T10.3:** Implement chain verbose output (structured JSON).
   - [x] **T10.4:** Refine ZSH completion (chains, options).
   - [x] **T10.5:** Write comprehensive README.md and usage examples.
-  - [ ] **T10.6:** Create/document YAML schema.
+  - [x] **T10.6:** Create/document YAML schema.
   - [ ] **T10.7:** Thorough end-to-end testing.
   - [ ] **T10.8:** Code review, cleanup, performance optimizations.
   - [ ] **T10.9:** Prepare for V1 release.
@@ -247,5 +247,19 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Working Examples:** All examples tested and verified to work with current implementation
   - **Comprehensive Example Config:** Created examples/comprehensive_example.yaml demonstrating all features
   - All README documentation complete and accurate. Ready to proceed to T10.6.
+
+  T10.6 completed successfully! Created comprehensive YAML schema documentation with:
+  - **Complete JSON Schema:** Created `schemas/httpcraft-config.schema.json` with full validation for all HttpCraft configuration options
+  - **Editor Integration:** Added setup instructions for VS Code, IntelliJ IDEA, and WebStorm with autocompletion and validation
+  - **Comprehensive Testing:** Added 20 unit tests covering valid and invalid configurations, including edge cases
+  - **Variable Support:** Schema supports `{{variable}}` placeholders in URLs, paths, headers, and all configuration values
+  - **Documentation:** Created `schemas/README.md` with complete setup and troubleshooting guide
+  - **Command-line Validation:** Added support for ajv-cli validation with installation and usage instructions
+  - **Example Configuration:** Created `examples/schema-example.yaml` demonstrating schema usage with editor integration
+  - **Validation Rules:** Enforces required properties, HTTP methods, naming patterns, URL formats, and chain structure
+  - **README Integration:** Added comprehensive schema section to main README with features and setup instructions
+  - **Backward Compatibility:** All existing example configurations validate successfully against the new schema
+  - **Testable Outcome Achieved:** Schema file exists and is fully usable with YAML linters and editors
+  All YAML schema implementation complete and tested. Ready to proceed to T10.7.
 
 ---
