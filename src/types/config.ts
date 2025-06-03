@@ -8,6 +8,20 @@ export interface HttpCraftConfig {
   plugins?: PluginConfiguration[];
   apis: Record<string, ApiDefinition>;
   chains?: Record<string, ChainDefinition>;
+  variables?: string[]; // T9.3: Global variable file paths
+}
+
+/**
+ * Raw configuration that may contain import specifications
+ * Used during parsing before modular imports are resolved
+ */
+export interface RawHttpCraftConfig {
+  config?: ConfigSection;
+  profiles?: Record<string, ProfileDefinition>;
+  plugins?: PluginConfiguration[];
+  apis: Record<string, ApiDefinition> | string[];
+  chains?: Record<string, ChainDefinition>;
+  variables?: string[]; // T9.3: Global variable file paths
 }
 
 export interface ConfigSection {

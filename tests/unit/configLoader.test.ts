@@ -19,15 +19,18 @@ describe('ConfigLoader', () => {
   });
 
   it('should throw error for non-existent file', async () => {
-    const configPath = './non-existent-file.yaml';
+    const configPath = path.join(process.cwd(), 'non-existent-config.yaml');
     
     await expect(configLoader.loadConfig(configPath)).rejects.toThrow(/Failed to load configuration/);
   });
 
-  it('should throw error for invalid config structure', async () => {
+  it('should handle config without apis section (for modular imports)', async () => {
     const configPath = path.join(process.cwd(), 'tests/fixtures/invalid-config.yaml');
     
-    await expect(configLoader.loadConfig(configPath)).rejects.toThrow(/apis section is required/);
+    const config = await configLoader.loadConfig(configPath);
+    expect(config.apis).toEqual({});
+    // Config should still be valid even without apis section
+    expect(typeof config).toBe('object');
   });
 
   describe('loadDefaultConfig - T2.3 Search Hierarchy', () => {
