@@ -852,4 +852,111 @@ describe('VariableResolver', () => {
       expect(result).toBe('Path: /usr/bin:/bin');
     });
   });
+
+  describe('T9.4: Secret Variable Resolution', () => {
+    it('should resolve secret variables from environment', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          API_KEY: 'secret-api-key-123',
+          SECRET_TOKEN: 'secret-token-456'
+        }
+      };
+
+      const result = await resolver.resolve('API Key: {{secret.API_KEY}}', contextWithSecrets);
+      expect(result).toBe('API Key: secret-api-key-123');
+    });
+
+    it('should resolve multiple secret variables', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          API_KEY: 'secret-api-key',
+          DB_PASSWORD: 'secret-db-password'
+        }
+      };
+
+      const result = await resolver.resolve('API: {{secret.API_KEY}}, DB: {{secret.DB_PASSWORD}}', contextWithSecrets);
+      expect(result).toBe('API: secret-api-key, DB: secret-db-password');
+    });
+
+    it('should throw error for undefined secret variables', async () => {
+      await expect(resolver.resolve('Missing: {{secret.UNDEFINED_SECRET}}', mockContext))
+        .rejects.toThrow(VariableResolutionError);
+      
+      await expect(resolver.resolve('Missing: {{secret.UNDEFINED_SECRET}}', mockContext))
+        .rejects.toThrow("Secret variable 'UNDEFINED_SECRET' is not defined");
+    });
+
+    it('should differentiate between secret and env variables in error messages', async () => {
+      try {
+        await resolver.resolve('Missing: {{secret.MISSING_VAR}}', mockContext);
+        expect.fail('Should have thrown error');
+      } catch (error) {
+        expect(error).toBeInstanceOf(VariableResolutionError);
+        expect((error as VariableResolutionError).message).toBe("Secret variable 'MISSING_VAR' is not defined");
+        expect((error as VariableResolutionError).variableName).toBe('secret.MISSING_VAR');
+      }
+
+      try {
+        await resolver.resolve('Missing: {{env.MISSING_VAR}}', mockContext);
+        expect.fail('Should have thrown error');
+      } catch (error) {
+        expect(error).toBeInstanceOf(VariableResolutionError);
+        expect((error as VariableResolutionError).message).toBe("Environment variable 'MISSING_VAR' is not defined");
+        expect((error as VariableResolutionError).variableName).toBe('env.MISSING_VAR');
+      }
+    });
+
+    it('should handle secret variables in different contexts', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          API_KEY: 'test-secret-key',
+          DATABASE_URL: 'postgres://user:pass@host:5432/db'
+        }
+      };
+
+      // In headers
+      const headerTemplate = 'Authorization: Bearer {{secret.API_KEY}}';
+      const resolvedHeader = await resolver.resolve(headerTemplate, contextWithSecrets);
+      expect(resolvedHeader).toBe('Authorization: Bearer test-secret-key');
+
+      // In URLs
+      const urlTemplate = 'postgresql://{{secret.DATABASE_URL}}';
+      const resolvedUrl = await resolver.resolve(urlTemplate, contextWithSecrets);
+      expect(resolvedUrl).toBe('postgresql://postgres://user:pass@host:5432/db');
+    });
+
+    it('should work with resolveValue method for objects', async () => {
+      const contextWithSecrets = {
+        ...mockContext,
+        env: {
+          ...mockContext.env,
+          API_KEY: 'secret-key-value',
+          SECRET_TOKEN: 'secret-token-value'
+        }
+      };
+
+      const template = {
+        headers: {
+          'Authorization': 'Bearer {{secret.API_KEY}}',
+          'X-Secret-Token': '{{secret.SECRET_TOKEN}}'
+        },
+        url: 'https://api.example.com/{{secret.API_KEY}}'
+      };
+
+      const resolved = await resolver.resolveValue(template, contextWithSecrets);
+      expect(resolved).toEqual({
+        headers: {
+          'Authorization': 'Bearer secret-key-value',
+          'X-Secret-Token': 'secret-token-value'
+        },
+        url: 'https://api.example.com/secret-key-value'
+      });
+    });
+  });
 }); 

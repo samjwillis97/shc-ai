@@ -5,6 +5,7 @@
 export interface HttpCraftConfig {
   config?: ConfigSection;
   profiles?: Record<string, ProfileDefinition>;
+  secrets?: SecretsConfiguration; // T9.4: Secrets configuration
   plugins?: PluginConfiguration[];
   apis: Record<string, ApiDefinition>;
   chains?: Record<string, ChainDefinition>;
@@ -19,6 +20,7 @@ export interface HttpCraftConfig {
 export interface RawHttpCraftConfig {
   config?: ConfigSection;
   profiles?: Record<string, ProfileDefinition>;
+  secrets?: SecretsConfiguration; // T9.4: Secrets configuration
   plugins?: PluginConfiguration[];
   apis: Record<string, ApiDefinition> | string[];
   chains?: Record<string, ChainDefinition> | string[];
@@ -31,6 +33,14 @@ export interface ConfigSection {
 
 export interface ProfileDefinition {
   [key: string]: string | number | boolean;
+}
+
+/**
+ * T9.4: Configuration for secret providers
+ */
+export interface SecretsConfiguration {
+  provider?: 'env' | string; // Default: 'env' for OS environment variables
+  // Future: additional provider-specific configuration
 }
 
 export interface PluginConfiguration {

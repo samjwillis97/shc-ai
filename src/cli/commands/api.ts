@@ -112,7 +112,17 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     let resolvedEndpoint: EndpointDefinition;
     
     try {
-      resolvedApi = await variableResolver.resolveValue(api, variableContext) as ApiDefinition;
+      // Only resolve the specific API properties we need, not all endpoints
+      // This prevents variable resolution errors from other endpoints affecting the current request
+      const resolvedApiBase: Pick<ApiDefinition, 'baseUrl' | 'headers' | 'params' | 'variables'> & { endpoints?: any } = {
+        baseUrl: await variableResolver.resolveValue(api.baseUrl, variableContext),
+        headers: api.headers ? await variableResolver.resolveValue(api.headers, variableContext) : undefined,
+        params: api.params ? await variableResolver.resolveValue(api.params, variableContext) : undefined,
+        variables: api.variables, // Don't resolve variables themselves, just pass them through
+        endpoints: {} // Add empty endpoints to satisfy ApiDefinition interface
+      };
+      
+      resolvedApi = resolvedApiBase as ApiDefinition;
       resolvedEndpoint = await variableResolver.resolveValue(endpoint, variableContext) as EndpointDefinition;
     } catch (error) {
       if (error instanceof VariableResolutionError) {

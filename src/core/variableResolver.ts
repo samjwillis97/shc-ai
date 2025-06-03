@@ -76,7 +76,7 @@ export class VariableResolver {
   }
   
   /**
-   * Resolves scoped variables like env.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable, steps.stepId.*
+   * Resolves scoped variables like env.VAR_NAME, secret.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable, steps.stepId.*
    */
   private async resolveScopedVariable(variableName: string, context: VariableContext): Promise<string> {
     const [scope, ...keyParts] = variableName.split('.');
@@ -89,6 +89,16 @@ export class VariableResolver {
         }
         throw new VariableResolutionError(
           `Environment variable '${key}' is not defined`,
+          variableName
+        );
+        
+      case 'secret':
+        // T9.4: Secret variable resolution (default provider: OS environment)
+        if (context.env[key] !== undefined) {
+          return context.env[key];
+        }
+        throw new VariableResolutionError(
+          `Secret variable '${key}' is not defined`,
           variableName
         );
         
