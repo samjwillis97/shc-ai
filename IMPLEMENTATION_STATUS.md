@@ -195,7 +195,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 - **Tasks:**
   - [x] **T10.1:** Implement "post-response" plugin hook.
   - [ ] **T10.2:** Implement plugin loading from npm.
-  - [ ] **T10.3:** Implement chain verbose output (structured JSON).
+  - [x] **T10.3:** Implement chain verbose output (structured JSON).
   - [ ] **T10.4:** Refine ZSH completion (chains, options).
   - [ ] **T10.5:** Write comprehensive README.md and usage examples.
   - [ ] **T10.6:** Create/document YAML schema.
@@ -211,5 +211,15 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Example Configuration:** Added xml-api-example.yaml demonstrating post-response hook usage
   - **Testable Outcome Achieved:** Plugin successfully converts XML response bodies to JSON format as required
   - All post-response hook functionality working correctly with error handling and sequential execution. Ready to proceed to T10.2.
+
+  T10.3 completed successfully! Implemented chain structured JSON output with:
+  - **CLI Option:** Added `--chain-output` option with choices 'default' and 'full' (defaults to 'default')
+  - **Structured JSON Format:** When `--chain-output full` is used, outputs detailed JSON with chainName, success status, and complete step information
+  - **Step Details:** Each step includes stepId, complete request object (method, url, headers, body), complete response object (status, statusText, headers, body), success status, and error details if applicable
+  - **Backward Compatibility:** Default behavior unchanged - still outputs last step's response body when `--chain-output` is not specified or set to 'default'
+  - **Comprehensive Testing:** Added 4 unit tests and 4 integration tests covering all output scenarios including single-step chains, multi-step chains, and error handling
+  - **Real HTTP Testing:** Integration tests verified with actual HTTP requests to jsonplaceholder.typicode.com
+  - **Testable Outcome Achieved:** Flag produces detailed JSON output for chain debugging as required
+  - All chain structured JSON output functionality working correctly. Ready to proceed to T10.4.
 
 ---

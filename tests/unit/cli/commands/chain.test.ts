@@ -452,5 +452,243 @@ describe('Chain Command', () => {
         configWithProfiles.profiles
       );
     });
+
+    describe('T10.3: Chain Structured JSON Output', () => {
+      it('should output default format (last step body) when chainOutput is default', async () => {
+        vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
+        vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
+        
+        const mockResult: ChainExecutionResult = {
+          chainName: 'simpleChain',
+          success: true,
+          steps: [
+            {
+              stepId: 'createUser',
+              request: { method: 'POST', url: 'https://api.test.com/users', headers: {}, body: {} },
+              response: { status: 201, statusText: 'Created', headers: {}, body: '{"id": 123, "name": "testuser"}' },
+              success: true
+            },
+            {
+              stepId: 'getUser',
+              request: { method: 'GET', url: 'https://api.test.com/users/123', headers: {}, body: undefined },
+              response: { status: 200, statusText: 'OK', headers: {}, body: '{"id": 123, "name": "testuser", "email": "test@example.com"}' },
+              success: true
+            }
+          ]
+        };
+        
+        vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
+
+        await handleChainCommand({
+          chainName: 'simpleChain',
+          config: 'test-config.yaml',
+          chainOutput: 'default'
+        });
+
+        // Should output the last step's response body (default behavior)
+        expect(consoleLogSpy).toHaveBeenCalledWith('{"id": 123, "name": "testuser", "email": "test@example.com"}');
+      });
+
+      it('should output structured JSON when chainOutput is full', async () => {
+        vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
+        vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
+        
+        const mockResult: ChainExecutionResult = {
+          chainName: 'simpleChain',
+          success: true,
+          steps: [
+            {
+              stepId: 'createUser',
+              request: { 
+                method: 'POST', 
+                url: 'https://api.test.com/users', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: '{"name": "testuser", "email": "test@example.com"}' 
+              },
+              response: { 
+                status: 201, 
+                statusText: 'Created', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: '{"id": 123, "name": "testuser"}' 
+              },
+              success: true
+            },
+            {
+              stepId: 'getUser',
+              request: { 
+                method: 'GET', 
+                url: 'https://api.test.com/users/123', 
+                headers: { 'Authorization': 'Bearer token' }, 
+                body: undefined 
+              },
+              response: { 
+                status: 200, 
+                statusText: 'OK', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: '{"id": 123, "name": "testuser", "email": "test@example.com"}' 
+              },
+              success: true
+            }
+          ]
+        };
+        
+        vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
+
+        await handleChainCommand({
+          chainName: 'simpleChain',
+          config: 'test-config.yaml',
+          chainOutput: 'full'
+        });
+
+        // Should output structured JSON of all steps
+        const expectedOutput = {
+          chainName: 'simpleChain',
+          success: true,
+          steps: [
+            {
+              stepId: 'createUser',
+              request: {
+                method: 'POST',
+                url: 'https://api.test.com/users',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{"name": "testuser", "email": "test@example.com"}'
+              },
+              response: {
+                status: 201,
+                statusText: 'Created',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{"id": 123, "name": "testuser"}'
+              },
+              success: true,
+              error: undefined
+            },
+            {
+              stepId: 'getUser',
+              request: {
+                method: 'GET',
+                url: 'https://api.test.com/users/123',
+                headers: { 'Authorization': 'Bearer token' },
+                body: undefined
+              },
+              response: {
+                status: 200,
+                statusText: 'OK',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{"id": 123, "name": "testuser", "email": "test@example.com"}'
+              },
+              success: true,
+              error: undefined
+            }
+          ]
+        };
+
+        expect(consoleLogSpy).toHaveBeenCalledWith(JSON.stringify(expectedOutput, null, 2));
+      });
+
+      it('should output structured JSON for single step chain when chainOutput is full', async () => {
+        vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
+        vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
+        
+        const mockResult: ChainExecutionResult = {
+          chainName: 'minimalChain',
+          success: true,
+          steps: [
+            {
+              stepId: 'step1',
+              request: { 
+                method: 'GET', 
+                url: 'https://api.test.com/users/123', 
+                headers: {}, 
+                body: undefined 
+              },
+              response: { 
+                status: 200, 
+                statusText: 'OK', 
+                headers: {}, 
+                body: '{"id": 123}' 
+              },
+              success: true
+            }
+          ]
+        };
+        
+        vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
+
+        await handleChainCommand({
+          chainName: 'minimalChain',
+          config: 'test-config.yaml',
+          chainOutput: 'full'
+        });
+
+        // Should output structured JSON for single step
+        const expectedOutput = {
+          chainName: 'minimalChain',
+          success: true,
+          steps: [
+            {
+              stepId: 'step1',
+              request: {
+                method: 'GET',
+                url: 'https://api.test.com/users/123',
+                headers: {},
+                body: undefined
+              },
+              response: {
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                body: '{"id": 123}'
+              },
+              success: true,
+              error: undefined
+            }
+          ]
+        };
+
+        expect(consoleLogSpy).toHaveBeenCalledWith(JSON.stringify(expectedOutput, null, 2));
+      });
+
+      it('should output structured JSON including error details when step fails', async () => {
+        vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
+        vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
+        
+        const mockResult: ChainExecutionResult = {
+          chainName: 'simpleChain',
+          success: false,
+          steps: [
+            {
+              stepId: 'createUser',
+              request: { 
+                method: 'POST', 
+                url: 'https://api.test.com/users', 
+                headers: {}, 
+                body: '{"name": "testuser"}' 
+              },
+              response: { 
+                status: 400, 
+                statusText: 'Bad Request', 
+                headers: {}, 
+                body: '{"error": "Invalid data"}' 
+              },
+              success: false,
+              error: 'HTTP 400: Bad Request'
+            }
+          ],
+          error: "Step 'createUser' failed: HTTP 400: Bad Request"
+        };
+        
+        vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
+
+        await expect(handleChainCommand({
+          chainName: 'simpleChain',
+          config: 'test-config.yaml',
+          chainOutput: 'full'
+        })).rejects.toThrow('Process exited with code 1');
+
+        // Should still show the error, not structured output when chain fails
+        expect(consoleErrorSpy).toHaveBeenCalledWith("Chain execution failed: Step 'createUser' failed: HTTP 400: Bad Request");
+        expect(consoleLogSpy).not.toHaveBeenCalled(); // No structured output on failure
+      });
+    });
   });
 }); 

@@ -804,6 +804,229 @@ chains:
     });
   });
 
+  describe('T10.3: Chain Structured JSON Output', () => {
+    it('should output structured JSON for all steps when using --chain-output full', async () => {
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getPost:
+        method: GET
+        path: "/posts/1"
+      getUser:
+        method: GET
+        path: "/users/1"
+
+chains:
+  getPostAndUser:
+    description: "Get a post and its user"
+    steps:
+      - id: getPost
+        call: jsonplaceholder.getPost
+      - id: getUser
+        call: jsonplaceholder.getUser
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'getPostAndUser', '--config', testChainConfigFile, '--chain-output', 'full']);
+
+      expect(result.exitCode).toBe(0);
+      
+      // Parse the structured JSON output
+      const output = JSON.parse(result.stdout);
+      
+      // Verify the structure
+      expect(output).toHaveProperty('chainName', 'getPostAndUser');
+      expect(output).toHaveProperty('success', true);
+      expect(output).toHaveProperty('steps');
+      expect(Array.isArray(output.steps)).toBe(true);
+      expect(output.steps).toHaveLength(2);
+      
+      // Verify first step (getPost)
+      const firstStep = output.steps[0];
+      expect(firstStep).toHaveProperty('stepId', 'getPost');
+      expect(firstStep).toHaveProperty('request');
+      expect(firstStep).toHaveProperty('response');
+      expect(firstStep).toHaveProperty('success', true);
+      
+      expect(firstStep.request).toHaveProperty('method', 'GET');
+      expect(firstStep.request).toHaveProperty('url', 'https://jsonplaceholder.typicode.com/posts/1');
+      expect(firstStep.request).toHaveProperty('headers');
+      // GET requests may not have a body property, so we don't assert its existence
+      
+      expect(firstStep.response).toHaveProperty('status', 200);
+      expect(firstStep.response).toHaveProperty('statusText', 'OK');
+      expect(firstStep.response).toHaveProperty('headers');
+      expect(firstStep.response).toHaveProperty('body');
+      
+      // Parse the response body to verify it's valid JSON
+      const postData = JSON.parse(firstStep.response.body);
+      expect(postData).toHaveProperty('id', 1);
+      expect(postData).toHaveProperty('title');
+      
+      // Verify second step (getUser)
+      const secondStep = output.steps[1];
+      expect(secondStep).toHaveProperty('stepId', 'getUser');
+      expect(secondStep).toHaveProperty('request');
+      expect(secondStep).toHaveProperty('response');
+      expect(secondStep).toHaveProperty('success', true);
+      
+      expect(secondStep.request).toHaveProperty('method', 'GET');
+      expect(secondStep.request).toHaveProperty('url', 'https://jsonplaceholder.typicode.com/users/1');
+      // GET requests may not have a body property, so we don't assert its existence
+      
+      expect(secondStep.response).toHaveProperty('status', 200);
+      expect(secondStep.response).toHaveProperty('statusText', 'OK');
+      expect(secondStep.response).toHaveProperty('headers');
+      expect(secondStep.response).toHaveProperty('body');
+      
+      // Parse the response body to verify it's valid JSON
+      const userData = JSON.parse(secondStep.response.body);
+      expect(userData).toHaveProperty('id', 1);
+      expect(userData).toHaveProperty('name');
+      expect(userData).toHaveProperty('email');
+    });
+
+    it('should output structured JSON for single step chains when using --chain-output full', async () => {
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getPost:
+        method: GET
+        path: "/posts/1"
+
+chains:
+  singleStepChain:
+    description: "Single step chain"
+    steps:
+      - id: getPost
+        call: jsonplaceholder.getPost
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'singleStepChain', '--config', testChainConfigFile, '--chain-output', 'full']);
+
+      expect(result.exitCode).toBe(0);
+      
+      // Parse the structured JSON output
+      const output = JSON.parse(result.stdout);
+      
+      // Verify the structure
+      expect(output).toHaveProperty('chainName', 'singleStepChain');
+      expect(output).toHaveProperty('success', true);
+      expect(output).toHaveProperty('steps');
+      expect(Array.isArray(output.steps)).toBe(true);
+      expect(output.steps).toHaveLength(1);
+      
+      // Verify the single step
+      const step = output.steps[0];
+      expect(step).toHaveProperty('stepId', 'getPost');
+      expect(step).toHaveProperty('request');
+      expect(step).toHaveProperty('response');
+      expect(step).toHaveProperty('success', true);
+      
+      expect(step.request).toHaveProperty('method', 'GET');
+      expect(step.request).toHaveProperty('url', 'https://jsonplaceholder.typicode.com/posts/1');
+      expect(step.request).toHaveProperty('headers');
+      // GET requests may not have a body property, so we don't assert its existence
+      
+      expect(step.response).toHaveProperty('status', 200);
+      expect(step.response).toHaveProperty('statusText', 'OK');
+      expect(step.response).toHaveProperty('headers');
+      expect(step.response).toHaveProperty('body');
+      
+      // Parse the response body to verify it's valid JSON
+      const postData = JSON.parse(step.response.body);
+      expect(postData).toHaveProperty('id', 1);
+      expect(postData).toHaveProperty('title');
+    });
+
+    it('should default to last step body output when --chain-output is not specified', async () => {
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getPost:
+        method: GET
+        path: "/posts/1"
+      getUser:
+        method: GET
+        path: "/users/1"
+
+chains:
+  getPostAndUser:
+    description: "Get a post and its user"
+    steps:
+      - id: getPost
+        call: jsonplaceholder.getPost
+      - id: getUser
+        call: jsonplaceholder.getUser
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'getPostAndUser', '--config', testChainConfigFile]);
+
+      expect(result.exitCode).toBe(0);
+      
+      // Should output just the last step's response body (user data)
+      const output = JSON.parse(result.stdout);
+      expect(output).toHaveProperty('id', 1);
+      expect(output).toHaveProperty('name');
+      expect(output).toHaveProperty('email');
+      
+      // Should NOT be the structured format
+      expect(output).not.toHaveProperty('chainName');
+      expect(output).not.toHaveProperty('steps');
+    });
+
+    it('should default to last step body output when --chain-output default is explicitly specified', async () => {
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getPost:
+        method: GET
+        path: "/posts/1"
+      getUser:
+        method: GET
+        path: "/users/1"
+
+chains:
+  getPostAndUser:
+    description: "Get a post and its user"
+    steps:
+      - id: getPost
+        call: jsonplaceholder.getPost
+      - id: getUser
+        call: jsonplaceholder.getUser
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'getPostAndUser', '--config', testChainConfigFile, '--chain-output', 'default']);
+
+      expect(result.exitCode).toBe(0);
+      
+      // Should output just the last step's response body (user data)
+      const output = JSON.parse(result.stdout);
+      expect(output).toHaveProperty('id', 1);
+      expect(output).toHaveProperty('name');
+      expect(output).toHaveProperty('email');
+      
+      // Should NOT be the structured format
+      expect(output).not.toHaveProperty('chainName');
+      expect(output).not.toHaveProperty('steps');
+    });
+  });
+
   describe('Error Handling', () => {
     it('should fail gracefully when step variable references non-existent step', async () => {
       const config = `

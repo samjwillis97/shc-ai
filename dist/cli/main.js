@@ -58,6 +58,7 @@ async function main() {
             verbose: argv.verbose,
             dryRun: argv['dry-run'],
             exitOnHttpError: argv['exit-on-http-error'],
+            chainOutput: argv['chain-output'],
         });
     })
         .command('completion <shell>', 'Generate shell completion script', (yargs) => {
@@ -102,6 +103,12 @@ async function main() {
         .option('exit-on-http-error', {
         describe: 'Exit with non-zero code for specified HTTP error status codes (e.g., "4xx", "5xx", "401,403")',
         type: 'string',
+    })
+        .option('chain-output', {
+        describe: 'Output format for chains ("default" for last step body, "full" for structured JSON of all steps)',
+        type: 'string',
+        choices: ['default', 'full'],
+        default: 'default',
     })
         // Hidden options for completion
         .option('get-api-names', {

@@ -74,6 +74,7 @@ async function main() {
           verbose: argv.verbose as boolean,
           dryRun: argv['dry-run'] as boolean,
           exitOnHttpError: argv['exit-on-http-error'] as string | undefined,
+          chainOutput: argv['chain-output'] as string | undefined,
         });
       }
     )
@@ -124,6 +125,12 @@ async function main() {
     .option('exit-on-http-error', {
       describe: 'Exit with non-zero code for specified HTTP error status codes (e.g., "4xx", "5xx", "401,403")',
       type: 'string',
+    })
+    .option('chain-output', {
+      describe: 'Output format for chains ("default" for last step body, "full" for structured JSON of all steps)',
+      type: 'string',
+      choices: ['default', 'full'],
+      default: 'default',
     })
     // Hidden options for completion
     .option('get-api-names', {

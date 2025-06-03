@@ -14,6 +14,7 @@ export interface ChainCommandArgs {
   verbose?: boolean;
   dryRun?: boolean;
   exitOnHttpError?: string;
+  chainOutput?: string;
 }
 
 export async function handleChainCommand(args: ChainCommandArgs): Promise<void> {
@@ -103,10 +104,36 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
     
     // Handle execution result
     if (result.success) {
-      // Output the response body of the last successful step (T8.11)
-      if (result.steps.length > 0) {
-        const lastStep = result.steps[result.steps.length - 1];
-        console.log(lastStep.response.body);
+      if (args.chainOutput === 'full') {
+        // T10.3: Output structured JSON of all steps' resolved requests and responses
+        const structuredOutput = {
+          chainName: result.chainName,
+          success: result.success,
+          steps: result.steps.map(step => ({
+            stepId: step.stepId,
+            request: {
+              method: step.request.method,
+              url: step.request.url,
+              headers: step.request.headers,
+              body: step.request.body
+            },
+            response: {
+              status: step.response.status,
+              statusText: step.response.statusText,
+              headers: step.response.headers,
+              body: step.response.body
+            },
+            success: step.success,
+            error: step.error
+          }))
+        };
+        console.log(JSON.stringify(structuredOutput, null, 2));
+      } else {
+        // Default output: response body of the last successful step (T8.11)
+        if (result.steps.length > 0) {
+          const lastStep = result.steps[result.steps.length - 1];
+          console.log(lastStep.response.body);
+        }
       }
     } else {
       console.error(`Chain execution failed: ${result.error}`);
