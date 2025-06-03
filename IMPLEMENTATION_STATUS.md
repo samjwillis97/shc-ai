@@ -196,7 +196,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [x] **T10.1:** Implement "post-response" plugin hook.
   - [ ] **T10.2:** Implement plugin loading from npm.
   - [x] **T10.3:** Implement chain verbose output (structured JSON).
-  - [ ] **T10.4:** Refine ZSH completion (chains, options).
+  - [x] **T10.4:** Refine ZSH completion (chains, options).
   - [ ] **T10.5:** Write comprehensive README.md and usage examples.
   - [ ] **T10.6:** Create/document YAML schema.
   - [ ] **T10.7:** Thorough end-to-end testing.
@@ -221,5 +221,16 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Real HTTP Testing:** Integration tests verified with actual HTTP requests to jsonplaceholder.typicode.com
   - **Testable Outcome Achieved:** Flag produces detailed JSON output for chain debugging as required
   - All chain structured JSON output functionality working correctly. Ready to proceed to T10.4.
+
+  T10.4 completed successfully! Refined ZSH completion system with:
+  - **Chain Name Completion:** Added `--get-chain-names` hidden command for dynamic chain name completion
+  - **Enhanced Completion Script:** Updated ZSH completion script to support `httpcraft chain <TAB>` with contextual chain name completion
+  - **New Option Support:** Added `--chain-output` option completion with 'default' and 'full' choices
+  - **Improved Structure:** Restructured completion script with better subcommand handling for chain, completion, request, and API commands
+  - **Comprehensive Testing:** Added 18 unit tests and 19 integration tests covering all completion scenarios
+  - **Error Handling:** Graceful handling of missing configs and malformed files in completion commands
+  - **Testable Outcome Achieved:** All completion functionality working - chain names, API names, endpoint names, and CLI options are all completable
+  - **Command Coverage:** All commands (chain, completion, request, API calls) have proper tab completion support
+  - All ZSH completion refinements working correctly with 37 tests passing. Ready to proceed to T10.5.
 
 ---
