@@ -194,14 +194,19 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 - **Status:** [~]
 - **Tasks:**
   - [x] **T10.1:** Implement "post-response" plugin hook.
-  - [ ] **T10.2:** Implement plugin loading from npm.
-  - [x] **T10.3:** Implement chain verbose output (structured JSON).
-  - [x] **T10.4:** Refine ZSH completion (chains, options).
-  - [x] **T10.5:** Write comprehensive README.md and usage examples.
-  - [x] **T10.6:** Create/document YAML schema.
-  - [ ] **T10.7:** Thorough end-to-end testing.
-  - [ ] **T10.8:** Code review, cleanup, performance optimizations.
-  - [ ] **T10.9:** Prepare for V1 release.
+  - [ ] **T10.2:** Implement API-level plugin configuration.
+  - [ ] **T10.3:** Implement plugin configuration merging.
+  - [ ] **T10.4:** Implement variable substitution in API-level plugin configurations.
+  - [ ] **T10.5:** Implement validation for API-level plugin references.
+  - [ ] **T10.6:** Update YAML schema to include API-level plugin configuration.
+  - [ ] **T10.7:** Implement plugin loading from npm.
+  - [x] **T10.8:** Implement chain verbose output (structured JSON).
+  - [x] **T10.9:** Refine ZSH completion (chains, options).
+  - [x] **T10.10:** Write comprehensive README.md and usage examples.
+  - [x] **T10.11:** Create/document YAML schema.
+  - [ ] **T10.12:** Thorough end-to-end testing.
+  - [ ] **T10.13:** Code review, cleanup, performance optimizations.
+  - [ ] **T10.14:** Prepare for V1 release.
 - **Notes/Blockers:** T10.1 completed successfully! Implemented complete post-response hook system with:
   - **PostResponseHook Type:** Added PostResponseHook type definition and support in PluginInstance interface
   - **PluginManager Integration:** Updated PluginManager to register and execute post-response hooks in sequence
@@ -212,7 +217,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Testable Outcome Achieved:** Plugin successfully converts XML response bodies to JSON format as required
   - All post-response hook functionality working correctly with error handling and sequential execution. Ready to proceed to T10.2.
 
-  T10.3 completed successfully! Implemented chain structured JSON output with:
+  T10.8 completed successfully! Implemented chain structured JSON output with:
   - **CLI Option:** Added `--chain-output` option with choices 'default' and 'full' (defaults to 'default')
   - **Structured JSON Format:** When `--chain-output full` is used, outputs detailed JSON with chainName, success status, and complete step information
   - **Step Details:** Each step includes stepId, complete request object (method, url, headers, body), complete response object (status, statusText, headers, body), success status, and error details if applicable
@@ -220,9 +225,9 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Comprehensive Testing:** Added 4 unit tests and 4 integration tests covering all output scenarios including single-step chains, multi-step chains, and error handling
   - **Real HTTP Testing:** Integration tests verified with actual HTTP requests to jsonplaceholder.typicode.com
   - **Testable Outcome Achieved:** Flag produces detailed JSON output for chain debugging as required
-  - All chain structured JSON output functionality working correctly. Ready to proceed to T10.4.
+  - All chain structured JSON output functionality working correctly. Ready to proceed to T10.9.
 
-  T10.4 completed successfully! Refined ZSH completion system with:
+  T10.9 completed successfully! Refined ZSH completion system with:
   - **Chain Name Completion:** Added `--get-chain-names` hidden command for dynamic chain name completion
   - **Enhanced Completion Script:** Updated ZSH completion script to support `httpcraft chain <TAB>` with contextual chain name completion
   - **New Option Support:** Added `--chain-output` option completion with 'default' and 'full' choices
@@ -231,9 +236,9 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Error Handling:** Graceful handling of missing configs and malformed files in completion commands
   - **Testable Outcome Achieved:** All completion functionality working - chain names, API names, endpoint names, and CLI options are all completable
   - **Command Coverage:** All commands (chain, completion, request, API calls) have proper tab completion support
-  - All ZSH completion refinements working correctly with 37 tests passing. Ready to proceed to T10.5.
+  - All ZSH completion refinements working correctly with 37 tests passing. Ready to proceed to T10.10.
 
-  T10.5 completed successfully! Created comprehensive README.md with:
+  T10.10 completed successfully! Created comprehensive README.md with:
   - **Complete Documentation:** Comprehensive README.md covering all major features, installation, usage, and configuration
   - **Quick Start Guide:** Step-by-step quick start with working examples using JSONPlaceholder API
   - **Usage Examples:** Extensive examples covering basic API calls, profiles, chains, verbose output, dry-run mode, and scripting
@@ -246,9 +251,9 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Troubleshooting Section:** Common issues and solutions with debugging commands
   - **Working Examples:** All examples tested and verified to work with current implementation
   - **Comprehensive Example Config:** Created examples/comprehensive_example.yaml demonstrating all features
-  - All README documentation complete and accurate. Ready to proceed to T10.6.
+  - All README documentation complete and accurate. Ready to proceed to T10.11.
 
-  T10.6 completed successfully! Created comprehensive YAML schema documentation with:
+  T10.11 completed successfully! Created comprehensive YAML schema documentation with:
   - **Complete JSON Schema:** Created `schemas/httpcraft-config.schema.json` with full validation for all HttpCraft configuration options
   - **Editor Integration:** Added setup instructions for VS Code, IntelliJ IDEA, and WebStorm with autocompletion and validation
   - **Comprehensive Testing:** Added 20 unit tests covering valid and invalid configurations, including edge cases
@@ -260,6 +265,6 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **README Integration:** Added comprehensive schema section to main README with features and setup instructions
   - **Backward Compatibility:** All existing example configurations validate successfully against the new schema
   - **Testable Outcome Achieved:** Schema file exists and is fully usable with YAML linters and editors
-  All YAML schema implementation complete and tested. Ready to proceed to T10.7.
+  All YAML schema implementation complete and tested. Ready to proceed to T10.12.
 
 ---

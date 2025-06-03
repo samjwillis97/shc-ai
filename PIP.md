@@ -242,21 +242,31 @@
 - **Tasks:**
   - **T10.1:** Implement "post-response" plugin hook. Plugins can register async functions that receive the response object and can transform it (e.g., XML to JSON) or its properties before further processing/output.
     - _Testable Outcome:_ A plugin can convert an XML response body to JSON.
-  - **T10.2:** Implement plugin loading from npm (e.g., `plugins: [{npmPackage: 'httpcraft-s3-auth', name: 's3Auth'}]`). This involves `npm install` mechanics or dynamic import.
+  - **T10.2:** Implement API-level plugin configuration. Enhance YAML config to support `plugins` section within API definitions for overriding global plugin configurations.
+    - _Testable Outcome:_ API definitions can include plugin configuration overrides that are parsed correctly.
+  - **T10.3:** Implement plugin configuration merging. When an API defines plugin configuration, merge it with global plugin config (API-level overwrites global keys).
+    - _Testable Outcome:_ Plugin receives merged configuration with API-level values taking precedence over global values.
+  - **T10.4:** Implement variable substitution in API-level plugin configurations using the same `{{variable}}` syntax as other configuration elements.
+    - _Testable Outcome:_ Variables in API-level plugin configs are resolved using the current variable context.
+  - **T10.5:** Implement validation for API-level plugin references. If an API references a plugin name not defined globally, report error and halt execution.
+    - _Testable Outcome:_ Tool exits with informative error when API references undefined plugin.
+  - **T10.6:** Update YAML schema to include API-level plugin configuration with validation rules for plugin name references and configuration structure.
+    - _Testable Outcome:_ Schema validates API-level plugin configurations and rejects invalid references.
+  - **T10.7:** Implement plugin loading from npm (e.g., `plugins: [{npmPackage: 'httpcraft-s3-auth', name: 's3Auth'}]`). This involves `npm install` mechanics or dynamic import.
     - _Testable Outcome:_ A simple npm-published plugin can be loaded and used.
-  - **T10.3:** Implement chain verbose output: an optional flag (e.g., `--chain-output full`) to output a structured JSON object of all steps' resolved requests and responses to `stdout`.
+  - **T10.8:** Implement chain verbose output: an optional flag (e.g., `--chain-output full`) to output a structured JSON object of all steps' resolved requests and responses to `stdout`.
     - _Testable Outcome:_ Flag produces detailed JSON output for chain debugging.
-  - **T10.4:** Refine ZSH completion: Add completion for chain names (`httpcraft chain <TAB>`). Add completion for more CLI options.
+  - **T10.9:** Refine ZSH completion: Add completion for chain names (`httpcraft chain <TAB>`). Add completion for more CLI options.
     - _Testable Outcome:_ Chain names and all relevant options are completable.
-  - **T10.5:** Write comprehensive README.md: installation, quick start, detailed usage, configuration file structure, variable precedence, chain examples, plugin development guide.
+  - **T10.10:** Write comprehensive README.md: installation, quick start, detailed usage, configuration file structure, variable precedence, chain examples, plugin development guide.
     - _Testable Outcome:_ Documentation is clear and covers all features.
-  - **T10.6:** Create/document the YAML schema for configuration files.
+  - **T10.11:** Create/document the YAML schema for configuration files.
     - _Testable Outcome:_ Schema file exists and is usable with YAML linters/editors.
-  - **T10.7:** Conduct thorough end-to-end testing of diverse scenarios, including edge cases for all features.
+  - **T10.12:** Conduct thorough end-to-end testing of diverse scenarios, including edge cases for all features.
     - _Testable Outcome:_ High test coverage, major bugs identified and fixed.
-  - **T10.8:** Code review, cleanup, and minor performance optimizations if identified as necessary.
+  - **T10.13:** Code review, cleanup, and minor performance optimizations if identified as necessary.
     - _Testable Outcome:_ Code quality meets standards.
-  - **T10.9:** Prepare for V1 release (e.g., version bump, changelog).
+  - **T10.14:** Prepare for V1 release (e.g., version bump, changelog).
 
 ---
 
