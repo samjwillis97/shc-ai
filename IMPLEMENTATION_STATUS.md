@@ -194,10 +194,10 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 - **Status:** [~]
 - **Tasks:**
   - [x] **T10.1:** Implement "post-response" plugin hook.
-  - [ ] **T10.2:** Implement API-level plugin configuration.
-  - [ ] **T10.3:** Implement plugin configuration merging.
-  - [ ] **T10.4:** Implement variable substitution in API-level plugin configurations.
-  - [ ] **T10.5:** Implement validation for API-level plugin references.
+  - [x] **T10.2:** Implement API-level plugin configuration.
+  - [x] **T10.3:** Implement plugin configuration merging.
+  - [x] **T10.4:** Implement variable substitution in API-level plugin configurations.
+  - [x] **T10.5:** Implement validation for API-level plugin references.
   - [ ] **T10.6:** Update YAML schema to include API-level plugin configuration.
   - [ ] **T10.7:** Implement plugin loading from npm.
   - [x] **T10.8:** Implement chain verbose output (structured JSON).
@@ -216,6 +216,19 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Example Configuration:** Added xml-api-example.yaml demonstrating post-response hook usage
   - **Testable Outcome Achieved:** Plugin successfully converts XML response bodies to JSON format as required
   - All post-response hook functionality working correctly with error handling and sequential execution. Ready to proceed to T10.2.
+
+  T10.2, T10.3, T10.4, T10.5 completed successfully! Implemented complete API-level plugin configuration system with:
+  - **T10.2 API-level Plugin Configuration:** Enhanced YAML config to support `plugins` section within API definitions for overriding global plugin configurations
+  - **T10.3 Plugin Configuration Merging:** When an API defines plugin configuration, merge it with global plugin config (API-level overwrites global keys)
+  - **T10.4 Variable Substitution:** Implemented variable substitution in API-level plugin configurations using the same `{{variable}}` syntax as other configuration elements
+  - **T10.5 Validation:** Added validation for API-level plugin references - if an API references a plugin name not defined globally, report error and halt execution
+  - **PluginManager Enhancement:** Added `getMergedPluginConfigurations()` method that merges API and global configs with API precedence
+  - **CLI Integration:** Updated API command handler to resolve variables in API-level plugin configs before creating API-specific plugin manager
+  - **Variable Context Integration:** API-level plugin configs are resolved using the full variable context (CLI > Profile > API > Endpoint > Global variables)
+  - **Comprehensive Testing:** Added 6 unit tests and 4 integration tests covering all API-level plugin configuration scenarios including variable resolution, error handling, and complex nested objects
+  - **Error Handling:** Proper error handling for undefined variables in plugin configurations with informative error messages
+  - **Testable Outcomes Achieved:** All testable outcomes met - API definitions can include plugin configuration overrides, plugins receive merged configuration with API-level values taking precedence, variables in API-level plugin configs are resolved using current variable context, and tool exits with informative error when API references undefined plugin
+  - All API-level plugin configuration functionality working correctly with 30 total tests passing. Ready to proceed to T10.6.
 
   T10.8 completed successfully! Implemented chain structured JSON output with:
   - **CLI Option:** Added `--chain-output` option with choices 'default' and 'full' (defaults to 'default')

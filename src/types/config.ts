@@ -54,6 +54,7 @@ export interface ApiDefinition {
   headers?: Record<string, string>;
   params?: Record<string, string>;
   variables?: Record<string, string | number | boolean>;
+  plugins?: PluginConfiguration[]; // T10.2: API-level plugin configuration
   endpoints: Record<string, EndpointDefinition>;
 }
 

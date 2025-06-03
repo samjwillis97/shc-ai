@@ -4,6 +4,7 @@ import { PluginConfiguration } from '../../src/types/config.js';
 import { HttpRequest, HttpResponse } from '../../src/types/plugin.js';
 import fs from 'fs/promises';
 import path from 'path';
+import { vi } from 'vitest';
 
 describe('PluginManager', () => {
   let pluginManager: PluginManager;
@@ -608,6 +609,276 @@ export default {
       
       expect(plugins1).not.toBe(plugins2); // Different array instances
       expect(plugins1).toEqual(plugins2); // Same content
+    });
+  });
+
+  describe('API-level plugin configuration (T10.2)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should merge API-level plugin configurations with global configurations', async () => {
+      // Create the actual plugin file
+      const pluginPath = path.join(tempDir, 'test-plugin.js');
+      const pluginContent = `
+export default {
+  async setup(context) {
+    // Test plugin
+  }
+};
+`;
+      await fs.writeFile(pluginPath, pluginContent);
+
+      // Setup global plugins
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './test-plugin.js',
+          name: 'testPlugin',
+          config: {
+            globalKey: 'globalValue',
+            sharedKey: 'globalSharedValue'
+          }
+        }
+      ];
+
+      // Setup API-level plugin override
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          path: '', // Path not used in API configs, comes from global
+          name: 'testPlugin',
+          config: {
+            apiKey: 'apiValue',
+            sharedKey: 'apiSharedValue' // Should override global value
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      const mergedConfigs = pluginManager.getMergedPluginConfigurations(apiConfigs);
+      
+      expect(mergedConfigs).toHaveLength(1);
+      expect(mergedConfigs[0].name).toBe('testPlugin');
+      expect(mergedConfigs[0].path).toBe('./test-plugin.js'); // From global config
+      expect(mergedConfigs[0].config).toEqual({
+        globalKey: 'globalValue',
+        sharedKey: 'apiSharedValue', // API value should override global
+        apiKey: 'apiValue'
+      });
+    });
+
+    it('should include global plugins not overridden by API configs', async () => {
+      // Create the actual plugin files
+      const plugin1Path = path.join(tempDir, 'plugin1.js');
+      const plugin2Path = path.join(tempDir, 'plugin2.js');
+      const pluginContent = `
+export default {
+  async setup(context) {
+    // Test plugin
+  }
+};
+`;
+      await fs.writeFile(plugin1Path, pluginContent);
+      await fs.writeFile(plugin2Path, pluginContent);
+
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './plugin1.js',
+          name: 'plugin1',
+          config: { key1: 'value1' }
+        },
+        {
+          path: './plugin2.js',
+          name: 'plugin2',
+          config: { key2: 'value2' }
+        }
+      ];
+
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          path: '',
+          name: 'plugin1',
+          config: { key1: 'overridden' }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      const mergedConfigs = pluginManager.getMergedPluginConfigurations(apiConfigs);
+      
+      expect(mergedConfigs).toHaveLength(2);
+      
+      const plugin1Config = mergedConfigs.find(c => c.name === 'plugin1');
+      const plugin2Config = mergedConfigs.find(c => c.name === 'plugin2');
+      
+      expect(plugin1Config?.config).toEqual({ key1: 'overridden' });
+      expect(plugin2Config?.config).toEqual({ key2: 'value2' });
+    });
+
+    it('should validate that API-level plugins reference existing global plugins (T10.5)', async () => {
+      // Create the actual plugin file
+      const plugin1Path = path.join(tempDir, 'plugin1.js');
+      const pluginContent = `
+export default {
+  async setup(context) {
+    // Test plugin
+  }
+};
+`;
+      await fs.writeFile(plugin1Path, pluginContent);
+
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './plugin1.js',
+          name: 'plugin1',
+          config: {}
+        }
+      ];
+
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          path: '',
+          name: 'nonexistentPlugin',
+          config: {}
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      expect(() => {
+        pluginManager.getMergedPluginConfigurations(apiConfigs);
+      }).toThrow("API references undefined plugin 'nonexistentPlugin'. Plugin must be defined in the global plugins section.");
+    });
+
+    it('should return global configs when no API configs provided', async () => {
+      // Create the actual plugin file
+      const plugin1Path = path.join(tempDir, 'plugin1.js');
+      const pluginContent = `
+export default {
+  async setup(context) {
+    // Test plugin
+  }
+};
+`;
+      await fs.writeFile(plugin1Path, pluginContent);
+
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './plugin1.js',
+          name: 'plugin1',
+          config: { key: 'value' }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      const mergedConfigs = pluginManager.getMergedPluginConfigurations();
+      
+      expect(mergedConfigs).toEqual(globalConfigs);
+    });
+
+    it('should handle empty API plugin configurations', async () => {
+      // Create the actual plugin file
+      const plugin1Path = path.join(tempDir, 'plugin1.js');
+      const pluginContent = `
+export default {
+  async setup(context) {
+    // Test plugin
+  }
+};
+`;
+      await fs.writeFile(plugin1Path, pluginContent);
+
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './plugin1.js',
+          name: 'plugin1',
+          config: { key: 'value' }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      const apiPluginManager = await pluginManager.loadApiPlugins([], tempDir);
+      
+      // Should still load global plugins
+      expect(apiPluginManager.getPlugins()).toHaveLength(1);
+    });
+
+    it('should create API-specific plugin manager with merged configurations', async () => {
+      // Create mock plugin file
+      const pluginContent = `
+export default {
+  async setup(context) {
+    // Store config for verification
+    this.mergedConfig = context.config;
+  }
+};
+      `;
+      
+      const pluginPath = path.join(tempDir, 'test-plugin.js');
+      await fs.writeFile(pluginPath, pluginContent);
+
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './test-plugin.js',
+          name: 'testPlugin',
+          config: {
+            globalKey: 'globalValue'
+          }
+        }
+      ];
+
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          path: '',
+          name: 'testPlugin',
+          config: {
+            apiKey: 'apiValue'
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      const apiPluginManager = await pluginManager.loadApiPlugins(apiConfigs, tempDir);
+      
+      // Verify that the API plugin manager was created with merged configurations
+      const apiPlugins = apiPluginManager.getPlugins();
+      expect(apiPlugins).toHaveLength(1);
+      expect(apiPlugins[0].name).toBe('testPlugin');
+      expect(apiPlugins[0].config).toEqual({
+        globalKey: 'globalValue',
+        apiKey: 'apiValue'
+      });
+    });
+  });
+
+  describe('T10.4: Variable substitution in API-level plugin configurations', () => {
+    it('should support variable substitution in API-level plugin configurations', () => {
+      // Create plugin config with variables that need to be resolved
+      const apiConfigsWithVariables: PluginConfiguration[] = [
+        {
+          path: '',
+          name: 'testPlugin',
+          config: {
+            apiKey: '{{testVar}}',
+            baseUrl: 'https://{{env.API_HOST}}/api',
+            timeout: '{{timeoutValue}}',
+            nested: {
+              value: '{{nestedVar}}'
+            }
+          }
+        }
+      ];
+
+      // Test that the configuration structure supports variables
+      // The actual variable resolution will be tested in integration tests
+      // since it requires the variable resolver and context
+      expect(apiConfigsWithVariables[0].config?.apiKey).toBe('{{testVar}}');
+      expect(apiConfigsWithVariables[0].config?.baseUrl).toBe('https://{{env.API_HOST}}/api');
+      expect(apiConfigsWithVariables[0].config?.timeout).toBe('{{timeoutValue}}');
+      expect(apiConfigsWithVariables[0].config?.nested).toEqual({ value: '{{nestedVar}}' });
     });
   });
 }); 

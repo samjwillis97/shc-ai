@@ -19,14 +19,81 @@ import { PluginConfiguration } from '../types/config.js';
 
 export class PluginManager {
   private plugins: PluginInstance[] = [];
+  private globalPluginConfigs: PluginConfiguration[] = [];
 
   /**
    * Load and setup plugins from configuration
    */
   async loadPlugins(pluginConfigs: PluginConfiguration[], configDir: string = process.cwd()): Promise<void> {
+    // Store global plugin configurations for later merging with API-level configs
+    this.globalPluginConfigs = [...pluginConfigs];
+    
     for (const pluginConfig of pluginConfigs) {
       await this.loadPlugin(pluginConfig, configDir);
     }
+  }
+
+  /**
+   * T10.2 & T10.3: Create merged plugin configurations for a specific API
+   * API-level plugin configurations override global configurations
+   */
+  getMergedPluginConfigurations(apiPluginConfigs?: PluginConfiguration[]): PluginConfiguration[] {
+    if (!apiPluginConfigs || apiPluginConfigs.length === 0) {
+      return this.globalPluginConfigs;
+    }
+
+    const mergedConfigs: PluginConfiguration[] = [];
+    const globalConfigsMap = new Map<string, PluginConfiguration>();
+    
+    // Index global configurations by plugin name
+    for (const globalConfig of this.globalPluginConfigs) {
+      globalConfigsMap.set(globalConfig.name, globalConfig);
+    }
+
+    // Process API-level plugin configurations
+    for (const apiConfig of apiPluginConfigs) {
+      // T10.5: Validate that API references a globally defined plugin
+      const globalConfig = globalConfigsMap.get(apiConfig.name);
+      if (!globalConfig) {
+        throw new Error(`API references undefined plugin '${apiConfig.name}'. Plugin must be defined in the global plugins section.`);
+      }
+
+      // T10.3: Merge configurations (API-level overwrites global keys)
+      const mergedConfig: PluginConfiguration = {
+        path: globalConfig.path, // Path always comes from global config
+        name: apiConfig.name,
+        config: {
+          ...globalConfig.config, // Start with global config
+          ...apiConfig.config     // Override with API-level config
+        }
+      };
+
+      mergedConfigs.push(mergedConfig);
+    }
+
+    // Add any global plugins not overridden by API-level configs
+    for (const globalConfig of this.globalPluginConfigs) {
+      if (!apiPluginConfigs.find(apiConfig => apiConfig.name === globalConfig.name)) {
+        mergedConfigs.push(globalConfig);
+      }
+    }
+
+    return mergedConfigs;
+  }
+
+  /**
+   * T10.2: Load plugins for a specific API with merged configurations
+   */
+  async loadApiPlugins(apiPluginConfigs?: PluginConfiguration[], configDir: string = process.cwd()): Promise<PluginManager> {
+    const apiPluginManager = new PluginManager();
+    
+    // Get merged configurations for this API
+    const mergedConfigs = this.getMergedPluginConfigurations(apiPluginConfigs);
+    
+    // Load plugins with merged configurations
+    await apiPluginManager.loadPlugins(mergedConfigs, configDir);
+    
+    return apiPluginManager;
   }
 
   /**
@@ -79,7 +146,10 @@ export class PluginManager {
       // Add to loaded plugins
       this.plugins.push(pluginInstance);
       
-      console.debug(`[PluginManager] Loaded plugin '${pluginConfig.name}' from ${pluginPath}`);
+      // Use process.stderr.write instead of console.debug to avoid polluting stdout
+      if (process.env.NODE_ENV === 'development') {
+        process.stderr.write(`[PluginManager] Loaded plugin '${pluginConfig.name}' from ${pluginPath}\n`);
+      }
     } catch (error) {
       throw new Error(`Failed to load plugin '${pluginConfig.name}' from ${pluginConfig.path}: ${error instanceof Error ? error.message : String(error)}`);
     }

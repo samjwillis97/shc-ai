@@ -4,7 +4,7 @@ import { httpClient } from '../../core/httpClient.js';
 import { variableResolver, VariableResolutionError } from '../../core/variableResolver.js';
 import { VariableResolver } from '../../core/variableResolver.js';
 import { PluginManager } from '../../core/pluginManager.js';
-import type { HttpCraftConfig, ApiDefinition, EndpointDefinition } from '../../types/config.js';
+import type { HttpCraftConfig, ApiDefinition, EndpointDefinition, PluginConfiguration } from '../../types/config.js';
 import path from 'path';
 
 export interface ApiCommandArgs {
@@ -37,14 +37,12 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       configPath = defaultConfig.path;
     }
     
-    // Initialize and load plugins (T7.2 and T7.7)
-    const pluginManager = new PluginManager();
+    // Initialize global plugin manager to store global configurations
+    const globalPluginManager = new PluginManager();
+    let configDir = path.dirname(configPath);
+    
     if (config.plugins && config.plugins.length > 0) {
-      const configDir = path.dirname(configPath);
-      await pluginManager.loadPlugins(config.plugins, configDir);
-      
-      // Set plugin manager on HTTP client for pre-request hooks
-      httpClient.setPluginManager(pluginManager);
+      await globalPluginManager.loadPlugins(config.plugins, configDir);
     }
     
     // Find API
@@ -94,10 +92,41 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       mergedProfileVars = variableResolver.mergeProfiles(profileNames, config.profiles);
     }
     
-    // Get plugin variable sources (T7.4 and T7.5)
-    const pluginVariableSources = pluginManager.getVariableSources();
+    // Create initial variable context (without plugin variables since we need to resolve API plugin configs first)
+    const initialVariableContext = variableResolver.createContext(
+      args.variables || {},
+      mergedProfileVars,
+      api.variables,
+      endpoint.variables,
+      undefined, // No plugin variables yet
+      config.globalVariables // T9.3: Global variables
+    );
     
-    // Create variable context with Phase 9 precedence including global variables
+    // T10.4: Apply variable substitution to API-level plugin configurations
+    let resolvedApiPluginConfigs: PluginConfiguration[] | undefined;
+    if (api.plugins && api.plugins.length > 0) {
+      try {
+        resolvedApiPluginConfigs = await variableResolver.resolveValue(api.plugins, initialVariableContext) as PluginConfiguration[];
+      } catch (error) {
+        if (error instanceof VariableResolutionError) {
+          console.error(`Error: Failed to resolve variables in API-level plugin configuration: ${error.message}`);
+          process.exit(1);
+        } else {
+          throw error;
+        }
+      }
+    }
+    
+    // T10.2: Create API-specific plugin manager with resolved configurations
+    const apiPluginManager = await globalPluginManager.loadApiPlugins(resolvedApiPluginConfigs, configDir);
+    
+    // Set API-specific plugin manager on HTTP client
+    httpClient.setPluginManager(apiPluginManager);
+    
+    // Get plugin variable sources from resolved API plugin manager (T7.4 and T7.5)
+    const pluginVariableSources = apiPluginManager.getVariableSources();
+    
+    // Create final variable context with resolved plugin variable sources
     const variableContext = variableResolver.createContext(
       args.variables || {},
       mergedProfileVars,
