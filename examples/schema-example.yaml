@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=../schemas/httpcraft-config.schema.json
+
+# Example HttpCraft configuration demonstrating schema validation
+# This file shows how to reference the schema for editor integration
+
+config:
+  defaultProfile: "development"
+
+profiles:
+  development:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    apiKey: "dev-key-123"
+  
+  production:
+    baseUrl: "https://api.example.com"
+    apiKey: "{{secret.PROD_API_KEY}}"
+
+apis:
+  jsonplaceholder:
+    description: "JSONPlaceholder testing API"
+    baseUrl: "{{profile.baseUrl}}"
+    headers:
+      User-Agent: "HttpCraft/1.0"
+      Authorization: "Bearer {{profile.apiKey}}"
+    variables:
+      version: "v1"
+    endpoints:
+      getTodo:
+        description: "Get a todo item by ID"
+        method: GET
+        path: "/todos/{{todoId}}"
+        variables:
+          todoId: 1
+      
+      createPost:
+        description: "Create a new post"
+        method: POST
+        path: "/posts"
+        headers:
+          Content-Type: "application/json"
+        body:
+          title: "{{title}}"
+          body: "{{body}}"
+          userId: 1
+        variables:
+          title: "Example Post"
+          body: "This is an example post created with HttpCraft"
+
+chains:
+  createAndGetPost:
+    description: "Create a post and then retrieve it"
+    vars:
+      postTitle: "My Test Post {{$timestamp}}"
+      postBody: "Created at {{$isoTimestamp}}"
+    steps:
+      - id: createPost
+        description: "Create a new post"
+        call: jsonplaceholder.createPost
+        with:
+          body:
+            title: "{{postTitle}}"
+            body: "{{postBody}}"
+            userId: 1
+      
+      - id: getPost
+        description: "Retrieve the created post"
+        call: jsonplaceholder.getTodo
+        with:
+          pathParams:
+            todoId: "{{steps.createPost.response.body.id}}"
+
+plugins:
+  - name: authPlugin
+    path: "./plugins/auth.js"
+    config:
+      tokenUrl: "https://auth.example.com/token"
+      clientId: "{{secret.CLIENT_ID}}" 

@@ -422,6 +422,108 @@ httpcraft --profile prod chain integrationTest --var testId="deploy-$(date +%s)"
 echo "Deployment tests completed successfully!"
 ```
 
+## 📋 Configuration Schema & Validation
+
+HttpCraft includes a comprehensive JSON Schema for configuration validation and editor integration.
+
+### Schema Features
+
+- ✅ **Validation**: Catch configuration errors before runtime
+- ✅ **Autocompletion**: Get intelligent suggestions in your editor
+- ✅ **Documentation**: Hover help for all configuration options
+- ✅ **Type checking**: Ensure correct data types and formats
+
+### Editor Integration
+
+#### VS Code
+
+Install the "YAML" extension by Red Hat, then add to your VS Code settings:
+
+```json
+{
+  "yaml.schemas": {
+    "./schemas/httpcraft-config.schema.json": [
+      ".httpcraft.yaml",
+      ".httpcraft.yml",
+      "**/httpcraft.yaml",
+      "**/httpcraft.yml"
+    ]
+  }
+}
+```
+
+Or add a schema reference directly to your config file:
+
+```yaml
+# yaml-language-server: $schema=./schemas/httpcraft-config.schema.json
+
+apis:
+  myapi:
+    baseUrl: "https://api.example.com"
+    # Editor will provide autocompletion and validation here!
+```
+
+#### IntelliJ IDEA / WebStorm
+
+1. Go to **Settings** → **Languages & Frameworks** → **Schemas and DTDs** → **JSON Schema Mappings**
+2. Click **+** to add a new mapping
+3. Set **Schema file or URL** to `./schemas/httpcraft-config.schema.json`
+4. Add file patterns: `*.httpcraft.yaml`, `*.httpcraft.yml`
+
+### Command-Line Validation
+
+Validate your configuration files using `ajv-cli`:
+
+```bash
+# Install ajv-cli globally
+npm install -g ajv-cli
+
+# Validate your config
+ajv validate -s schemas/httpcraft-config.schema.json -d .httpcraft.yaml
+```
+
+### Schema Validation Rules
+
+The schema enforces:
+
+- **Required properties**: `apis` at root, `baseUrl`/`endpoints` for APIs
+- **HTTP methods**: Only valid methods (`GET`, `POST`, `PUT`, etc.)
+- **URL formats**: Base URLs must be HTTP/HTTPS or contain variables
+- **Naming conventions**: API/endpoint names must follow identifier patterns
+- **Variable syntax**: Supports `{{variable}}` substitutions
+- **Chain structure**: Proper step definitions with `id` and `call`
+
+### Example Validated Configuration
+
+```yaml
+# This configuration is fully validated by the schema
+config:
+  defaultProfile: "development"
+
+profiles:
+  development:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    apiKey: "dev-key-123"
+
+apis:
+  jsonplaceholder:
+    baseUrl: "{{profile.baseUrl}}"
+    headers:
+      Authorization: "Bearer {{profile.apiKey}}"
+    endpoints:
+      getTodo:
+        method: GET
+        path: "/todos/{{todoId}}"
+        variables:
+          todoId: 1
+
+chains:
+  testFlow:
+    steps:
+      - id: getTodo
+        call: jsonplaceholder.getTodo
+```
+
 ## 🏗️ Development
 
 ### Project Structure

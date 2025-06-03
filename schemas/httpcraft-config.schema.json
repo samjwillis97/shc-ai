@@ -1,0 +1,363 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://httpcraft.dev/schemas/config.json",
+  "title": "HttpCraft Configuration",
+  "description": "Configuration schema for HttpCraft - a command-line HTTP API client",
+  "type": "object",
+  "properties": {
+    "config": {
+      "type": "object",
+      "description": "Global tool settings",
+      "properties": {
+        "defaultProfile": {
+          "description": "Default profile to use when no --profile flag is specified",
+          "oneOf": [
+            { "type": "string" },
+            { 
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "List of profiles to apply by default"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "profiles": {
+      "description": "Named sets of variables for different environments or configurations",
+      "oneOf": [
+        {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z][a-zA-Z0-9_-]*$": {
+              "$ref": "#/definitions/ProfileDefinition"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Import profiles from files or directories"
+        }
+      ]
+    },
+    "secrets": {
+      "type": "object",
+      "description": "Configuration for secret management",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "default": "env",
+          "description": "Secret provider type (default: environment variables)"
+        }
+      },
+      "additionalProperties": true
+    },
+    "plugins": {
+      "type": "array",
+      "description": "Plugin configurations",
+      "items": {
+        "$ref": "#/definitions/PluginConfiguration"
+      }
+    },
+    "variables": {
+      "type": "array",
+      "description": "Paths to global variable files",
+      "items": { "type": "string" }
+    },
+    "apis": {
+      "description": "API definitions",
+      "oneOf": [
+        {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z][a-zA-Z0-9_-]*$": {
+              "$ref": "#/definitions/ApiDefinition"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Import APIs from files or directories"
+        }
+      ]
+    },
+    "chains": {
+      "description": "Chain definitions for multi-step request sequences",
+      "oneOf": [
+        {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z][a-zA-Z0-9_-]*$": {
+              "$ref": "#/definitions/ChainDefinition"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Import chains from files or directories"
+        }
+      ]
+    }
+  },
+  "required": ["apis"],
+  "additionalProperties": false,
+  "definitions": {
+    "ProfileDefinition": {
+      "type": "object",
+      "description": "A profile containing variables and settings",
+      "patternProperties": {
+        "^[a-zA-Z_][a-zA-Z0-9_]*$": {
+          "description": "Variable name and value",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "PluginConfiguration": {
+      "type": "object",
+      "description": "Plugin configuration",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to local plugin file"
+        },
+        "npmPackage": {
+          "type": "string",
+          "description": "npm package name for the plugin"
+        },
+        "name": {
+          "type": "string",
+          "description": "Plugin name/identifier"
+        },
+        "config": {
+          "type": "object",
+          "description": "Plugin-specific configuration",
+          "additionalProperties": true
+        }
+      },
+      "required": ["name"],
+      "oneOf": [
+        { "required": ["path"] },
+        { "required": ["npmPackage"] }
+      ],
+      "additionalProperties": false
+    },
+    "ApiDefinition": {
+      "type": "object",
+      "description": "API definition containing base URL and endpoints",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "API description"
+        },
+        "baseUrl": {
+          "type": "string",
+          "description": "Base URL for the API (can contain {{variable}} substitutions)",
+          "pattern": "^(https?://|\\{\\{[^}]+\\}\\})"
+        },
+        "headers": {
+          "$ref": "#/definitions/HeadersMap",
+          "description": "Default headers for all endpoints in this API"
+        },
+        "params": {
+          "$ref": "#/definitions/ParamsMap",
+          "description": "Default query parameters for all endpoints in this API"
+        },
+        "variables": {
+          "$ref": "#/definitions/VariablesMap",
+          "description": "API-level variables"
+        },
+        "endpoints": {
+          "type": "object",
+          "description": "Endpoint definitions",
+          "patternProperties": {
+            "^[a-zA-Z][a-zA-Z0-9_-]*$": {
+              "$ref": "#/definitions/EndpointDefinition"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["baseUrl", "endpoints"],
+      "additionalProperties": false
+    },
+    "EndpointDefinition": {
+      "type": "object",
+      "description": "HTTP endpoint definition",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Endpoint description"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+          "description": "HTTP method"
+        },
+        "path": {
+          "type": "string",
+          "description": "URL path (can contain {{variable}} substitutions)",
+          "pattern": "^(/|\\{\\{[^}]+\\}\\})"
+        },
+        "headers": {
+          "$ref": "#/definitions/HeadersMap",
+          "description": "Endpoint-specific headers (override API defaults)"
+        },
+        "params": {
+          "$ref": "#/definitions/ParamsMap",
+          "description": "Endpoint-specific query parameters (override API defaults)"
+        },
+        "body": {
+          "description": "Request body (can be object for JSON or string for other types)",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object" },
+            { "type": "array" },
+            { "type": "number" },
+            { "type": "boolean" },
+            { "type": "null" }
+          ]
+        },
+        "variables": {
+          "$ref": "#/definitions/VariablesMap",
+          "description": "Endpoint-level variables"
+        }
+      },
+      "required": ["method", "path"],
+      "additionalProperties": false
+    },
+    "ChainDefinition": {
+      "type": "object",
+      "description": "Chain definition for multi-step request sequences",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Chain description"
+        },
+        "vars": {
+          "$ref": "#/definitions/VariablesMap",
+          "description": "Chain-level variables"
+        },
+        "steps": {
+          "type": "array",
+          "description": "Ordered list of request steps",
+          "items": {
+            "$ref": "#/definitions/ChainStep"
+          },
+          "minItems": 1
+        }
+      },
+      "required": ["steps"],
+      "additionalProperties": false
+    },
+    "ChainStep": {
+      "type": "object",
+      "description": "A single step in a chain",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+          "description": "Unique identifier for this step within the chain"
+        },
+        "description": {
+          "type": "string",
+          "description": "Step description"
+        },
+        "call": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*\\.[a-zA-Z][a-zA-Z0-9_-]*$",
+          "description": "API endpoint to call in format 'api_name.endpoint_name'"
+        },
+        "with": {
+          "$ref": "#/definitions/StepOverrides",
+          "description": "Step-specific overrides for headers, params, pathParams, or body"
+        }
+      },
+      "required": ["id", "call"],
+      "additionalProperties": false
+    },
+    "StepOverrides": {
+      "type": "object",
+      "description": "Step-specific overrides",
+      "properties": {
+        "headers": {
+          "$ref": "#/definitions/HeadersMap",
+          "description": "Override headers for this step"
+        },
+        "params": {
+          "$ref": "#/definitions/ParamsMap",
+          "description": "Override query parameters for this step"
+        },
+        "pathParams": {
+          "$ref": "#/definitions/ParamsMap",
+          "description": "Path parameters for URL substitution"
+        },
+        "body": {
+          "description": "Override request body for this step",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object" },
+            { "type": "array" },
+            { "type": "number" },
+            { "type": "boolean" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "HeadersMap": {
+      "type": "object",
+      "description": "HTTP headers map",
+      "patternProperties": {
+        "^[a-zA-Z][a-zA-Z0-9-]*$": {
+          "type": "string",
+          "description": "Header value (can contain {{variable}} substitutions)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ParamsMap": {
+      "type": "object",
+      "description": "Parameters map (query params or path params)",
+      "patternProperties": {
+        "^[a-zA-Z_][a-zA-Z0-9_]*$": {
+          "description": "Parameter value (can contain {{variable}} substitutions)",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "VariablesMap": {
+      "type": "object",
+      "description": "Variables map",
+      "patternProperties": {
+        "^[a-zA-Z_][a-zA-Z0-9_]*$": {
+          "description": "Variable value",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+} 
