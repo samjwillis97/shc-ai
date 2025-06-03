@@ -153,6 +153,23 @@
       ],
       "additionalProperties": false
     },
+    "ApiPluginConfiguration": {
+      "type": "object",
+      "description": "API-level plugin configuration override",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Plugin name/identifier (must reference a globally defined plugin)"
+        },
+        "config": {
+          "type": "object",
+          "description": "Plugin-specific configuration overrides (merged with global plugin config)",
+          "additionalProperties": true
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
     "ApiDefinition": {
       "type": "object",
       "description": "API definition containing base URL and endpoints",
@@ -177,6 +194,13 @@
         "variables": {
           "$ref": "#/definitions/VariablesMap",
           "description": "API-level variables"
+        },
+        "plugins": {
+          "type": "array",
+          "description": "API-level plugin configuration overrides",
+          "items": {
+            "$ref": "#/definitions/ApiPluginConfiguration"
+          }
         },
         "endpoints": {
           "type": "object",

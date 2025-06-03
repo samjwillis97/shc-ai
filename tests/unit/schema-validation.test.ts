@@ -227,6 +227,94 @@ describe('HttpCraft Configuration Schema Validation', () => {
         expect(valid).toBe(true);
       });
     });
+
+    it('should validate API-level plugin configuration', () => {
+      const config = {
+        plugins: [
+          {
+            name: 'testPlugin',
+            path: './plugins/test.js',
+            config: {
+              globalKey: 'globalValue'
+            }
+          }
+        ],
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            plugins: [
+              {
+                name: 'testPlugin',
+                config: {
+                  apiKey: '{{testVar}}',
+                  nested: {
+                    value: 'nested-value'
+                  }
+                }
+              }
+            ],
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      if (!valid) {
+        console.log('API-level plugin validation errors:', validate.errors);
+      }
+      
+      expect(valid).toBe(true);
+    });
+
+    it('should validate API without plugins (plugins is optional)', () => {
+      const config = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      expect(valid).toBe(true);
+    });
+
+    it('should validate empty API-level plugins array', () => {
+      const config = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            plugins: [],
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      expect(valid).toBe(true);
+    });
   });
 
   describe('Invalid Configurations', () => {
@@ -618,6 +706,91 @@ describe('HttpCraft Configuration Schema Validation', () => {
         expect.arrayContaining([
           expect.objectContaining({
             keyword: 'oneOf'
+          })
+        ])
+      );
+    });
+
+    it('should reject API-level plugin without name', () => {
+      const config = {
+        plugins: [
+          {
+            name: 'testPlugin',
+            path: './plugins/test.js'
+          }
+        ],
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            plugins: [
+              {
+                config: {
+                  apiKey: 'value'
+                }
+              }
+            ],
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      expect(valid).toBe(false);
+      expect(validate.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            keyword: 'required',
+            params: { missingProperty: 'name' }
+          })
+        ])
+      );
+    });
+
+    it('should reject API-level plugin with additional properties', () => {
+      const config = {
+        plugins: [
+          {
+            name: 'testPlugin',
+            path: './plugins/test.js'
+          }
+        ],
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            plugins: [
+              {
+                name: 'testPlugin',
+                path: './invalid/path.js', // API-level plugins shouldn't have path
+                config: {
+                  apiKey: 'value'
+                }
+              }
+            ],
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      expect(valid).toBe(false);
+      expect(validate.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            keyword: 'additionalProperties'
           })
         ])
       );

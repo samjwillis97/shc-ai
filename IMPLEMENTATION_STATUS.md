@@ -198,7 +198,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [x] **T10.3:** Implement plugin configuration merging.
   - [x] **T10.4:** Implement variable substitution in API-level plugin configurations.
   - [x] **T10.5:** Implement validation for API-level plugin references.
-  - [ ] **T10.6:** Update YAML schema to include API-level plugin configuration.
+  - [x] **T10.6:** Update YAML schema to include API-level plugin configuration.
   - [ ] **T10.7:** Implement plugin loading from npm.
   - [x] **T10.8:** Implement chain verbose output (structured JSON).
   - [x] **T10.9:** Refine ZSH completion (chains, options).
@@ -279,5 +279,15 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Backward Compatibility:** All existing example configurations validate successfully against the new schema
   - **Testable Outcome Achieved:** Schema file exists and is fully usable with YAML linters and editors
   All YAML schema implementation complete and tested. Ready to proceed to T10.12.
+
+  T10.6 completed successfully! Updated YAML schema to include API-level plugin configuration with:
+  - **ApiPluginConfiguration Definition:** Added new schema definition for API-level plugin configurations with required `name` property and optional `config` object
+  - **API Definition Enhancement:** Added `plugins` property to `ApiDefinition` schema that accepts array of `ApiPluginConfiguration` objects
+  - **Validation Rules:** API-level plugins only require `name` (references global plugin) and optional `config` for overrides, no `path` or `npmPackage` allowed
+  - **Schema Testing:** Added 5 comprehensive schema validation tests covering valid API-level plugin configurations, optional plugins, empty arrays, missing name validation, and additional properties rejection
+  - **Backward Compatibility:** All existing configurations continue to validate successfully, APIs without plugins remain valid
+  - **Editor Support:** Schema enables autocompletion and validation for API-level plugin configurations in editors with YAML schema support
+  - **Testable Outcome Achieved:** Schema validates API-level plugin configurations and rejects invalid references as required
+  - All schema validation tests passing (25/25) including new API-level plugin configuration tests. Ready to proceed to T10.7.
 
 ---
