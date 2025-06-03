@@ -7,7 +7,7 @@ export declare class HttpClient {
      */
     setPluginManager(pluginManager: PluginManager): void;
     /**
-     * Executes an HTTP request with plugin pre-request hooks
+     * Executes an HTTP request with plugin pre-request and post-response hooks
      * @param request The request configuration
      * @returns The response data
      */

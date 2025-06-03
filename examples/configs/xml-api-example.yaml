@@ -1,0 +1,72 @@
+# Example configuration demonstrating T10.1 Post-Response Hooks
+# Shows how to use the xmlToJsonPlugin to convert XML responses to JSON
+
+config:
+  defaultProfile: development
+
+profiles:
+  development:
+    baseUrl: https://httpbin.org
+    debug: true
+  production:
+    baseUrl: https://api.production.com
+    debug: false
+
+plugins:
+  - path: "./examples/plugins/xmlToJsonPlugin.js"
+    name: xmlToJsonPlugin
+    config:
+      convertXmlToJson: true
+      debug: true
+      normalizeTags: false
+      normalize: true
+      ignoreAttrs: false
+      strictMode: false
+
+apis:
+  httpbin:
+    baseUrl: "{{baseUrl}}"
+    headers:
+      User-Agent: "HttpCraft/1.0 XML-to-JSON Demo"
+    endpoints:
+      getXml:
+        method: GET
+        path: "/xml"
+        description: "Get XML response that will be converted to JSON by plugin"
+      
+      getJson:
+        method: GET  
+        path: "/json"
+        description: "Get JSON response (no conversion needed)"
+
+  # Example API that returns XML data
+  xmlApi:
+    baseUrl: "https://www.w3schools.com"
+    endpoints:
+      getSample:
+        method: GET
+        path: "/xml/note.xml"
+        description: "Get sample XML note that will be converted to JSON"
+
+# Example chain that processes both XML and JSON responses
+chains:
+  processData:
+    description: "Demonstrates processing both XML and JSON APIs with post-response hooks"
+    vars:
+      testValue: "demo"
+    steps:
+      - id: getXmlData
+        description: "Fetch XML data (will be converted to JSON)"
+        call: httpbin.getXml
+        
+      - id: getJsonData  
+        description: "Fetch JSON data (no conversion needed)"
+        call: httpbin.getJson
+        
+      - id: processResults
+        description: "Show that both responses are now JSON"
+        call: httpbin.getJson
+        with:
+          params:
+            xmlDataType: "{{steps.getXmlData.response.body.slideshow.slide[0].title}}"
+            jsonDataType: "{{steps.getJsonData.response.body.slideshow.slide[0].title}}" 

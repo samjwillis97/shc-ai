@@ -47,10 +47,12 @@
   "dependencies": {
     "@types/axios": "^0.9.36",
     "@types/js-yaml": "^4.0.9",
+    "@types/xml2js": "^0.4.14",
     "@types/yargs": "^17.0.33",
     "axios": "^1.9.0",
     "js-yaml": "^4.1.0",
     "jsonpath-plus": "^10.3.0",
+    "xml2js": "^0.6.2",
     "yargs": "^18.0.0"
   }
 }

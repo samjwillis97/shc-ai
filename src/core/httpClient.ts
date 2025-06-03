@@ -14,7 +14,7 @@ export class HttpClient {
   }
 
   /**
-   * Executes an HTTP request with plugin pre-request hooks
+   * Executes an HTTP request with plugin pre-request and post-response hooks
    * @param request The request configuration
    * @returns The response data
    */
@@ -40,12 +40,20 @@ export class HttpClient {
         validateStatus: () => true,
       });
 
-      return {
+      // Create response object
+      const httpResponse: HttpResponse = {
         status: response.status,
         statusText: response.statusText,
         headers: response.headers as Record<string, string>,
         body: typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
       };
+
+      // Execute post-response hooks from plugins (T10.1)
+      if (this.pluginManager) {
+        await this.pluginManager.executePostResponseHooks(mutableRequest, httpResponse);
+      }
+
+      return httpResponse;
     } catch (error: any) {
       if (error.isAxiosError) {
         if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {

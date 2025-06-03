@@ -21,6 +21,7 @@ export interface PluginContext {
   response?: HttpResponse;
   config: PluginConfig;
   registerPreRequestHook: (hook: PreRequestHook) => void;
+  registerPostResponseHook: (hook: PostResponseHook) => void;
   registerVariableSource: (name: string, source: VariableSource) => void;
 }
 
@@ -41,5 +42,6 @@ export interface PluginInstance {
   plugin: Plugin;
   config: PluginConfig;
   preRequestHooks: PreRequestHook[];
+  postResponseHooks: PostResponseHook[];
   variableSources: Record<string, VariableSource>;
 } 

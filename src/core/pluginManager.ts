@@ -10,8 +10,10 @@ import {
   PluginContext,
   PluginConfig,
   PreRequestHook,
+  PostResponseHook,
   VariableSource,
-  HttpRequest
+  HttpRequest,
+  HttpResponse
 } from '../types/plugin.js';
 import { PluginConfiguration } from '../types/config.js';
 
@@ -51,6 +53,7 @@ export class PluginManager {
         plugin,
         config: pluginConfig.config || {},
         preRequestHooks: [],
+        postResponseHooks: [],
         variableSources: {}
       };
 
@@ -61,6 +64,9 @@ export class PluginManager {
         config: pluginInstance.config,
         registerPreRequestHook: (hook: PreRequestHook) => {
           pluginInstance.preRequestHooks.push(hook);
+        },
+        registerPostResponseHook: (hook: PostResponseHook) => {
+          pluginInstance.postResponseHooks.push(hook);
         },
         registerVariableSource: (name: string, source: VariableSource) => {
           pluginInstance.variableSources[name] = source;
@@ -89,6 +95,21 @@ export class PluginManager {
           await hook(request);
         } catch (error) {
           throw new Error(`Pre-request hook failed in plugin '${pluginInstance.name}': ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Execute all post-response hooks in order (T10.1)
+   */
+  async executePostResponseHooks(request: HttpRequest, response: HttpResponse): Promise<void> {
+    for (const pluginInstance of this.plugins) {
+      for (const hook of pluginInstance.postResponseHooks) {
+        try {
+          await hook(request, response);
+        } catch (error) {
+          throw new Error(`Post-response hook failed in plugin '${pluginInstance.name}': ${error instanceof Error ? error.message : String(error)}`);
         }
       }
     }

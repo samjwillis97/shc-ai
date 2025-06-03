@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { PluginManager } from '../../src/core/pluginManager.js';
 import { PluginConfiguration } from '../../src/types/config.js';
-import { HttpRequest } from '../../src/types/plugin.js';
+import { HttpRequest, HttpResponse } from '../../src/types/plugin.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -356,6 +356,228 @@ export default {
       const variableSources = pluginManager.getVariableSources();
       const configVarValue = await variableSources.testPlugin.configVar();
       expect(configVarValue).toBe('default-config');
+    });
+  });
+
+  describe('T10.1: Post-Response Hooks', () => {
+    it('should register and execute post-response hooks', async () => {
+      const postResponsePluginPath = path.join(tempDir, 'postResponsePlugin.js');
+      const postResponsePluginContent = `
+export default {
+  async setup(context) {
+    context.registerPostResponseHook(async (request, response) => {
+      response.headers['X-Post-Response-Hook'] = 'executed';
+      response.headers['X-Original-Status'] = response.status.toString();
+    });
+  }
+};
+`;
+      await fs.writeFile(postResponsePluginPath, postResponsePluginContent);
+
+      const pluginConfig: PluginConfiguration = {
+        path: postResponsePluginPath,
+        name: 'postResponsePlugin'
+      };
+
+      await pluginManager.loadPlugins([pluginConfig], process.cwd());
+
+      const request: HttpRequest = {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {}
+      };
+
+      const response: HttpResponse = {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        body: 'test response'
+      };
+
+      await pluginManager.executePostResponseHooks(request, response);
+
+      expect(response.headers['X-Post-Response-Hook']).toBe('executed');
+      expect(response.headers['X-Original-Status']).toBe('200');
+    });
+
+    it('should execute multiple post-response hooks in order', async () => {
+      const firstPluginPath = path.join(tempDir, 'firstPostResponsePlugin.js');
+      const firstPluginContent = `
+export default {
+  async setup(context) {
+    context.registerPostResponseHook(async (request, response) => {
+      response.headers['X-Hook-Order'] = 'first';
+    });
+  }
+};
+`;
+      await fs.writeFile(firstPluginPath, firstPluginContent);
+
+      const secondPluginPath = path.join(tempDir, 'secondPostResponsePlugin.js');
+      const secondPluginContent = `
+export default {
+  async setup(context) {
+    context.registerPostResponseHook(async (request, response) => {
+      response.headers['X-Hook-Order'] = (response.headers['X-Hook-Order'] || '') + 'second';
+    });
+  }
+};
+`;
+      await fs.writeFile(secondPluginPath, secondPluginContent);
+
+      const pluginConfigs: PluginConfiguration[] = [
+        { path: firstPluginPath, name: 'firstPlugin' },
+        { path: secondPluginPath, name: 'secondPlugin' }
+      ];
+
+      await pluginManager.loadPlugins(pluginConfigs, process.cwd());
+
+      const request: HttpRequest = {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {}
+      };
+
+      const response: HttpResponse = {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        body: 'test response'
+      };
+
+      await pluginManager.executePostResponseHooks(request, response);
+
+      expect(response.headers['X-Hook-Order']).toBe('firstsecond');
+    });
+
+    it('should allow post-response hooks to transform response body', async () => {
+      const transformPluginPath = path.join(tempDir, 'transformPlugin.js');
+      const transformPluginContent = `
+export default {
+  async setup(context) {
+    context.registerPostResponseHook(async (request, response) => {
+      if (response.body === 'transform-me') {
+        response.body = '{"transformed": true, "original": "transform-me"}';
+        response.headers['content-type'] = 'application/json';
+        response.headers['x-transformed-by'] = 'transformPlugin';
+      }
+    });
+  }
+};
+`;
+      await fs.writeFile(transformPluginPath, transformPluginContent);
+
+      const pluginConfig: PluginConfiguration = {
+        path: transformPluginPath,
+        name: 'transformPlugin'
+      };
+
+      await pluginManager.loadPlugins([pluginConfig], process.cwd());
+
+      const request: HttpRequest = {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {}
+      };
+
+      const response: HttpResponse = {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'text/plain' },
+        body: 'transform-me'
+      };
+
+      await pluginManager.executePostResponseHooks(request, response);
+
+      expect(response.body).toBe('{"transformed": true, "original": "transform-me"}');
+      expect(response.headers['content-type']).toBe('application/json');
+      expect(response.headers['x-transformed-by']).toBe('transformPlugin');
+    });
+
+    it('should handle post-response hook errors gracefully', async () => {
+      const errorPluginPath = path.join(tempDir, 'postResponseErrorPlugin.js');
+      const errorPluginContent = `
+export default {
+  async setup(context) {
+    context.registerPostResponseHook(async (request, response) => {
+      throw new Error('Post-response hook error');
+    });
+  }
+};
+`;
+      await fs.writeFile(errorPluginPath, errorPluginContent);
+
+      const pluginConfig: PluginConfiguration = {
+        path: errorPluginPath,
+        name: 'errorPlugin'
+      };
+
+      await pluginManager.loadPlugins([pluginConfig], process.cwd());
+
+      const request: HttpRequest = {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {}
+      };
+
+      const response: HttpResponse = {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        body: 'test response'
+      };
+
+      await expect(pluginManager.executePostResponseHooks(request, response))
+        .rejects.toThrow('Post-response hook failed in plugin \'errorPlugin\': Post-response hook error');
+    });
+
+    it('should support plugins with both pre-request and post-response hooks', async () => {
+      const dualHookPluginPath = path.join(tempDir, 'dualHookPlugin.js');
+      const dualHookPluginContent = `
+export default {
+  async setup(context) {
+    context.registerPreRequestHook(async (request) => {
+      request.headers['X-Pre-Hook'] = 'executed';
+    });
+    
+    context.registerPostResponseHook(async (request, response) => {
+      response.headers['X-Post-Hook'] = 'executed';
+      // Can access modified request from pre-hook
+      response.headers['X-Request-Had-Pre-Hook'] = request.headers['X-Pre-Hook'] || 'no';
+    });
+  }
+};
+`;
+      await fs.writeFile(dualHookPluginPath, dualHookPluginContent);
+
+      const pluginConfig: PluginConfiguration = {
+        path: dualHookPluginPath,
+        name: 'dualHookPlugin'
+      };
+
+      await pluginManager.loadPlugins([pluginConfig], process.cwd());
+
+      const request: HttpRequest = {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {}
+      };
+
+      const response: HttpResponse = {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        body: 'test response'
+      };
+
+      // Execute pre-request hooks first
+      await pluginManager.executePreRequestHooks(request);
+      expect(request.headers['X-Pre-Hook']).toBe('executed');
+
+      // Then execute post-response hooks
+      await pluginManager.executePostResponseHooks(request, response);
+      expect(response.headers['X-Post-Hook']).toBe('executed');
+      expect(response.headers['X-Request-Had-Pre-Hook']).toBe('executed');
     });
   });
 
