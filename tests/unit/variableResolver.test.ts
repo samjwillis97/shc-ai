@@ -708,4 +708,148 @@ describe('VariableResolver', () => {
       });
     });
   });
+
+  describe('T9.3: Global Variables Support', () => {
+    it('should resolve global variables', async () => {
+      const contextWithGlobals = {
+        ...mockContext,
+        globalVariables: {
+          globalVar: 'global-value',
+          anotherGlobal: 'another-global-value'
+        }
+      };
+
+      const result = await resolver.resolve('Global: {{globalVar}}', contextWithGlobals);
+      expect(result).toBe('Global: global-value');
+    });
+
+    it('should resolve multiple global variables', async () => {
+      const contextWithGlobals = {
+        ...mockContext,
+        globalVariables: {
+          var1: 'value1',
+          var2: 'value2'
+        }
+      };
+
+      const result = await resolver.resolve('{{var1}} and {{var2}}', contextWithGlobals);
+      expect(result).toBe('value1 and value2');
+    });
+
+    it('should handle different data types in global variables', async () => {
+      const contextWithGlobals = {
+        ...mockContext,
+        globalVariables: {
+          stringVar: 'hello',
+          numberVar: 42,
+          booleanVar: true
+        }
+      };
+
+      const result1 = await resolver.resolve('String: {{stringVar}}', contextWithGlobals);
+      expect(result1).toBe('String: hello');
+
+      const result2 = await resolver.resolve('Number: {{numberVar}}', contextWithGlobals);
+      expect(result2).toBe('Number: 42');
+
+      const result3 = await resolver.resolve('Boolean: {{booleanVar}}', contextWithGlobals);
+      expect(result3).toBe('Boolean: true');
+    });
+  });
+
+  describe('T9.3: Variable Precedence with Global Variables', () => {
+    it('should prefer CLI variables over global variables', async () => {
+      const contextWithGlobals = {
+        ...mockContext,
+        globalVariables: {
+          testVar: 'global-value'
+        },
+        cli: {
+          testVar: 'cli-value'
+        }
+      };
+
+      const result = await resolver.resolve('Value: {{testVar}}', contextWithGlobals);
+      expect(result).toBe('Value: cli-value');
+    });
+
+    it('should prefer profile variables over global variables', async () => {
+      const contextWithGlobals = {
+        ...mockContext,
+        globalVariables: {
+          testVar: 'global-value'
+        },
+        profiles: {
+          testVar: 'profile-value'
+        }
+      };
+
+      const result = await resolver.resolve('Value: {{testVar}}', contextWithGlobals);
+      expect(result).toBe('Value: profile-value');
+    });
+
+    it('should prefer API variables over global variables', async () => {
+      const contextWithGlobals = {
+        ...mockContext,
+        globalVariables: {
+          testVar: 'global-value'
+        },
+        api: {
+          testVar: 'api-value'
+        }
+      };
+
+      const result = await resolver.resolve('Value: {{testVar}}', contextWithGlobals);
+      expect(result).toBe('Value: api-value');
+    });
+
+    it('should prefer endpoint variables over global variables', async () => {
+      const contextWithGlobals = {
+        ...mockContext,
+        globalVariables: {
+          testVar: 'global-value'
+        },
+        endpoint: {
+          testVar: 'endpoint-value'
+        }
+      };
+
+      const result = await resolver.resolve('Value: {{testVar}}', contextWithGlobals);
+      expect(result).toBe('Value: endpoint-value');
+    });
+
+    it('should prefer global variables over environment variables', async () => {
+      const contextWithGlobals = {
+        ...mockContext,
+        globalVariables: {
+          PATH: 'global-path-value'
+        }
+      };
+
+      const result = await resolver.resolve('Path: {{PATH}}', contextWithGlobals);
+      expect(result).toBe('Path: global-path-value');
+    });
+
+    it('should fall back to environment when global variable not defined', async () => {
+      const contextWithGlobals = {
+        ...mockContext,
+        globalVariables: {
+          someOtherVar: 'global-value'
+        }
+      };
+
+      const result = await resolver.resolve('Path: {{PATH}}', contextWithGlobals);
+      expect(result).toBe('Path: /usr/bin:/bin');
+    });
+
+    it('should handle missing global variables gracefully', async () => {
+      const contextWithoutGlobals = {
+        ...mockContext,
+        globalVariables: undefined
+      };
+
+      const result = await resolver.resolve('Path: {{PATH}}', contextWithoutGlobals);
+      expect(result).toBe('Path: /usr/bin:/bin');
+    });
+  });
 }); 

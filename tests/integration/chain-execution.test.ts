@@ -587,38 +587,39 @@ apis:
   jsonplaceholder:
     baseUrl: "https://jsonplaceholder.typicode.com"
     endpoints:
-      createPost:
-        method: POST
-        path: "/posts"
+      updatePost:
+        method: PUT
+        path: "/posts/1"
         headers:
           Content-Type: "application/json"
         body:
           title: "{{title}}"
           body: "{{content}}"
           userId: 1
+          id: 1
       getPost:
         method: GET
         path: "/posts/{{postId}}"
 
 chains:
-  createAndGetPost:
-    description: "Create a post and then retrieve it using the ID from the response"
+  updateAndGetPost:
+    description: "Update a post and then retrieve it using the ID from the response"
     vars:
-      title: "Test Post"
-      content: "This is a test post"
+      title: "Updated Test Post"
+      content: "This is an updated test post"
     steps:
-      - id: createPost
-        call: jsonplaceholder.createPost
+      - id: updatePost
+        call: jsonplaceholder.updatePost
       - id: getPost
         call: jsonplaceholder.getPost
         with:
           pathParams:
-            postId: "{{steps.createPost.response.body.id}}"
+            postId: "{{steps.updatePost.response.body.id}}"
 `;
 
       writeFileSync(testChainConfigFile, config);
 
-      const result = await runCli(['chain', 'createAndGetPost', '--config', testChainConfigFile, '--verbose']);
+      const result = await runCli(['chain', 'updateAndGetPost', '--config', testChainConfigFile, '--verbose']);
 
       expect(result.exitCode).toBe(0);
       
@@ -630,8 +631,8 @@ chains:
       expect(output).toHaveProperty('userId');
       
       // Verify verbose output shows both steps
-      expect(result.stderr).toContain('[CHAIN] Starting execution of chain: createAndGetPost');
-      expect(result.stderr).toContain('[STEP createPost]');
+      expect(result.stderr).toContain('[CHAIN] Starting execution of chain: updateAndGetPost');
+      expect(result.stderr).toContain('[STEP updatePost]');
       expect(result.stderr).toContain('[STEP getPost]');
     });
 

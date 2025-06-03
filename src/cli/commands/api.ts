@@ -96,13 +96,14 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     // Get plugin variable sources (T7.4 and T7.5)
     const pluginVariableSources = pluginManager.getVariableSources();
     
-    // Create variable context with Phase 7 precedence including plugins
+    // Create variable context with Phase 9 precedence including global variables
     const variableContext = variableResolver.createContext(
       args.variables || {},
       mergedProfileVars,
       api.variables,
       endpoint.variables,
-      pluginVariableSources
+      pluginVariableSources,
+      config.globalVariables // T9.3: Global variables
     );
     
     // Apply variable resolution to configuration elements

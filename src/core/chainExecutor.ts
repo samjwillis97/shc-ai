@@ -159,7 +159,9 @@ export class ChainExecutor {
       cliVariables,
       profiles,
       api.variables,
-      endpoint.variables
+      endpoint.variables,
+      undefined, // No plugins in chain execution yet
+      config.globalVariables // T9.3: Global variables
     );
     
     // Add chain variables to the context
@@ -169,18 +171,31 @@ export class ChainExecutor {
     variableContext.steps = previousSteps;
 
     try {
-      // Resolve variables in API and endpoint configurations first
-      const resolvedApi = await variableResolver.resolveValue(api, variableContext) as ApiDefinition;
-      const resolvedEndpoint = await variableResolver.resolveValue(endpoint, variableContext) as EndpointDefinition;
-
-      // T8.5: Resolve step.with overrides using the full variable context (including steps)
+      // T8.5: First resolve step.with overrides using the full variable context (including steps)
       let resolvedStepWith: any = null;
       if (step.with) {
         resolvedStepWith = await variableResolver.resolveValue(step.with, variableContext);
       }
 
+      // If step.with provides pathParams, add them to the variable context
+      // so they can be used during endpoint variable resolution
+      if (resolvedStepWith?.pathParams) {
+        variableContext.stepWith = resolvedStepWith.pathParams;
+      }
+
+      // Resolve only the API-level properties (not all endpoints) and the specific endpoint we need
+      const resolvedApiBase: Pick<ApiDefinition, 'baseUrl' | 'headers' | 'params' | 'variables'> & { endpoints?: any } = {
+        baseUrl: await variableResolver.resolveValue(api.baseUrl, variableContext),
+        headers: api.headers ? await variableResolver.resolveValue(api.headers, variableContext) : undefined,
+        params: api.params ? await variableResolver.resolveValue(api.params, variableContext) : undefined,
+        variables: api.variables, // Don't resolve variables themselves, just pass them through
+        endpoints: {} // Add empty endpoints to satisfy ApiDefinition interface
+      };
+      
+      const resolvedEndpoint = await variableResolver.resolveValue(endpoint, variableContext) as EndpointDefinition;
+
       // Build request details with step.with overrides
-      let url = urlBuilder.buildUrl(resolvedApi, resolvedEndpoint);
+      let url = urlBuilder.buildUrl(resolvedApiBase as ApiDefinition, resolvedEndpoint);
       
       // T8.5: Apply pathParams substitution if provided in step.with
       if (resolvedStepWith?.pathParams) {
@@ -188,13 +203,13 @@ export class ChainExecutor {
       }
       
       // T8.5: Merge headers with step.with overrides (step.with has highest precedence)
-      const baseHeaders = urlBuilder.mergeHeaders(resolvedApi, resolvedEndpoint);
+      const baseHeaders = urlBuilder.mergeHeaders(resolvedApiBase as ApiDefinition, resolvedEndpoint);
       const headers = resolvedStepWith?.headers 
         ? { ...baseHeaders, ...resolvedStepWith.headers }
         : baseHeaders;
       
       // T8.5: Merge params with step.with overrides (step.with has highest precedence)
-      const baseParams = urlBuilder.mergeParams(resolvedApi, resolvedEndpoint);
+      const baseParams = urlBuilder.mergeParams(resolvedApiBase as ApiDefinition, resolvedEndpoint);
       const params = resolvedStepWith?.params
         ? { ...baseParams, ...resolvedStepWith.params }
         : baseParams;
@@ -309,4 +324,4 @@ export class ChainExecutor {
 }
 
 // Singleton instance
-export const chainExecutor = new ChainExecutor(); 
+export const chainExecutor = new ChainExecutor();

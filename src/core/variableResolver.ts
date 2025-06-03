@@ -14,6 +14,7 @@ export interface VariableContext {
   endpoint?: Record<string, any>;
   api?: Record<string, any>;
   profiles?: Record<string, any>; // Merged profile variables
+  globalVariables?: Record<string, any>; // T9.3: Global variable files
   plugins?: Record<string, Record<string, VariableSource>>; // Plugin variable sources
   env: Record<string, string>;
   steps?: StepExecutionResult[]; // T8.8 & T8.9: Step execution results for chains
@@ -244,7 +245,7 @@ export class VariableResolver {
   
   /**
    * Resolves unscoped variables using precedence order
-   * Phase 7 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Environment
+   * Phase 9 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Global Variables > Environment
    * Note: Plugin variables require the plugins.name.variable syntax and are not available as unscoped
    */
   private resolveUnscopedVariable(variableName: string, context: VariableContext): any {
@@ -278,7 +279,12 @@ export class VariableResolver {
       return context.profiles[variableName];
     }
     
-    // 7. Environment variables (lowest precedence)
+    // 7. Global variables (T9.3)
+    if (context.globalVariables && context.globalVariables[variableName] !== undefined) {
+      return context.globalVariables[variableName];
+    }
+    
+    // 8. Environment variables (lowest precedence)
     if (context.env[variableName] !== undefined) {
       return context.env[variableName];
     }
@@ -330,14 +336,15 @@ export class VariableResolver {
   
   /**
    * Creates a variable context from CLI arguments and environment variables
-   * Enhanced for Phase 7 with plugin support
+   * Enhanced for Phase 9 with global variables support
    */
   createContext(
     cliVars: Record<string, string>,
     profiles?: Record<string, any>,
     api?: Record<string, any>,
     endpoint?: Record<string, any>,
-    plugins?: Record<string, Record<string, VariableSource>>
+    plugins?: Record<string, Record<string, VariableSource>>,
+    globalVariables?: Record<string, any> // T9.3: Global variables
   ): VariableContext {
     return {
       cli: { ...cliVars },
@@ -345,6 +352,7 @@ export class VariableResolver {
       api: api ? { ...api } : undefined,
       endpoint: endpoint ? { ...endpoint } : undefined,
       plugins: plugins ? { ...plugins } : undefined,
+      globalVariables: globalVariables ? { ...globalVariables } : undefined, // T9.3
       env: { ...process.env } as Record<string, string>
     };
   }

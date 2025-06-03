@@ -728,4 +728,305 @@ chains:
       expect(config.chains!.conflictChain.steps[0].call).toBe('api.endpoint2');
     });
   });
+});
+
+describe('ConfigLoader - Global Variable Files (T9.3)', () => {
+  let tempDir: string;
+  let configLoader: ConfigLoader;
+
+  beforeEach(async () => {
+    configLoader = new ConfigLoader();
+    // Create a temporary directory for test files
+    tempDir = path.join(process.cwd(), 'test-temp-vars-' + Date.now());
+    await fs.mkdir(tempDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    // Clean up temp directory
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+  });
+
+  describe('Variable File Loading', () => {
+    it('should load variables from a single file', async () => {
+      // Create variable file
+      const varFile = path.join(tempDir, 'globals.yaml');
+      await fs.writeFile(varFile, `
+globalVar1: "global-value-1"
+globalVar2: 42
+globalVar3: true
+`);
+
+      // Create main config file
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  test:
+    baseUrl: "https://example.com"
+    endpoints:
+      get:
+        method: GET
+        path: "/test"
+variables:
+  - "./globals.yaml"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.globalVariables).toEqual({
+        globalVar1: 'global-value-1',
+        globalVar2: 42,
+        globalVar3: true
+      });
+    });
+
+    it('should load variables from multiple files', async () => {
+      // Create first variable file
+      const varFile1 = path.join(tempDir, 'globals1.yaml');
+      await fs.writeFile(varFile1, `
+var1: "value1"
+var2: "value2"
+`);
+
+      // Create second variable file
+      const varFile2 = path.join(tempDir, 'globals2.yaml');
+      await fs.writeFile(varFile2, `
+var3: "value3"
+var4: "value4"
+`);
+
+      // Create main config file
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  test:
+    baseUrl: "https://example.com"
+    endpoints:
+      get:
+        method: GET
+        path: "/test"
+variables:
+  - "./globals1.yaml"
+  - "./globals2.yaml"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.globalVariables).toEqual({
+        var1: 'value1',
+        var2: 'value2',
+        var3: 'value3',
+        var4: 'value4'
+      });
+    });
+
+    it('should handle "last loaded wins" for variable conflicts', async () => {
+      // Create first variable file
+      const varFile1 = path.join(tempDir, 'globals1.yaml');
+      await fs.writeFile(varFile1, `
+conflictVar: "first-value"
+uniqueVar1: "unique1"
+`);
+
+      // Create second variable file
+      const varFile2 = path.join(tempDir, 'globals2.yaml');
+      await fs.writeFile(varFile2, `
+conflictVar: "second-value"
+uniqueVar2: "unique2"
+`);
+
+      // Create main config file
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  test:
+    baseUrl: "https://example.com"
+    endpoints:
+      get:
+        method: GET
+        path: "/test"
+variables:
+  - "./globals1.yaml"
+  - "./globals2.yaml"  # This should win for conflicts
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.globalVariables).toEqual({
+        conflictVar: 'second-value', // Last loaded wins
+        uniqueVar1: 'unique1',
+        uniqueVar2: 'unique2'
+      });
+    });
+
+    it('should handle configs without variables section', async () => {
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  test:
+    baseUrl: "https://example.com"
+    endpoints:
+      get:
+        method: GET
+        path: "/test"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.globalVariables).toEqual({});
+    });
+
+    it('should support different data types in variable files', async () => {
+      const varFile = path.join(tempDir, 'types.yaml');
+      await fs.writeFile(varFile, `
+stringVar: "hello world"
+numberVar: 123
+floatVar: 45.67
+booleanTrue: true
+booleanFalse: false
+nullVar: null
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  test:
+    baseUrl: "https://example.com"
+    endpoints:
+      get:
+        method: GET
+        path: "/test"
+variables:
+  - "./types.yaml"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.globalVariables).toEqual({
+        stringVar: 'hello world',
+        numberVar: 123,
+        floatVar: 45.67,
+        booleanTrue: true,
+        booleanFalse: false,
+        nullVar: null
+      });
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should throw error for non-existent variable file', async () => {
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  test:
+    baseUrl: "https://example.com"
+    endpoints:
+      get:
+        method: GET
+        path: "/test"
+variables:
+  - "./non-existent.yaml"
+`);
+
+      await expect(configLoader.loadConfig(configFile)).rejects.toThrow(
+        'Failed to load variable file ./non-existent.yaml'
+      );
+    });
+
+    it('should throw error for invalid variable file content', async () => {
+      const varFile = path.join(tempDir, 'invalid.yaml');
+      await fs.writeFile(varFile, `
+invalidVar:
+  nested: "object"  # Objects are not allowed
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  test:
+    baseUrl: "https://example.com"
+    endpoints:
+      get:
+        method: GET
+        path: "/test"
+variables:
+  - "./invalid.yaml"
+`);
+
+      await expect(configLoader.loadConfig(configFile)).rejects.toThrow(
+        'Invalid variable \'invalidVar\': value must be a string, number, or boolean'
+      );
+    });
+
+    it('should throw error for malformed YAML in variable file', async () => {
+      const varFile = path.join(tempDir, 'malformed.yaml');
+      await fs.writeFile(varFile, `
+invalidYaml: [
+  unclosed bracket
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  test:
+    baseUrl: "https://example.com"
+    endpoints:
+      get:
+        method: GET
+        path: "/test"
+variables:
+  - "./malformed.yaml"
+`);
+
+      await expect(configLoader.loadConfig(configFile)).rejects.toThrow();
+    });
+
+    it('should throw error for non-string variable file path', async () => {
+      // This would be caught during YAML parsing, but we test the validation
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  test:
+    baseUrl: "https://example.com"
+    endpoints:
+      get:
+        method: GET
+        path: "/test"
+variables:
+  - 123  # Invalid: not a string
+`);
+
+      await expect(configLoader.loadConfig(configFile)).rejects.toThrow(
+        'Variable file path must be a string'
+      );
+    });
+
+    it('should throw error for variable file that is not an object', async () => {
+      const varFile = path.join(tempDir, 'not-object.yaml');
+      await fs.writeFile(varFile, `
+- "this is an array"
+- "not an object"
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  test:
+    baseUrl: "https://example.com"
+    endpoints:
+      get:
+        method: GET
+        path: "/test"
+variables:
+  - "./not-object.yaml"
+`);
+
+      await expect(configLoader.loadConfig(configFile)).rejects.toThrow(
+        'Invalid variable file: must contain an object'
+      );
+    });
+  });
 }); 

@@ -44,11 +44,17 @@ export class ConfigLoader {
         ? await this.loadModularChains(rawConfig.chains, path.dirname(fullPath))
         : {};
 
+      // Load global variable files (T9.3)
+      const globalVariables = rawConfig.variables 
+        ? await this.loadGlobalVariables(rawConfig.variables, path.dirname(fullPath))
+        : {};
+
       // Convert to processed config
       const config: HttpCraftConfig = {
         ...rawConfig,
         apis: processedApis,
-        chains: processedChains
+        chains: processedChains,
+        globalVariables // T9.3: Add loaded global variables
       };
       
       return config;
@@ -338,6 +344,68 @@ export class ConfigLoader {
         throw new Error(`Failed to load chain file ${fullFilePath}: ${error.message}`);
       }
       throw new Error(`Failed to load chain file ${fullFilePath}: Unknown error`);
+    }
+  }
+
+  /**
+   * Loads global variable files (T9.3)
+   * @param variableFiles Array of variable file paths
+   * @param basePath Base path for resolving relative paths
+   * @returns Merged global variables
+   */
+  async loadGlobalVariables(
+    variableFiles: string[],
+    basePath: string
+  ): Promise<Record<string, any>> {
+    const mergedVariables: Record<string, any> = {};
+
+    for (const filePath of variableFiles) {
+      if (typeof filePath !== 'string') {
+        throw new Error('Variable file path must be a string');
+      }
+
+      try {
+        const loadedVariables = await this.loadVariableFile(filePath, basePath);
+        // Merge variables (last loaded wins for conflicts)
+        Object.assign(mergedVariables, loadedVariables);
+      } catch (error) {
+        throw new Error(`Failed to load variable file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    return mergedVariables;
+  }
+
+  /**
+   * Loads variables from a single file
+   */
+  async loadVariableFile(
+    filePath: string,
+    basePath: string
+  ): Promise<Record<string, any>> {
+    const fullFilePath = path.resolve(basePath, filePath);
+
+    try {
+      const fileContent = await fs.readFile(fullFilePath, 'utf-8');
+      const variables = yaml.load(fileContent) as Record<string, any>;
+
+      if (!variables || typeof variables !== 'object' || Array.isArray(variables)) {
+        throw new Error('Invalid variable file: must contain an object');
+      }
+
+      // Validate that all values are primitive types (string, number, boolean)
+      for (const [key, value] of Object.entries(variables)) {
+        if (value !== null && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+          throw new Error(`Invalid variable '${key}': value must be a string, number, or boolean`);
+        }
+      }
+
+      return variables;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to load variable file ${fullFilePath}: ${error.message}`);
+      }
+      throw new Error(`Failed to load variable file ${fullFilePath}: Unknown error`);
     }
   }
 }

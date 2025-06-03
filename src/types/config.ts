@@ -9,6 +9,7 @@ export interface HttpCraftConfig {
   apis: Record<string, ApiDefinition>;
   chains?: Record<string, ChainDefinition>;
   variables?: string[]; // T9.3: Global variable file paths
+  globalVariables?: Record<string, any>; // T9.3: Loaded global variables
 }
 
 /**
