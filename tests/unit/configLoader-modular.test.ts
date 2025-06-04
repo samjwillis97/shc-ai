@@ -1029,4 +1029,366 @@ variables:
       );
     });
   });
+});
+
+describe('ConfigLoader - Modular Profile Imports', () => {
+  let tempDir: string;
+  let configLoader: ConfigLoader;
+
+  beforeEach(async () => {
+    configLoader = new ConfigLoader();
+    // Create a temporary directory for test files
+    tempDir = path.join(process.cwd(), 'test-temp-profiles-' + Date.now());
+    await fs.mkdir(tempDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    // Clean up temp directory
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+  });
+
+  describe('Directory Import Support', () => {
+    it('should load profiles from directory using "directory:" syntax', async () => {
+      // Create test directory structure
+      const profilesDir = path.join(tempDir, 'profiles');
+      await fs.mkdir(profilesDir, { recursive: true });
+
+      // Create profile files
+      await fs.writeFile(path.join(profilesDir, 'development.yaml'), `
+development:
+  apiHost: "dev.example.com"
+  debug: true
+  timeout: 5000
+`);
+
+      await fs.writeFile(path.join(profilesDir, 'production.yaml'), `
+production:
+  apiHost: "api.example.com"
+  debug: false
+  timeout: 10000
+`);
+
+      // Create main config file
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  testApi:
+    baseUrl: "https://example.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+profiles:
+  - "directory:./profiles/"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.profiles).toHaveProperty('development');
+      expect(config.profiles).toHaveProperty('production');
+      expect(config.profiles!.development.apiHost).toBe('dev.example.com');
+      expect(config.profiles!.development.debug).toBe(true);
+      expect(config.profiles!.production.apiHost).toBe('api.example.com');
+      expect(config.profiles!.production.debug).toBe(false);
+    });
+
+    it('should handle empty directory gracefully', async () => {
+      // Create empty directory
+      const profilesDir = path.join(tempDir, 'profiles');
+      await fs.mkdir(profilesDir, { recursive: true });
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  testApi:
+    baseUrl: "https://example.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+profiles:
+  - "directory:./profiles/"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+      expect(config.profiles).toEqual({});
+    });
+
+    it('should merge profiles from multiple files in deterministic order', async () => {
+      // Create test directory structure
+      const profilesDir = path.join(tempDir, 'profiles');
+      await fs.mkdir(profilesDir, { recursive: true });
+
+      // Create profile files (note: alphabetical order matters)
+      await fs.writeFile(path.join(profilesDir, 'a-base.yaml'), `
+base:
+  host: "base.example.com"
+  port: 80
+`);
+
+      await fs.writeFile(path.join(profilesDir, 'b-override.yaml'), `
+base:
+  host: "override.example.com"
+  ssl: true
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  testApi:
+    baseUrl: "https://example.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+profiles:
+  - "directory:./profiles/"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.profiles).toHaveProperty('base');
+      // b-override.yaml should override values from a-base.yaml
+      expect(config.profiles!.base.host).toBe('override.example.com');
+      expect(config.profiles!.base.port).toBe(80); // preserved from first file
+      expect(config.profiles!.base.ssl).toBe(true); // added by second file
+    });
+
+    it('should throw error for non-existent directory', async () => {
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  testApi:
+    baseUrl: "https://example.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+profiles:
+  - "directory:./non-existent/"
+`);
+
+      await expect(configLoader.loadConfig(configFile))
+        .rejects.toThrow(/Profile directory not found/);
+    });
+  });
+
+  describe('Individual File Import Support', () => {
+    it('should load profiles from individual files', async () => {
+      // Create profile file
+      const profileFile = path.join(tempDir, 'my-profile.yaml');
+      await fs.writeFile(profileFile, `
+myProfile:
+  apiHost: "my.example.com"
+  userId: "user123"
+  enabled: true
+`);
+
+      // Create main config file
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  testApi:
+    baseUrl: "https://example.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+profiles:
+  - "./my-profile.yaml"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.profiles).toHaveProperty('myProfile');
+      expect(config.profiles!.myProfile.apiHost).toBe('my.example.com');
+      expect(config.profiles!.myProfile.userId).toBe('user123');
+      expect(config.profiles!.myProfile.enabled).toBe(true);
+    });
+  });
+
+  describe('Mixed Import Types', () => {
+    it('should handle mixed directory and file imports', async () => {
+      // Create directory with profiles
+      const profilesDir = path.join(tempDir, 'profiles');
+      await fs.mkdir(profilesDir, { recursive: true });
+
+      await fs.writeFile(path.join(profilesDir, 'dev.yaml'), `
+dev:
+  env: "development"
+  debug: true
+`);
+
+      // Create individual profile file
+      const profileFile = path.join(tempDir, 'extra-profile.yaml');
+      await fs.writeFile(profileFile, `
+prod:
+  env: "production"
+  debug: false
+`);
+
+      // Create main config file
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  testApi:
+    baseUrl: "https://example.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+profiles:
+  - "directory:./profiles/"
+  - "./extra-profile.yaml"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.profiles).toHaveProperty('dev');
+      expect(config.profiles).toHaveProperty('prod');
+      expect(config.profiles!.dev.env).toBe('development');
+      expect(config.profiles!.prod.env).toBe('production');
+    });
+
+    it('should handle later imports overriding earlier ones', async () => {
+      // Create directory with profiles
+      const profilesDir = path.join(tempDir, 'profiles');
+      await fs.mkdir(profilesDir, { recursive: true });
+
+      await fs.writeFile(path.join(profilesDir, 'base.yaml'), `
+shared:
+  host: "directory.example.com"
+  port: 8080
+`);
+
+      // Create individual profile file that overrides
+      const profileFile = path.join(tempDir, 'override.yaml');
+      await fs.writeFile(profileFile, `
+shared:
+  host: "file.example.com"
+  ssl: true
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  testApi:
+    baseUrl: "https://example.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+profiles:
+  - "directory:./profiles/"
+  - "./override.yaml"
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.profiles).toHaveProperty('shared');
+      expect(config.profiles!.shared.host).toBe('file.example.com'); // overridden by file
+      expect(config.profiles!.shared.port).toBe(8080); // preserved from directory
+      expect(config.profiles!.shared.ssl).toBe(true); // added by file
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should throw error for invalid profile file content', async () => {
+      const profileFile = path.join(tempDir, 'invalid.yaml');
+      await fs.writeFile(profileFile, 'invalid yaml content: [unclosed');
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  testApi:
+    baseUrl: "https://example.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+profiles:
+  - "./invalid.yaml"
+`);
+
+      await expect(configLoader.loadConfig(configFile))
+        .rejects.toThrow(/Failed to load profile file/);
+    });
+
+    it('should throw error for non-object profile values', async () => {
+      const profileFile = path.join(tempDir, 'invalid-profile.yaml');
+      await fs.writeFile(profileFile, `
+myProfile:
+  validKey: "value"
+  invalidKey:
+    nested: "object"
+`);
+
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  testApi:
+    baseUrl: "https://example.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+profiles:
+  - "./invalid-profile.yaml"
+`);
+
+      await expect(configLoader.loadConfig(configFile))
+        .rejects.toThrow(/Invalid profile variable 'invalidKey'/);
+    });
+
+    it('should throw error for non-string import specification', async () => {
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  testApi:
+    baseUrl: "https://example.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+profiles:
+  - 123
+`);
+
+      await expect(configLoader.loadConfig(configFile))
+        .rejects.toThrow(/Profile import specification must be a string/);
+    });
+  });
+
+  describe('Direct Profile Definition Support', () => {
+    it('should still support direct profile definitions', async () => {
+      const configFile = path.join(tempDir, 'config.yaml');
+      await fs.writeFile(configFile, `
+apis:
+  testApi:
+    baseUrl: "https://example.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+profiles:
+  dev:
+    host: "dev.example.com"
+    debug: true
+  prod:
+    host: "prod.example.com"
+    debug: false
+`);
+
+      const config = await configLoader.loadConfig(configFile);
+
+      expect(config.profiles).toHaveProperty('dev');
+      expect(config.profiles).toHaveProperty('prod');
+      expect(config.profiles!.dev.host).toBe('dev.example.com');
+      expect(config.profiles!.prod.host).toBe('prod.example.com');
+    });
+  });
 }); 

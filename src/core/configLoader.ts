@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import yaml from 'js-yaml';
-import type { HttpCraftConfig, RawHttpCraftConfig, ApiDefinition, ChainDefinition } from '../types/config.js';
+import type { HttpCraftConfig, RawHttpCraftConfig, ApiDefinition, ChainDefinition, ProfileDefinition } from '../types/config.js';
 
 export interface ConfigWithPath {
   config: HttpCraftConfig;
@@ -39,6 +39,11 @@ export class ConfigLoader {
         ? await this.loadModularApis(rawConfig.apis, path.dirname(fullPath))
         : {};
 
+      // Load modular imports for profiles
+      const processedProfiles = rawConfig.profiles 
+        ? await this.loadModularProfiles(rawConfig.profiles, path.dirname(fullPath))
+        : {};
+
       // Load modular imports for chains (T9.2)
       const processedChains = rawConfig.chains 
         ? await this.loadModularChains(rawConfig.chains, path.dirname(fullPath))
@@ -53,6 +58,7 @@ export class ConfigLoader {
       const config: HttpCraftConfig = {
         ...rawConfig,
         apis: processedApis,
+        profiles: processedProfiles,
         chains: processedChains,
         globalVariables // T9.3: Add loaded global variables
       };
@@ -406,6 +412,140 @@ export class ConfigLoader {
         throw new Error(`Failed to load variable file ${fullFilePath}: ${error.message}`);
       }
       throw new Error(`Failed to load variable file ${fullFilePath}: Unknown error`);
+    }
+  }
+
+  /**
+   * Loads profile definitions from modular imports
+   * Supports both direct definitions and import specifications
+   * T9.4: Implement modular imports for profile definitions from a directory
+   */
+  async loadModularProfiles(
+    profilesConfig: Record<string, ProfileDefinition> | string[],
+    basePath: string
+  ): Promise<Record<string, ProfileDefinition>> {
+    const mergedProfiles: Record<string, ProfileDefinition> = {};
+
+    // If it's a direct definition object, return as-is
+    if (!Array.isArray(profilesConfig)) {
+      return profilesConfig;
+    }
+
+    // Process import specifications
+    for (const importSpec of profilesConfig) {
+      if (typeof importSpec !== 'string') {
+        throw new Error('Profile import specification must be a string');
+      }
+
+      let loadedProfiles: Record<string, ProfileDefinition>;
+
+      if (importSpec.startsWith('directory:')) {
+        // Load from directory
+        const dirPath = importSpec.substring(10); // Remove "directory:" prefix
+        loadedProfiles = await this.loadProfilesFromDirectory(dirPath, basePath);
+      } else {
+        // Load from individual file
+        loadedProfiles = await this.loadProfilesFromFile(importSpec, basePath);
+      }
+
+      // Merge with existing profiles
+      for (const [profileName, profileDef] of Object.entries(loadedProfiles)) {
+        if (mergedProfiles[profileName]) {
+          // Profile already exists, merge properties (last loaded wins for property conflicts)
+          mergedProfiles[profileName] = { ...mergedProfiles[profileName], ...profileDef };
+        } else {
+          // New profile, add it
+          mergedProfiles[profileName] = profileDef;
+        }
+      }
+    }
+
+    return mergedProfiles;
+  }
+
+  /**
+   * Loads profile definitions from all .yaml/.yml files in a directory
+   */
+  async loadProfilesFromDirectory(
+    dirPath: string,
+    basePath: string
+  ): Promise<Record<string, ProfileDefinition>> {
+    const fullDirPath = path.resolve(basePath, dirPath);
+    const mergedProfiles: Record<string, ProfileDefinition> = {};
+
+    try {
+      const files = await fs.readdir(fullDirPath);
+      
+      // Filter for YAML files and sort for deterministic order
+      const yamlFiles = files
+        .filter(file => file.endsWith('.yaml') || file.endsWith('.yml'))
+        .sort();
+
+      for (const file of yamlFiles) {
+        const filePath = path.join(fullDirPath, file);
+        try {
+          const fileProfiles = await this.loadProfilesFromFile(filePath, '');
+          // Merge profiles with property-level merging for conflicting profile names
+          for (const [profileName, profileDef] of Object.entries(fileProfiles)) {
+            if (mergedProfiles[profileName]) {
+              // Profile already exists, merge properties (last loaded wins for property conflicts)
+              mergedProfiles[profileName] = { ...mergedProfiles[profileName], ...profileDef };
+            } else {
+              // New profile, add it
+              mergedProfiles[profileName] = profileDef;
+            }
+          }
+        } catch (error) {
+          throw new Error(`Failed to load profile file ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      return mergedProfiles;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('ENOENT')) {
+        throw new Error(`Profile directory not found: ${fullDirPath}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Loads profile definitions from a single file
+   */
+  async loadProfilesFromFile(
+    filePath: string,
+    basePath: string
+  ): Promise<Record<string, ProfileDefinition>> {
+    const fullFilePath = basePath ? path.resolve(basePath, filePath) : filePath;
+
+    try {
+      const fileContent = await fs.readFile(fullFilePath, 'utf-8');
+      const fileConfig = yaml.load(fileContent) as Record<string, ProfileDefinition>;
+
+      if (!fileConfig || typeof fileConfig !== 'object') {
+        throw new Error('Invalid profile file: must contain an object');
+      }
+
+      // Validate that all top-level keys are valid profile definitions
+      for (const [profileName, profileDef] of Object.entries(fileConfig)) {
+        if (!profileDef || typeof profileDef !== 'object') {
+          throw new Error(`Invalid profile definition for '${profileName}': must be an object`);
+        }
+        
+        // Validate that profile values are primitive types (string, number, boolean)
+        for (const [key, value] of Object.entries(profileDef)) {
+          if (value !== null && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+            throw new Error(`Invalid profile variable '${key}' in profile '${profileName}': must be string, number, or boolean`);
+          }
+        }
+      }
+
+      return fileConfig;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to load profile file ${fullFilePath}: ${error.message}`);
+      }
+      throw new Error(`Failed to load profile file ${fullFilePath}: Unknown error`);
     }
   }
 }

@@ -304,7 +304,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Test Coverage:** Created comprehensive end-to-end test suite covering all major features working together
   - **Real HTTP Testing:** Tests use actual HTTP requests to httpbin.org to verify functionality 
   - **Feature Integration:** Tests verify configuration loading, variable resolution, profiles, plugins, chains, CLI options, and error handling
-  - **Test Results:** 459 tests passing out of 467 total tests (99.4% pass rate)
+  - **Test Results:** 459 tests passing out of 467 total tests (98.4% pass rate)
   - **Core Functionality Verified:** All core features working correctly including:
     - Basic API requests with complete variable resolution and profiles
     - Plugin system with variables, hooks, and parameterized functions (T10.15)
@@ -316,6 +316,10 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Production Ready:** All critical workflows tested and verified working for v1.0 release
   - **Minor Issues:** 3 non-critical test failures in edge cases (exit codes and error patterns) that don't affect core functionality
   - **Skipped Tests:** 5 npm plugin tests correctly skipped (require actual npm packages)
+  - **Follow-up Needed:** Fix 3 edge case test failures:
+    1. Parameterized plugin function quote escaping in test configuration
+    2. JSONPath assumptions about httpbin.org response structure in chain test
+    3. Error message format expectations in exit-on-http-error test
   All end-to-end testing complete and HttpCraft ready for production use. Ready to proceed to T10.13.
 
 ---
