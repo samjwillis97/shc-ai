@@ -1,0 +1,139 @@
+# OAuth2 Authentication Examples for HttpCraft
+# This file demonstrates various OAuth2 authentication scenarios
+
+plugins:
+  # OAuth2 Client Credentials Grant (most common for API-to-API)
+  - path: "../src/plugins/oauth2Plugin.js"
+    name: "oauth2ClientCreds"
+    config:
+      grantType: "client_credentials"
+      tokenUrl: "https://auth.example.com/oauth2/token"
+      clientId: "{{env.OAUTH2_CLIENT_ID}}"
+      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
+      scope: "api:read api:write"
+      authMethod: "basic"  # or "post" (default)
+      timeout: 30000
+
+  # OAuth2 with different scope for specific API
+  - path: "../src/plugins/oauth2Plugin.js"
+    name: "oauth2ReadOnly"
+    config:
+      grantType: "client_credentials"
+      tokenUrl: "https://auth.example.com/oauth2/token"
+      clientId: "{{env.OAUTH2_CLIENT_ID}}"
+      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
+      scope: "api:read"
+      authMethod: "basic"
+
+  # OAuth2 Authorization Code Grant (for user authentication)
+  - path: "../src/plugins/oauth2Plugin.js"
+    name: "oauth2AuthCode"
+    config:
+      grantType: "authorization_code"
+      tokenUrl: "https://auth.example.com/oauth2/token"
+      clientId: "{{env.OAUTH2_CLIENT_ID}}"
+      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
+      authorizationCode: "{{env.OAUTH2_AUTH_CODE}}"  # Obtained separately
+      redirectUri: "https://myapp.com/callback"
+      codeVerifier: "{{env.OAUTH2_CODE_VERIFIER}}"  # For PKCE
+
+profiles:
+  development:
+    oauth_server: "https://dev-auth.example.com"
+    api_base: "https://dev-api.example.com"
+  
+  staging:
+    oauth_server: "https://staging-auth.example.com"
+    api_base: "https://staging-api.example.com"
+  
+  production:
+    oauth_server: "https://auth.example.com"
+    api_base: "https://api.example.com"
+
+apis:
+  # API using automatic OAuth2 authentication
+  protectedApi:
+    baseUrl: "{{profile.api_base}}/v1"
+    plugins:
+      - name: "oauth2ClientCreds"
+        config:
+          # Override token URL per environment
+          tokenUrl: "{{profile.oauth_server}}/oauth2/token"
+    endpoints:
+      getUsers:
+        method: GET
+        path: "/users"
+        # Authorization header will be automatically added by OAuth2 plugin
+      
+      createUser:
+        method: POST
+        path: "/users"
+        headers:
+          Content-Type: "application/json"
+        body:
+          name: "{{username}}"
+          email: "{{email}}"
+      
+      getUserById:
+        method: GET
+        path: "/users/{{userId}}"
+
+  # API with read-only OAuth2 scope
+  readOnlyApi:
+    baseUrl: "{{profile.api_base}}/v1"
+    plugins:
+      - name: "oauth2ReadOnly"
+        config:
+          tokenUrl: "{{profile.oauth_server}}/oauth2/token"
+    endpoints:
+      getReports:
+        method: GET
+        path: "/reports"
+      
+      getReport:
+        method: GET
+        path: "/reports/{{reportId}}"
+
+  # API with manual token management (using plugin variables)
+  manualTokenApi:
+    baseUrl: "{{profile.api_base}}/v1"
+    endpoints:
+      getDataWithManualToken:
+        method: GET
+        path: "/secure-data"
+        headers:
+          # Manually use the OAuth2 token
+          Authorization: "{{plugins.oauth2ClientCreds.tokenType}} {{plugins.oauth2ClientCreds.accessToken}}"
+      
+      getDataWithScopedToken:
+        method: GET
+        path: "/admin-data"
+        headers:
+          # Use parameterized function for custom scope
+          Authorization: "Bearer {{plugins.oauth2ClientCreds.getTokenWithScope('admin:read')}}"
+
+# Example chains demonstrating OAuth2 flows
+chains:
+  oauth2UserWorkflow:
+    description: "Complete user workflow with OAuth2 authentication"
+    vars:
+      username: "john.doe"
+      email: "john.doe@example.com"
+    steps:
+      - id: createUser
+        call: protectedApi.createUser
+        
+      - id: getCreatedUser
+        call: protectedApi.getUserById
+        with:
+          pathParams:
+            userId: "{{steps.createUser.response.body.id}}"
+      
+      - id: generateReport
+        call: readOnlyApi.getReports
+        
+  oauth2AdminWorkflow:
+    description: "Admin workflow with elevated scope"
+    steps:
+      - id: getAdminData
+        call: manualTokenApi.getDataWithScopedToken 

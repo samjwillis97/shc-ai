@@ -1,0 +1,44 @@
+# OAuth2 Built-in Plugin Example for HttpCraft
+# This demonstrates using OAuth2 as a built-in plugin without specifying a path
+
+plugins:
+  # OAuth2 as built-in plugin - no path required!
+  - name: "oauth2"
+    config:
+      grantType: "client_credentials"
+      tokenUrl: "https://auth.example.com/oauth2/token"
+      clientId: "{{env.OAUTH2_CLIENT_ID}}"
+      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
+      scope: "api:read api:write"
+      authMethod: "basic"
+      timeout: 30000
+
+profiles:
+  development:
+    api_base: "https://dev-api.example.com"
+  
+  production:
+    api_base: "https://api.example.com"
+
+apis:
+  # API using built-in OAuth2 authentication
+  protectedApi:
+    baseUrl: "{{profile.api_base}}/v1"
+    endpoints:
+      getUsers:
+        method: GET
+        path: "/users"
+        # Authorization header will be automatically added by OAuth2 plugin
+      
+      createUser:
+        method: POST
+        path: "/users"
+        headers:
+          Content-Type: "application/json"
+        body:
+          name: "{{username}}"
+          email: "{{email}}"
+
+# Example usage:
+# httpcraft protectedApi getUsers --profile development
+# httpcraft protectedApi createUser --profile production --var username="John" --var email="john@example.com" 

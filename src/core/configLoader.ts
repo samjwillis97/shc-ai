@@ -2,7 +2,13 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import yaml from 'js-yaml';
-import type { HttpCraftConfig, RawHttpCraftConfig, ApiDefinition, ChainDefinition, ProfileDefinition } from '../types/config.js';
+import type {
+  HttpCraftConfig,
+  RawHttpCraftConfig,
+  ApiDefinition,
+  ChainDefinition,
+  ProfileDefinition,
+} from '../types/config.js';
 
 export interface ConfigWithPath {
   config: HttpCraftConfig;
@@ -19,38 +25,38 @@ export class ConfigLoader {
     try {
       // Resolve the full path
       const fullPath = path.resolve(configPath);
-      
+
       // Check if file exists
       await fs.access(fullPath);
-      
+
       // Read the file
       const fileContent = await fs.readFile(fullPath, 'utf-8');
-      
+
       // Parse YAML as raw config (may contain import specifications)
       const rawConfig = yaml.load(fileContent) as RawHttpCraftConfig;
-      
+
       // Basic validation
       if (!rawConfig || typeof rawConfig !== 'object') {
         throw new Error('Invalid configuration: root must be an object');
       }
 
       // Load modular imports for APIs (T9.1)
-      const processedApis = rawConfig.apis 
+      const processedApis = rawConfig.apis
         ? await this.loadModularApis(rawConfig.apis, path.dirname(fullPath))
         : {};
 
       // Load modular imports for profiles
-      const processedProfiles = rawConfig.profiles 
+      const processedProfiles = rawConfig.profiles
         ? await this.loadModularProfiles(rawConfig.profiles, path.dirname(fullPath))
         : {};
 
       // Load modular imports for chains (T9.2)
-      const processedChains = rawConfig.chains 
+      const processedChains = rawConfig.chains
         ? await this.loadModularChains(rawConfig.chains, path.dirname(fullPath))
         : {};
 
       // Load global variable files (T9.3)
-      const globalVariables = rawConfig.variables 
+      const globalVariables = rawConfig.variables
         ? await this.loadGlobalVariables(rawConfig.variables, path.dirname(fullPath))
         : {};
 
@@ -60,9 +66,9 @@ export class ConfigLoader {
         apis: processedApis,
         profiles: processedProfiles,
         chains: processedChains,
-        globalVariables // T9.3: Add loaded global variables
+        globalVariables, // T9.3: Add loaded global variables
       };
-      
+
       return config;
     } catch (error) {
       if (error instanceof Error) {
@@ -124,10 +130,10 @@ export class ConfigLoader {
 
     try {
       const files = await fs.readdir(fullDirPath);
-      
+
       // Filter for YAML files and sort for deterministic order
       const yamlFiles = files
-        .filter(file => file.endsWith('.yaml') || file.endsWith('.yml'))
+        .filter((file) => file.endsWith('.yaml') || file.endsWith('.yml'))
         .sort();
 
       for (const file of yamlFiles) {
@@ -137,7 +143,9 @@ export class ConfigLoader {
           // Merge APIs (last loaded wins for conflicts)
           Object.assign(mergedApis, fileApis);
         } catch (error) {
-          throw new Error(`Failed to load API file ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          throw new Error(
+            `Failed to load API file ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
         }
       }
 
@@ -188,7 +196,7 @@ export class ConfigLoader {
       throw new Error(`Failed to load API file ${fullFilePath}: Unknown error`);
     }
   }
-  
+
   /**
    * Attempts to find and load the default config file using the search hierarchy:
    * 1. ./.httpcraft.yaml or ./.httpcraft.yml in current directory
@@ -199,27 +207,27 @@ export class ConfigLoader {
     // Search order as per T2.3 specification
     const localPaths = ['./.httpcraft.yaml', './.httpcraft.yml'];
     const globalPath = path.join(os.homedir(), '.config', 'httpcraft', 'config.yaml');
-    
+
     // First, try local configuration files in current directory
     for (const configPath of localPaths) {
       try {
         const config = await this.loadConfig(configPath);
         return {
           config,
-          path: path.resolve(configPath)
+          path: path.resolve(configPath),
         };
       } catch (error) {
         // Continue to next path
         continue;
       }
     }
-    
+
     // If no local config found, try global configuration
     try {
       const config = await this.loadConfig(globalPath);
       return {
         config,
-        path: globalPath
+        path: globalPath,
       };
     } catch (error) {
       // No configuration file found in any location
@@ -279,10 +287,10 @@ export class ConfigLoader {
 
     try {
       const files = await fs.readdir(fullDirPath);
-      
+
       // Filter for YAML files and sort for deterministic order
       const yamlFiles = files
-        .filter(file => file.endsWith('.yaml') || file.endsWith('.yml'))
+        .filter((file) => file.endsWith('.yaml') || file.endsWith('.yml'))
         .sort();
 
       for (const file of yamlFiles) {
@@ -292,7 +300,9 @@ export class ConfigLoader {
           // Merge chains (last loaded wins for conflicts)
           Object.assign(mergedChains, fileChains);
         } catch (error) {
-          throw new Error(`Failed to load chain file ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          throw new Error(
+            `Failed to load chain file ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
         }
       }
 
@@ -375,7 +385,9 @@ export class ConfigLoader {
         // Merge variables (last loaded wins for conflicts)
         Object.assign(mergedVariables, loadedVariables);
       } catch (error) {
-        throw new Error(`Failed to load variable file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to load variable file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     }
 
@@ -385,10 +397,7 @@ export class ConfigLoader {
   /**
    * Loads variables from a single file
    */
-  async loadVariableFile(
-    filePath: string,
-    basePath: string
-  ): Promise<Record<string, any>> {
+  async loadVariableFile(filePath: string, basePath: string): Promise<Record<string, any>> {
     const fullFilePath = path.resolve(basePath, filePath);
 
     try {
@@ -401,7 +410,12 @@ export class ConfigLoader {
 
       // Validate that all values are primitive types (string, number, boolean)
       for (const [key, value] of Object.entries(variables)) {
-        if (value !== null && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+        if (
+          value !== null &&
+          typeof value !== 'string' &&
+          typeof value !== 'number' &&
+          typeof value !== 'boolean'
+        ) {
           throw new Error(`Invalid variable '${key}': value must be a string, number, or boolean`);
         }
       }
@@ -475,10 +489,10 @@ export class ConfigLoader {
 
     try {
       const files = await fs.readdir(fullDirPath);
-      
+
       // Filter for YAML files and sort for deterministic order
       const yamlFiles = files
-        .filter(file => file.endsWith('.yaml') || file.endsWith('.yml'))
+        .filter((file) => file.endsWith('.yaml') || file.endsWith('.yml'))
         .sort();
 
       for (const file of yamlFiles) {
@@ -496,7 +510,9 @@ export class ConfigLoader {
             }
           }
         } catch (error) {
-          throw new Error(`Failed to load profile file ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          throw new Error(
+            `Failed to load profile file ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
         }
       }
 
@@ -531,11 +547,18 @@ export class ConfigLoader {
         if (!profileDef || typeof profileDef !== 'object') {
           throw new Error(`Invalid profile definition for '${profileName}': must be an object`);
         }
-        
+
         // Validate that profile values are primitive types (string, number, boolean)
         for (const [key, value] of Object.entries(profileDef)) {
-          if (value !== null && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
-            throw new Error(`Invalid profile variable '${key}' in profile '${profileName}': must be string, number, or boolean`);
+          if (
+            value !== null &&
+            typeof value !== 'string' &&
+            typeof value !== 'number' &&
+            typeof value !== 'boolean'
+          ) {
+            throw new Error(
+              `Invalid profile variable '${key}' in profile '${profileName}': must be string, number, or boolean`
+            );
           }
         }
       }
@@ -551,4 +574,4 @@ export class ConfigLoader {
 }
 
 // Singleton instance
-export const configLoader = new ConfigLoader(); 
+export const configLoader = new ConfigLoader();

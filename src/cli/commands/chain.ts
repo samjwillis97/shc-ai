@@ -22,42 +22,44 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
     // Load configuration
     let config: HttpCraftConfig;
     let configPath: string;
-    
+
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
       configPath = args.config;
     } else {
       const defaultConfig = await configLoader.loadDefaultConfig();
       if (!defaultConfig) {
-        console.error('Error: No configuration file found. Use --config to specify a config file or create .httpcraft.yaml');
+        console.error(
+          'Error: No configuration file found. Use --config to specify a config file or create .httpcraft.yaml'
+        );
         process.exit(1);
       }
       config = defaultConfig.config;
       configPath = defaultConfig.path;
     }
-    
+
     // Initialize and load plugins
     const pluginManager = new PluginManager();
     if (config.plugins && config.plugins.length > 0) {
       const configDir = path.dirname(configPath);
       await pluginManager.loadPlugins(config.plugins, configDir);
-      
+
       // Set plugin manager on HTTP client for pre-request hooks
       httpClient.setPluginManager(pluginManager);
     }
-    
+
     // Find chain
     if (!config.chains) {
       console.error('Error: No chains defined in configuration');
       process.exit(1);
     }
-    
+
     const chain = config.chains[args.chainName];
     if (!chain) {
       console.error(`Error: Chain '${args.chainName}' not found in configuration`);
       process.exit(1);
     }
-    
+
     // Determine which profiles to use
     let profileNames: string[] = [];
     if (args.profiles && args.profiles.length > 0) {
@@ -71,15 +73,17 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
         profileNames = [config.config.defaultProfile];
       }
     }
-    
+
     // Load and merge profile variables
     let mergedProfileVars: Record<string, any> = {};
     if (profileNames.length > 0) {
       if (!config.profiles) {
-        console.error(`Error: No profiles defined in configuration, but profile(s) requested: ${profileNames.join(', ')}`);
+        console.error(
+          `Error: No profiles defined in configuration, but profile(s) requested: ${profileNames.join(', ')}`
+        );
         process.exit(1);
       }
-      
+
       // Validate that all requested profiles exist
       for (const profileName of profileNames) {
         if (!config.profiles[profileName]) {
@@ -87,10 +91,10 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
           process.exit(1);
         }
       }
-      
+
       mergedProfileVars = variableResolver.mergeProfiles(profileNames, config.profiles);
     }
-    
+
     // Execute the chain
     const result = await chainExecutor.executeChain(
       args.chainName,
@@ -103,7 +107,7 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
       pluginManager,
       path.dirname(configPath)
     );
-    
+
     // Handle execution result
     if (result.success) {
       if (args.chainOutput === 'full') {
@@ -112,7 +116,7 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
         const structuredOutput = {
           chainName: result.chainName,
           success: result.success,
-          steps: result.steps.map(step => {
+          steps: result.steps.map((step) => {
             // Attempt to parse and format response body as JSON
             let formattedResponseBody = step.response.body;
             try {
@@ -143,18 +147,18 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
                 method: step.request.method,
                 url: step.request.url,
                 headers: step.request.headers,
-                body: formattedRequestBody
+                body: formattedRequestBody,
               },
               response: {
                 status: step.response.status,
                 statusText: step.response.statusText,
                 headers: step.response.headers,
-                body: formattedResponseBody
+                body: formattedResponseBody,
               },
               success: step.success,
-              error: step.error
+              error: step.error,
             };
-          })
+          }),
         };
         console.log(JSON.stringify(structuredOutput, null, 2));
       } else {
@@ -171,9 +175,8 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
       }
       process.exit(1);
     }
-    
   } catch (error) {
     console.error('Error executing chain:', error);
     process.exit(1);
   }
-} 
+}

@@ -5,12 +5,12 @@ import { hideBin } from 'yargs/helpers';
 import { handleRequestCommand } from './commands/request.js';
 import { handleApiCommand } from './commands/api.js';
 import { handleChainCommand } from './commands/chain.js';
-import { 
-  handleCompletionCommand, 
-  handleGetApiNamesCommand, 
+import {
+  handleCompletionCommand,
+  handleGetApiNamesCommand,
   handleGetEndpointNamesCommand,
   handleGetChainNamesCommand,
-  handleGetProfileNamesCommand
+  handleGetProfileNamesCommand,
 } from './commands/completion.js';
 
 async function main() {
@@ -125,11 +125,13 @@ async function main() {
       default: false,
     })
     .option('exit-on-http-error', {
-      describe: 'Exit with non-zero code for specified HTTP error status codes (e.g., "4xx", "5xx", "401,403")',
+      describe:
+        'Exit with non-zero code for specified HTTP error status codes (e.g., "4xx", "5xx", "401,403")',
       type: 'string',
     })
     .option('chain-output', {
-      describe: 'Output format for chains ("default" for last step body, "full" for structured JSON of all steps)',
+      describe:
+        'Output format for chains ("default" for last step body, "full" for structured JSON of all steps)',
       type: 'string',
       choices: ['default', 'full'],
       default: 'default',
@@ -169,9 +171,9 @@ async function main() {
   }
 
   if (argv['get-endpoint-names']) {
-    await handleGetEndpointNamesCommand({ 
+    await handleGetEndpointNamesCommand({
       apiName: argv['get-endpoint-names'] as string,
-      config: argv.config as string | undefined 
+      config: argv.config as string | undefined,
     });
     return;
   }
@@ -216,7 +218,7 @@ async function main() {
   if (argv._.length === 2 && typeof argv._[0] === 'string' && typeof argv._[1] === 'string') {
     const apiName = argv._[0];
     const endpointName = argv._[1];
-    
+
     await handleApiCommand({
       apiName,
       endpointName,
@@ -229,8 +231,12 @@ async function main() {
     });
   } else if (argv._.length === 0) {
     // No command provided, show help
-    console.log('Usage: httpcraft <api_name> <endpoint_name> [--config <path>] [--var key=value] [--profile <name>]');
-    console.log('       httpcraft chain <chain_name> [--config <path>] [--var key=value] [--profile <name>]');
+    console.log(
+      'Usage: httpcraft <api_name> <endpoint_name> [--config <path>] [--var key=value] [--profile <name>]'
+    );
+    console.log(
+      '       httpcraft chain <chain_name> [--config <path>] [--var key=value] [--profile <name>]'
+    );
     console.log('       httpcraft request <url>');
     console.log('       httpcraft completion <shell>');
     console.log('       httpcraft test');
@@ -242,4 +248,4 @@ async function main() {
 main().catch((error) => {
   console.error('Error:', error);
   process.exit(1);
-}); 
+});

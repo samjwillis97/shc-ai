@@ -10,10 +10,10 @@ export class UrlBuilder {
   buildUrl(api: ApiDefinition, endpoint: EndpointDefinition): string {
     const baseUrl = api.baseUrl.replace(/\/$/, ''); // Remove trailing slash
     const path = endpoint.path.startsWith('/') ? endpoint.path : `/${endpoint.path}`; // Ensure leading slash
-    
+
     return `${baseUrl}${path}`;
   }
-  
+
   /**
    * Merges query parameters from API and endpoint definitions
    * Endpoint params override API params for the same key
@@ -24,10 +24,10 @@ export class UrlBuilder {
   mergeParams(api: ApiDefinition, endpoint: EndpointDefinition): Record<string, string> {
     const apiParams = api.params || {};
     const endpointParams = endpoint.params || {};
-    
+
     return { ...apiParams, ...endpointParams };
   }
-  
+
   /**
    * Merges headers from API and endpoint definitions
    * Endpoint headers override API headers for the same key
@@ -38,10 +38,10 @@ export class UrlBuilder {
   mergeHeaders(api: ApiDefinition, endpoint: EndpointDefinition): Record<string, string> {
     const apiHeaders = api.headers || {};
     const endpointHeaders = endpoint.headers || {};
-    
+
     return { ...apiHeaders, ...endpointHeaders };
   }
 }
 
 // Singleton instance
-export const urlBuilder = new UrlBuilder(); 
+export const urlBuilder = new UrlBuilder();

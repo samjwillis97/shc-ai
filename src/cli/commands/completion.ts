@@ -125,7 +125,7 @@ export async function handleGetApiNamesCommand(args: GetApiNamesArgs): Promise<v
   try {
     // Load configuration
     let config: HttpCraftConfig;
-    
+
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
     } else {
@@ -136,7 +136,7 @@ export async function handleGetApiNamesCommand(args: GetApiNamesArgs): Promise<v
       }
       config = defaultConfigResult.config;
     }
-    
+
     // Output API names, one per line
     const apiNames = Object.keys(config.apis || {});
     for (const apiName of apiNames) {
@@ -155,7 +155,7 @@ export async function handleGetEndpointNamesCommand(args: GetEndpointNamesArgs):
   try {
     // Load configuration
     let config: HttpCraftConfig;
-    
+
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
     } else {
@@ -166,7 +166,7 @@ export async function handleGetEndpointNamesCommand(args: GetEndpointNamesArgs):
       }
       config = defaultConfigResult.config;
     }
-    
+
     // Find the API and output its endpoint names
     const api = config.apis?.[args.apiName];
     if (api && api.endpoints) {
@@ -188,7 +188,7 @@ export async function handleGetChainNamesCommand(args: GetChainNamesArgs): Promi
   try {
     // Load configuration
     let config: HttpCraftConfig;
-    
+
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
     } else {
@@ -199,7 +199,7 @@ export async function handleGetChainNamesCommand(args: GetChainNamesArgs): Promi
       }
       config = defaultConfigResult.config;
     }
-    
+
     // Output chain names, one per line
     const chainNames = Object.keys(config.chains || {});
     for (const chainName of chainNames) {
@@ -218,7 +218,7 @@ export async function handleGetProfileNamesCommand(args: GetProfileNamesArgs): P
   try {
     // Load configuration
     let config: HttpCraftConfig;
-    
+
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
     } else {
@@ -229,7 +229,7 @@ export async function handleGetProfileNamesCommand(args: GetProfileNamesArgs): P
       }
       config = defaultConfigResult.config;
     }
-    
+
     // Output profile names, one per line
     const profileNames = Object.keys(config.profiles || {});
     for (const profileName of profileNames) {
@@ -239,4 +239,4 @@ export async function handleGetProfileNamesCommand(args: GetProfileNamesArgs): P
     // Silently fail for completion - errors would break tab completion
     // User can use regular commands to see actual errors
   }
-} 
+}

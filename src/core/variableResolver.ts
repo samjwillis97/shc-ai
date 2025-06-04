@@ -28,13 +28,19 @@ export interface VariableContext {
   profiles?: Record<string, any>; // Merged profile variables
   globalVariables?: Record<string, any>; // T9.3: Global variable files
   plugins?: Record<string, Record<string, VariableSource>>; // Plugin variable sources
-  parameterizedPlugins?: Record<string, Record<string, import('../types/plugin.js').ParameterizedVariableSource>>; // T10.15: Parameterized plugin variable sources
+  parameterizedPlugins?: Record<
+    string,
+    Record<string, import('../types/plugin.js').ParameterizedVariableSource>
+  >; // T10.15: Parameterized plugin variable sources
   env: Record<string, string>;
   steps?: StepExecutionResult[]; // T8.8 & T8.9: Step execution results for chains
 }
 
 export class VariableResolutionError extends Error {
-  constructor(message: string, public variableName: string) {
+  constructor(
+    message: string,
+    public variableName: string
+  ) {
     super(message);
     this.name = 'VariableResolutionError';
   }
@@ -43,7 +49,7 @@ export class VariableResolutionError extends Error {
 export class VariableResolver {
   private secretVariables: Set<string> = new Set(); // T9.5: Track secret variables for masking
   private secretValues: Map<string, string> = new Map(); // T9.5: Track secret values for masking
-  
+
   /**
    * T9.5: Reset secret tracking (useful for testing or between requests)
    */
@@ -51,21 +57,21 @@ export class VariableResolver {
     this.secretVariables.clear();
     this.secretValues.clear();
   }
-  
+
   /**
    * T9.5: Get all tracked secret variables
    */
   getSecretVariables(): string[] {
     return Array.from(this.secretVariables);
   }
-  
+
   /**
    * T9.5: Mask secret values in a string for verbose/dry-run output
    * Replaces actual secret values with [SECRET] placeholder
    */
   maskSecrets(text: string): string {
     let maskedText = text;
-    
+
     // For each tracked secret value, replace it with [SECRET]
     for (const [variableName, secretValue] of this.secretValues) {
       if (secretValue && secretValue.length > 0) {
@@ -76,10 +82,10 @@ export class VariableResolver {
         maskedText = maskedText.replace(regex, '[SECRET]');
       }
     }
-    
+
     return maskedText;
   }
-  
+
   /**
    * Resolves variables in a string using {{variable}} syntax
    * Phase 8 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Plugins > Environment
@@ -90,29 +96,26 @@ export class VariableResolver {
     let resolvedTemplate = template;
     let iterationCount = 0;
     const maxIterations = 10; // Prevent infinite loops
-    
+
     while (iterationCount < maxIterations) {
       const originalTemplate = resolvedTemplate;
-      
+
       // T10.16: First pass - resolve any nested variables within variable names
       resolvedTemplate = await this.resolveNestedVariables(resolvedTemplate, context);
-      
+
       // Process variables sequentially to handle async plugin variables
       const matches = this.extractVariableMatches(resolvedTemplate);
-      
+
       for (const match of matches) {
         const variableName = match.content.trim();
-        
+
         // Validate that variable name is not empty
         if (!variableName) {
-          throw new VariableResolutionError(
-            'Variable name cannot be empty',
-            variableName
-          );
+          throw new VariableResolutionError('Variable name cannot be empty', variableName);
         }
-        
+
         let resolvedValue: string;
-        
+
         // T10.15: Check if this is a parameterized function call
         if (this.isParameterizedFunctionCall(variableName)) {
           resolvedValue = await this.resolveParameterizedFunctionCall(variableName, context);
@@ -137,55 +140,58 @@ export class VariableResolver {
             }
           }
         }
-        
+
         // Replace this specific variable match
         resolvedTemplate = resolvedTemplate.replace(match.fullMatch, resolvedValue);
       }
-      
+
       // T10.16: Check if the resolved template contains new variables to resolve
       // This handles cases where a variable's value is itself a variable reference
       const hasVariables = this.extractVariableMatches(resolvedTemplate).length > 0;
-      
+
       // If no more variables or no change in this iteration, we're done
       if (!hasVariables || resolvedTemplate === originalTemplate) {
         break;
       }
-      
+
       iterationCount++;
     }
-    
+
     if (iterationCount >= maxIterations) {
       throw new VariableResolutionError(
         'Maximum variable resolution iterations reached. Check for circular references.',
         template
       );
     }
-    
+
     return resolvedTemplate;
   }
-  
+
   /**
    * T10.16: Resolves nested variables within variable names only
    * This handles constructs like {{steps.getRecentClaims.response.body.data.{{claimIndex}}.id}}
    */
-  private async resolveNestedVariables(template: string, context: VariableContext): Promise<string> {
+  private async resolveNestedVariables(
+    template: string,
+    context: VariableContext
+  ): Promise<string> {
     let resolvedTemplate = template;
     let changed = true;
-    
+
     while (changed) {
       changed = false;
-      
+
       // Find variables that contain other variables inside their names
       const matches = this.extractVariableMatches(resolvedTemplate);
-      
+
       for (const match of matches) {
         const variableName = match.content.trim();
-        
+
         // Check if this variable name contains nested variables (has {{ inside the variable name)
         if (this.containsNestedVariables(variableName)) {
           // Resolve inner variables first
           const resolvedVariableName = await this.resolveInnerVariables(variableName, context);
-          
+
           // Replace the variable name with the resolved one
           const newVariableMatch = `{{${resolvedVariableName}}}`;
           resolvedTemplate = resolvedTemplate.replace(match.fullMatch, newVariableMatch);
@@ -194,10 +200,10 @@ export class VariableResolver {
         }
       }
     }
-    
+
     return resolvedTemplate;
   }
-  
+
   /**
    * T10.16: Checks if a variable name contains nested variables
    */
@@ -206,24 +212,30 @@ export class VariableResolver {
     const innerMatches = this.extractVariableMatches(variableName);
     return innerMatches.length > 0;
   }
-  
+
   /**
    * T10.16: Resolves inner variables within a variable name
    */
-  private async resolveInnerVariables(variableName: string, context: VariableContext): Promise<string> {
+  private async resolveInnerVariables(
+    variableName: string,
+    context: VariableContext
+  ): Promise<string> {
     let resolvedVariableName = variableName;
-    
+
     // Find and resolve inner variables
     const innerMatches = this.extractVariableMatches(variableName);
-    
+
     for (const innerMatch of innerMatches) {
       const innerVariableName = innerMatch.content.trim();
-      
+
       let resolvedInnerValue: string;
-      
+
       // T10.15: Check if this is a parameterized function call
       if (this.isParameterizedFunctionCall(innerVariableName)) {
-        resolvedInnerValue = await this.resolveParameterizedFunctionCall(innerVariableName, context);
+        resolvedInnerValue = await this.resolveParameterizedFunctionCall(
+          innerVariableName,
+          context
+        );
       }
       // Handle scoped variables
       else if (innerVariableName.includes('.')) {
@@ -231,7 +243,11 @@ export class VariableResolver {
       } else {
         // T9.6: Handle built-in dynamic variables first (they start with $)
         if (innerVariableName.startsWith('$')) {
-          resolvedInnerValue = this.resolveDynamicVariable(innerVariableName, '', innerVariableName);
+          resolvedInnerValue = this.resolveDynamicVariable(
+            innerVariableName,
+            '',
+            innerVariableName
+          );
         } else {
           // Handle unscoped variables with precedence
           const value = this.resolveUnscopedVariable(innerVariableName, context);
@@ -245,14 +261,14 @@ export class VariableResolver {
           }
         }
       }
-      
+
       // Replace the inner variable with its resolved value
       resolvedVariableName = resolvedVariableName.replace(innerMatch.fullMatch, resolvedInnerValue);
     }
-    
+
     return resolvedVariableName;
   }
-  
+
   /**
    * T10.15: Extracts variable matches from a template, handling nested braces correctly
    * Returns array of matches with full match string and content
@@ -260,16 +276,16 @@ export class VariableResolver {
   private extractVariableMatches(template: string): Array<{ fullMatch: string; content: string }> {
     const matches: Array<{ fullMatch: string; content: string }> = [];
     let i = 0;
-    
+
     while (i < template.length) {
       // Look for opening {{
       if (i < template.length - 1 && template[i] === '{' && template[i + 1] === '{') {
         const startIndex = i;
         i += 2; // Skip the {{
-        
+
         let braceCount = 1; // We've seen one opening {{
         let content = '';
-        
+
         // Find the matching }}
         while (i < template.length && braceCount > 0) {
           if (i < template.length - 1 && template[i] === '{' && template[i + 1] === '{') {
@@ -287,7 +303,7 @@ export class VariableResolver {
             i++;
           }
         }
-        
+
         if (braceCount === 0) {
           // Found a complete variable
           const fullMatch = template.substring(startIndex, i);
@@ -300,17 +316,20 @@ export class VariableResolver {
         i++;
       }
     }
-    
+
     return matches;
   }
-  
+
   /**
    * Resolves scoped variables like env.VAR_NAME, secret.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable, steps.stepId.*
    */
-  private async resolveScopedVariable(variableName: string, context: VariableContext): Promise<string> {
+  private async resolveScopedVariable(
+    variableName: string,
+    context: VariableContext
+  ): Promise<string> {
     const [scope, ...keyParts] = variableName.split('.');
     const key = keyParts.join('.');
-    
+
     switch (scope) {
       case 'env':
         if (context.env[key] !== undefined) {
@@ -320,7 +339,7 @@ export class VariableResolver {
           `Environment variable '${key}' is not defined`,
           variableName
         );
-        
+
       case 'secret':
         // T9.4: Secret variable resolution (default provider: OS environment)
         if (context.env[key] !== undefined) {
@@ -328,29 +347,20 @@ export class VariableResolver {
           this.secretValues.set(variableName, context.env[key]);
           return context.env[key];
         }
-        throw new VariableResolutionError(
-          `Secret variable '${key}' is not defined`,
-          variableName
-        );
-        
+        throw new VariableResolutionError(`Secret variable '${key}' is not defined`, variableName);
+
       case 'profile':
         if (context.profiles && context.profiles[key] !== undefined) {
           return this.stringifyValue(context.profiles[key]);
         }
-        throw new VariableResolutionError(
-          `Profile variable '${key}' is not defined`,
-          variableName
-        );
-        
+        throw new VariableResolutionError(`Profile variable '${key}' is not defined`, variableName);
+
       case 'api':
         if (context.api && context.api[key] !== undefined) {
           return this.stringifyValue(context.api[key]);
         }
-        throw new VariableResolutionError(
-          `API variable '${key}' is not defined`,
-          variableName
-        );
-        
+        throw new VariableResolutionError(`API variable '${key}' is not defined`, variableName);
+
       case 'endpoint':
         if (context.endpoint && context.endpoint[key] !== undefined) {
           return this.stringifyValue(context.endpoint[key]);
@@ -359,12 +369,12 @@ export class VariableResolver {
           `Endpoint variable '${key}' is not defined`,
           variableName
         );
-        
+
       case 'plugins':
         if (context.plugins) {
           const [pluginName, ...variableKeyParts] = keyParts;
           const variableKey = variableKeyParts.join('.');
-          
+
           if (context.plugins[pluginName] && context.plugins[pluginName][variableKey]) {
             const variableSource = context.plugins[pluginName][variableKey];
             try {
@@ -382,7 +392,7 @@ export class VariableResolver {
           `Plugin variable '${variableName}' is not defined`,
           variableName
         );
-        
+
       case 'steps':
         // T8.8 & T8.9: Handle step variables
         if (context.steps) {
@@ -392,44 +402,48 @@ export class VariableResolver {
           `Step variable '${variableName}' is not available (no steps in context)`,
           variableName
         );
-        
+
       default:
         // T9.6: Handle built-in dynamic variables with $ prefix
         if (scope.startsWith('$')) {
           return this.resolveDynamicVariable(scope, key, variableName);
         }
-        
+
         throw new VariableResolutionError(
           `Unknown variable scope '${scope}' in '${variableName}'`,
           variableName
         );
     }
   }
-  
+
   /**
    * T8.8 & T8.9: Resolves step variables like steps.stepId.response.body.field or steps.stepId.request.url
    */
-  private resolveStepVariable(keyParts: string[], steps: StepExecutionResult[], variableName: string): string {
+  private resolveStepVariable(
+    keyParts: string[],
+    steps: StepExecutionResult[],
+    variableName: string
+  ): string {
     if (keyParts.length < 2) {
       throw new VariableResolutionError(
         `Invalid step variable format '${variableName}'. Expected: steps.stepId.response.* or steps.stepId.request.*`,
         variableName
       );
     }
-    
+
     const [stepId, dataType, ...pathParts] = keyParts;
-    
+
     // Find the step by ID
-    const step = steps.find(s => s.stepId === stepId);
+    const step = steps.find((s) => s.stepId === stepId);
     if (!step) {
       throw new VariableResolutionError(
         `Step '${stepId}' not found in executed steps`,
         variableName
       );
     }
-    
+
     let targetData: any;
-    
+
     switch (dataType) {
       case 'response':
         targetData = step.response;
@@ -443,12 +457,12 @@ export class VariableResolver {
           variableName
         );
     }
-    
+
     // If no path parts, return the entire object as string
     if (pathParts.length === 0) {
       return this.stringifyValue(targetData);
     }
-    
+
     // Special handling for response.body and request.body - parse JSON if it's a string
     if (pathParts.length > 0 && pathParts[0].startsWith('body')) {
       if (typeof targetData.body === 'string') {
@@ -461,23 +475,22 @@ export class VariableResolver {
         }
       }
     }
-    
+
     // Use JSONPath to extract the value
     const jsonPath = `$.${pathParts.join('.')}`;
-    
+
     try {
       const result = JSONPath({ path: jsonPath, json: targetData });
-      
+
       if (result.length === 0) {
         throw new VariableResolutionError(
           `JSONPath '${jsonPath}' found no matches in step '${stepId}' ${dataType}`,
           variableName
         );
       }
-      
+
       // Return the first match
       return this.stringifyValue(result[0]);
-      
     } catch (error) {
       if (error instanceof VariableResolutionError) {
         throw error;
@@ -488,7 +501,7 @@ export class VariableResolver {
       );
     }
   }
-  
+
   /**
    * Resolves unscoped variables using precedence order
    * PRD FR3.2 precedence (Highest to Lowest):
@@ -510,44 +523,44 @@ export class VariableResolver {
     if (context.cli[variableName] !== undefined) {
       return context.cli[variableName];
     }
-    
+
     // 2. Step with overrides (for future chains)
     if (context.stepWith && context.stepWith[variableName] !== undefined) {
       return context.stepWith[variableName];
     }
-    
+
     // 3. Chain variables (for future chains)
     if (context.chainVars && context.chainVars[variableName] !== undefined) {
       return context.chainVars[variableName];
     }
-    
+
     // 4. Endpoint-specific variables
     if (context.endpoint && context.endpoint[variableName] !== undefined) {
       return context.endpoint[variableName];
     }
-    
+
     // 5. API-specific variables
     if (context.api && context.api[variableName] !== undefined) {
       return context.api[variableName];
     }
-    
+
     // 6. Profile variables (merged)
     if (context.profiles && context.profiles[variableName] !== undefined) {
       return context.profiles[variableName];
     }
-    
+
     // 7. Global variables (T9.3)
     if (context.globalVariables && context.globalVariables[variableName] !== undefined) {
       return context.globalVariables[variableName];
     }
-    
+
     // 8-10. Secret, env, and dynamic variables are only accessible via scoped syntax
     // (e.g., {{secret.VAR}}, {{env.VAR}}, {{$timestamp}})
     // They are not available as unscoped variables
-    
+
     return undefined;
   }
-  
+
   /**
    * Converts any value to string for HTTP contexts
    */
@@ -560,7 +573,7 @@ export class VariableResolver {
     }
     return JSON.stringify(value);
   }
-  
+
   /**
    * Resolves variables in any value (string, object, or array)
    * For strings, applies template substitution
@@ -570,7 +583,7 @@ export class VariableResolver {
     if (typeof value === 'string') {
       return this.resolve(value, context);
     }
-    
+
     if (Array.isArray(value)) {
       const resolvedArray = [];
       for (const item of value) {
@@ -578,7 +591,7 @@ export class VariableResolver {
       }
       return resolvedArray;
     }
-    
+
     if (value && typeof value === 'object') {
       const resolved: any = {};
       for (const [key, val] of Object.entries(value)) {
@@ -586,10 +599,10 @@ export class VariableResolver {
       }
       return resolved;
     }
-    
+
     return value;
   }
-  
+
   /**
    * Creates a variable context from CLI arguments and environment variables
    * Enhanced for Phase 9 with global variables support
@@ -602,7 +615,10 @@ export class VariableResolver {
     endpoint?: Record<string, any>,
     plugins?: Record<string, Record<string, VariableSource>>,
     globalVariables?: Record<string, any>, // T9.3: Global variables
-    parameterizedPlugins?: Record<string, Record<string, import('../types/plugin.js').ParameterizedVariableSource>> // T10.15: Parameterized plugins
+    parameterizedPlugins?: Record<
+      string,
+      Record<string, import('../types/plugin.js').ParameterizedVariableSource>
+    > // T10.15: Parameterized plugins
   ): VariableContext {
     return {
       cli: { ...cliVars },
@@ -612,40 +628,47 @@ export class VariableResolver {
       plugins: plugins ? { ...plugins } : undefined,
       parameterizedPlugins: parameterizedPlugins ? { ...parameterizedPlugins } : undefined, // T10.15
       globalVariables: globalVariables ? { ...globalVariables } : undefined, // T9.3
-      env: { ...process.env } as Record<string, string>
+      env: { ...process.env } as Record<string, string>,
     };
   }
-  
+
   /**
    * Merges multiple profiles into a single variables object
    * Later profiles override earlier ones for the same key
    */
-  mergeProfiles(profileNames: string[], profiles: Record<string, Record<string, any>>): Record<string, any> {
+  mergeProfiles(
+    profileNames: string[],
+    profiles: Record<string, Record<string, any>>
+  ): Record<string, any> {
     const merged: Record<string, any> = {};
-    
+
     for (const profileName of profileNames) {
       const profile = profiles[profileName];
       if (profile) {
         Object.assign(merged, profile);
       }
     }
-    
+
     return merged;
   }
-  
+
   /**
    * T9.6: Resolves built-in dynamic variables ($timestamp, $isoTimestamp, $randomInt, $guid)
    */
-  private resolveDynamicVariable(variableName: string, params: string, fullVariableName: string): string {
+  private resolveDynamicVariable(
+    variableName: string,
+    params: string,
+    fullVariableName: string
+  ): string {
     switch (variableName) {
       case '$timestamp':
         // Unix timestamp in seconds
         return Math.floor(Date.now() / 1000).toString();
-        
+
       case '$isoTimestamp':
         // ISO 8601 timestamp
         return new Date().toISOString();
-        
+
       case '$randomInt':
         // Random integer - supports optional range parameters like $randomInt(1,100)
         if (params) {
@@ -671,11 +694,11 @@ export class VariableResolver {
           // Default range: 0 to 999999
           return Math.floor(Math.random() * 1000000).toString();
         }
-        
+
       case '$guid':
         // Generate a UUID v4
         return this.generateUUID();
-        
+
       default:
         throw new VariableResolutionError(
           `Unknown dynamic variable '${variableName}'`,
@@ -683,14 +706,14 @@ export class VariableResolver {
         );
     }
   }
-  
+
   /**
    * T9.6: Generates a UUID v4 (simple implementation without external dependencies)
    */
   private generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
       return v.toString(16);
     });
   }
@@ -706,18 +729,18 @@ export class VariableResolver {
     if (!startPattern.test(variableName)) {
       return false;
     }
-    
+
     // Check if it ends with ) and has balanced parentheses
     if (!variableName.endsWith(')')) {
       return false;
     }
-    
+
     // Find the opening parenthesis
     const openParenIndex = variableName.indexOf('(');
     if (openParenIndex === -1) {
       return false;
     }
-    
+
     // Check if parentheses are balanced
     let parenCount = 0;
     for (let i = openParenIndex; i < variableName.length; i++) {
@@ -732,7 +755,7 @@ export class VariableResolver {
         }
       }
     }
-    
+
     return false; // Unbalanced or doesn't end correctly
   }
 
@@ -740,16 +763,19 @@ export class VariableResolver {
    * T10.15: Resolves a parameterized function call
    * Parses function arguments, resolves any variable references, and calls the plugin function
    */
-  private async resolveParameterizedFunctionCall(variableName: string, context: VariableContext): Promise<string> {
+  private async resolveParameterizedFunctionCall(
+    variableName: string,
+    context: VariableContext
+  ): Promise<string> {
     const functionCall = this.parseFunctionCall(variableName);
-    
+
     if (!context.parameterizedPlugins || !context.parameterizedPlugins[functionCall.pluginName]) {
       throw new VariableResolutionError(
         `Plugin '${functionCall.pluginName}' not found or has no parameterized functions`,
         variableName
       );
     }
-    
+
     const pluginFunctions = context.parameterizedPlugins[functionCall.pluginName];
     if (!pluginFunctions[functionCall.functionName]) {
       throw new VariableResolutionError(
@@ -757,7 +783,7 @@ export class VariableResolver {
         variableName
       );
     }
-    
+
     // Resolve function arguments
     const resolvedArgs: any[] = [];
     for (const arg of functionCall.arguments) {
@@ -769,7 +795,7 @@ export class VariableResolver {
         resolvedArgs.push(resolvedValue);
       }
     }
-    
+
     // Call the parameterized function
     try {
       const parameterizedFunction = pluginFunctions[functionCall.functionName];
@@ -797,9 +823,9 @@ export class VariableResolver {
         variableName
       );
     }
-    
+
     const [, pluginName, functionName] = basicMatch;
-    
+
     // Find the opening parenthesis
     const openParenIndex = variableName.indexOf('(');
     if (openParenIndex === -1 || !variableName.endsWith(')')) {
@@ -808,47 +834,47 @@ export class VariableResolver {
         variableName
       );
     }
-    
+
     // Extract the arguments string (everything between the outermost parentheses)
     const argsStr = variableName.substring(openParenIndex + 1, variableName.length - 1);
     const args: FunctionArgument[] = [];
-    
+
     if (argsStr.trim()) {
       // Parse function arguments
       const argMatches = this.parseArguments(argsStr);
       for (const argMatch of argMatches) {
         const trimmedArg = argMatch.trim();
-        
+
         if (trimmedArg.startsWith('"') && trimmedArg.endsWith('"')) {
           // String literal argument
           const stringValue = trimmedArg.slice(1, -1); // Remove quotes
-          
+
           // Check if the string contains variable references
           if (stringValue.includes('{{') && stringValue.includes('}}')) {
             args.push({
               type: 'variable',
-              value: stringValue
+              value: stringValue,
             });
           } else {
             args.push({
               type: 'string',
-              value: stringValue
+              value: stringValue,
             });
           }
         } else if (trimmedArg.startsWith('\\"') && trimmedArg.endsWith('\\"')) {
           // Handle escaped quotes (from nested function calls)
           const stringValue = trimmedArg.slice(2, -2); // Remove escaped quotes
-          
+
           // Check if the string contains variable references
           if (stringValue.includes('{{') && stringValue.includes('}}')) {
             args.push({
               type: 'variable',
-              value: stringValue
+              value: stringValue,
             });
           } else {
             args.push({
               type: 'string',
-              value: stringValue
+              value: stringValue,
             });
           }
         } else {
@@ -859,11 +885,11 @@ export class VariableResolver {
         }
       }
     }
-    
+
     return {
       pluginName,
       functionName,
-      arguments: args
+      arguments: args,
     };
   }
 
@@ -876,10 +902,10 @@ export class VariableResolver {
     let current = '';
     let inQuotes = false;
     let i = 0;
-    
+
     while (i < argsStr.length) {
       const char = argsStr[i];
-      
+
       if (char === '"' && (i === 0 || argsStr[i - 1] !== '\\')) {
         inQuotes = !inQuotes;
         current += char;
@@ -896,18 +922,18 @@ export class VariableResolver {
       } else {
         current += char;
       }
-      
+
       i++;
     }
-    
+
     // Add the last argument
     if (current.trim()) {
       args.push(current.trim());
     }
-    
+
     return args;
   }
 }
 
 // Singleton instance
-export const variableResolver = new VariableResolver(); 
+export const variableResolver = new VariableResolver();

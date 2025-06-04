@@ -47,4 +47,4 @@ export interface PluginInstance {
   postResponseHooks: PostResponseHook[];
   variableSources: Record<string, VariableSource>;
   parameterizedVariableSources: Record<string, ParameterizedVariableSource>;
-} 
+}

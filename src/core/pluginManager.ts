@@ -4,6 +4,7 @@
  */
 
 import path from 'path';
+import { fileURLToPath } from 'url';
 import {
   Plugin,
   PluginInstance,
@@ -14,9 +15,14 @@ import {
   VariableSource,
   HttpRequest,
   HttpResponse,
-  ParameterizedVariableSource
+  ParameterizedVariableSource,
 } from '../types/plugin.js';
 import { PluginConfiguration } from '../types/config.js';
+
+// Built-in plugins registry
+const BUILTIN_PLUGINS: Record<string, string> = {
+  oauth2: 'oauth2Plugin.js',
+};
 
 export class PluginManager {
   private plugins: PluginInstance[] = [];
@@ -25,10 +31,13 @@ export class PluginManager {
   /**
    * Load and setup plugins from configuration
    */
-  async loadPlugins(pluginConfigs: PluginConfiguration[], configDir: string = process.cwd()): Promise<void> {
+  async loadPlugins(
+    pluginConfigs: PluginConfiguration[],
+    configDir: string = process.cwd()
+  ): Promise<void> {
     // Store global plugin configurations for later merging with API-level configs
     this.globalPluginConfigs = [...pluginConfigs];
-    
+
     for (const pluginConfig of pluginConfigs) {
       await this.loadPlugin(pluginConfig, configDir);
     }
@@ -45,7 +54,7 @@ export class PluginManager {
 
     const mergedConfigs: PluginConfiguration[] = [];
     const globalConfigsMap = new Map<string, PluginConfiguration>();
-    
+
     // Index global configurations by plugin name
     for (const globalConfig of this.globalPluginConfigs) {
       globalConfigsMap.set(globalConfig.name, globalConfig);
@@ -56,7 +65,9 @@ export class PluginManager {
       // T10.5: Validate that API references a globally defined plugin
       const globalConfig = globalConfigsMap.get(apiConfig.name);
       if (!globalConfig) {
-        throw new Error(`API references undefined plugin '${apiConfig.name}'. Plugin must be defined in the global plugins section.`);
+        throw new Error(
+          `API references undefined plugin '${apiConfig.name}'. Plugin must be defined in the global plugins section.`
+        );
       }
 
       // T10.3: Merge configurations (API-level overwrites global keys)
@@ -67,8 +78,8 @@ export class PluginManager {
         name: apiConfig.name,
         config: {
           ...globalConfig.config, // Start with global config
-          ...apiConfig.config     // Override with API-level config
-        }
+          ...apiConfig.config, // Override with API-level config
+        },
       };
 
       mergedConfigs.push(mergedConfig);
@@ -76,7 +87,7 @@ export class PluginManager {
 
     // Add any global plugins not overridden by API-level configs
     for (const globalConfig of this.globalPluginConfigs) {
-      if (!apiPluginConfigs.find(apiConfig => apiConfig.name === globalConfig.name)) {
+      if (!apiPluginConfigs.find((apiConfig) => apiConfig.name === globalConfig.name)) {
         mergedConfigs.push(globalConfig);
       }
     }
@@ -87,12 +98,15 @@ export class PluginManager {
   /**
    * T10.2: Load plugins for a specific API with merged configurations
    */
-  async loadApiPlugins(apiPluginConfigs?: PluginConfiguration[], configDir: string = process.cwd()): Promise<PluginManager> {
+  async loadApiPlugins(
+    apiPluginConfigs?: PluginConfiguration[],
+    configDir: string = process.cwd()
+  ): Promise<PluginManager> {
     const apiPluginManager = new PluginManager();
-    
+
     // Get merged configurations for this API
     const mergedConfigs = this.getMergedPluginConfigurations(apiPluginConfigs);
-    
+
     // If no API-level plugin configurations, we can reuse existing plugin instances
     if (!apiPluginConfigs || apiPluginConfigs.length === 0) {
       // Copy all existing plugin instances to the new manager
@@ -100,10 +114,10 @@ export class PluginManager {
       apiPluginManager.globalPluginConfigs = [...this.globalPluginConfigs];
       return apiPluginManager;
     }
-    
+
     // Create a map of API-level plugin names for quick lookup
-    const apiPluginNames = new Set(apiPluginConfigs.map(config => config.name));
-    
+    const apiPluginNames = new Set(apiPluginConfigs.map((config) => config.name));
+
     // For each merged config, either copy existing plugin or load with new config
     for (const mergedConfig of mergedConfigs) {
       if (apiPluginNames.has(mergedConfig.name)) {
@@ -111,7 +125,7 @@ export class PluginManager {
         await apiPluginManager.loadPlugin(mergedConfig, configDir);
       } else {
         // This plugin is global-only, copy the existing instance
-        const existingPlugin = this.plugins.find(p => p.name === mergedConfig.name);
+        const existingPlugin = this.plugins.find((p) => p.name === mergedConfig.name);
         if (existingPlugin) {
           apiPluginManager.plugins.push(existingPlugin);
         } else {
@@ -120,46 +134,66 @@ export class PluginManager {
         }
       }
     }
-    
+
     return apiPluginManager;
   }
 
   /**
    * Load a single plugin from configuration
    * T10.7: Support loading from both local files and npm packages
+   * Support for built-in plugins (e.g., oauth2)
    */
   async loadPlugin(pluginConfig: PluginConfiguration, configDir: string): Promise<void> {
     try {
       let pluginPath: string;
       let pluginSource: string;
 
-      // Validate that either path or npmPackage is specified
-      if (!pluginConfig.path && !pluginConfig.npmPackage) {
-        throw new Error(`Plugin '${pluginConfig.name}' must specify either 'path' or 'npmPackage'`);
-      }
+      // Check if this is a built-in plugin first
+      if (BUILTIN_PLUGINS[pluginConfig.name] && !pluginConfig.path && !pluginConfig.npmPackage) {
+        // Load built-in plugin
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
 
-      if (pluginConfig.path && pluginConfig.npmPackage) {
-        throw new Error(`Plugin '${pluginConfig.name}' cannot specify both 'path' and 'npmPackage'`);
-      }
-
-      // T10.7: Handle npm package loading
-      if (pluginConfig.npmPackage) {
-        pluginPath = pluginConfig.npmPackage;
-        pluginSource = `npm package '${pluginConfig.npmPackage}'`;
+        // In development: src/core/pluginManager.ts -> src/plugins/
+        // In built: dist/core/pluginManager.js -> dist/plugins/
+        const pluginsDir = path.resolve(__dirname, '..', 'plugins');
+        pluginPath = path.join(pluginsDir, BUILTIN_PLUGINS[pluginConfig.name]);
+        pluginSource = `built-in plugin '${pluginConfig.name}'`;
       } else {
-        // Handle local file loading
-        pluginPath = path.resolve(configDir, pluginConfig.path!);
-        pluginSource = `local file '${pluginPath}'`;
+        // Validate that either path or npmPackage is specified for non-built-in plugins
+        if (!pluginConfig.path && !pluginConfig.npmPackage) {
+          throw new Error(
+            `Plugin '${pluginConfig.name}' must specify either 'path' or 'npmPackage', or be a built-in plugin`
+          );
+        }
+
+        if (pluginConfig.path && pluginConfig.npmPackage) {
+          throw new Error(
+            `Plugin '${pluginConfig.name}' cannot specify both 'path' and 'npmPackage'`
+          );
+        }
+
+        // T10.7: Handle npm package loading
+        if (pluginConfig.npmPackage) {
+          pluginPath = pluginConfig.npmPackage;
+          pluginSource = `npm package '${pluginConfig.npmPackage}'`;
+        } else {
+          // Handle local file loading
+          pluginPath = path.resolve(configDir, pluginConfig.path!);
+          pluginSource = `local file '${pluginPath}'`;
+        }
       }
-      
+
       // Dynamic import of the plugin module
       const pluginModule = await import(pluginPath);
-      
+
       // Get the plugin object (could be default export or named export)
       const plugin: Plugin = pluginModule.default || pluginModule;
-      
+
       if (!plugin || typeof plugin.setup !== 'function') {
-        throw new Error(`Plugin from ${pluginSource} does not export a valid Plugin object with a setup method`);
+        throw new Error(
+          `Plugin from ${pluginSource} does not export a valid Plugin object with a setup method`
+        );
       }
 
       // Create plugin instance
@@ -170,7 +204,7 @@ export class PluginManager {
         preRequestHooks: [],
         postResponseHooks: [],
         variableSources: {},
-        parameterizedVariableSources: {}
+        parameterizedVariableSources: {},
       };
 
       // Create context for plugin setup
@@ -187,9 +221,12 @@ export class PluginManager {
         registerVariableSource: (name: string, source: VariableSource) => {
           pluginInstance.variableSources[name] = source;
         },
-        registerParameterizedVariableSource: (name: string, source: ParameterizedVariableSource) => {
+        registerParameterizedVariableSource: (
+          name: string,
+          source: ParameterizedVariableSource
+        ) => {
           pluginInstance.parameterizedVariableSources[name] = source;
-        }
+        },
       };
 
       // Call plugin setup
@@ -197,14 +234,20 @@ export class PluginManager {
 
       // Add to loaded plugins
       this.plugins.push(pluginInstance);
-      
+
       // Use process.stderr.write instead of console.debug to avoid polluting stdout
       if (process.env.NODE_ENV === 'development') {
-        process.stderr.write(`[PluginManager] Loaded plugin '${pluginConfig.name}' from ${pluginSource}\n`);
+        process.stderr.write(
+          `[PluginManager] Loaded plugin '${pluginConfig.name}' from ${pluginSource}\n`
+        );
       }
     } catch (error) {
-      const source = pluginConfig.npmPackage ? `npm package '${pluginConfig.npmPackage}'` : `local file '${pluginConfig.path}'`;
-      throw new Error(`Failed to load plugin '${pluginConfig.name}' from ${source}: ${error instanceof Error ? error.message : String(error)}`);
+      const source = pluginConfig.npmPackage
+        ? `npm package '${pluginConfig.npmPackage}'`
+        : `local file '${pluginConfig.path}'`;
+      throw new Error(
+        `Failed to load plugin '${pluginConfig.name}' from ${source}: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -217,7 +260,9 @@ export class PluginManager {
         try {
           await hook(request);
         } catch (error) {
-          throw new Error(`Pre-request hook failed in plugin '${pluginInstance.name}': ${error instanceof Error ? error.message : String(error)}`);
+          throw new Error(
+            `Pre-request hook failed in plugin '${pluginInstance.name}': ${error instanceof Error ? error.message : String(error)}`
+          );
         }
       }
     }
@@ -232,7 +277,9 @@ export class PluginManager {
         try {
           await hook(request, response);
         } catch (error) {
-          throw new Error(`Post-response hook failed in plugin '${pluginInstance.name}': ${error instanceof Error ? error.message : String(error)}`);
+          throw new Error(
+            `Post-response hook failed in plugin '${pluginInstance.name}': ${error instanceof Error ? error.message : String(error)}`
+          );
         }
       }
     }
@@ -243,11 +290,11 @@ export class PluginManager {
    */
   getVariableSources(): Record<string, Record<string, VariableSource>> {
     const allSources: Record<string, Record<string, VariableSource>> = {};
-    
+
     for (const pluginInstance of this.plugins) {
       allSources[pluginInstance.name] = pluginInstance.variableSources;
     }
-    
+
     return allSources;
   }
 
@@ -256,11 +303,11 @@ export class PluginManager {
    */
   getParameterizedVariableSources(): Record<string, Record<string, ParameterizedVariableSource>> {
     const allSources: Record<string, Record<string, ParameterizedVariableSource>> = {};
-    
+
     for (const pluginInstance of this.plugins) {
       allSources[pluginInstance.name] = pluginInstance.parameterizedVariableSources;
     }
-    
+
     return allSources;
   }
 
@@ -277,4 +324,4 @@ export class PluginManager {
   getPlugins(): PluginInstance[] {
     return [...this.plugins];
   }
-} 
+}

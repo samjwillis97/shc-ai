@@ -273,4 +273,41 @@
 
 ---
 
+## Phase 11: OAuth2 Authentication (V1 Addition)
+
+- **Goal:** Implement comprehensive OAuth2 authentication support as a built-in plugin for HttpCraft v1 release.
+- **Tasks:**
+  - **T11.1:** Research OAuth2 specification and common provider implementations (Auth0, Azure AD, Google, Okta).
+    - _Testable Outcome:_ OAuth2 flows and provider requirements documented.
+  - **T11.2:** Design OAuth2 plugin architecture compatible with existing plugin system.
+    - _Testable Outcome:_ Plugin interface supports OAuth2 requirements.
+  - **T11.3:** Implement OAuth2 Client Credentials Grant flow for server-to-server authentication.
+    - _Testable Outcome:_ Plugin can obtain access tokens using client credentials.
+  - **T11.4:** Implement OAuth2 Authorization Code Grant flow with PKCE support for user authentication.
+    - _Testable Outcome:_ Plugin can exchange authorization codes for access tokens.
+  - **T11.5:** Implement OAuth2 Refresh Token Grant flow for automatic token renewal.
+    - _Testable Outcome:_ Plugin can refresh expired access tokens.
+  - **T11.6:** Implement intelligent token caching with expiration handling.
+    - _Testable Outcome:_ Tokens are cached and automatically renewed before expiration.
+  - **T11.7:** Add support for multiple authentication methods (Basic and POST).
+    - _Testable Outcome:_ Plugin supports both client authentication methods.
+  - **T11.8:** Integrate OAuth2 plugin with variable system for manual token access.
+    - _Testable Outcome:_ Tokens accessible via `{{plugins.oauth2.accessToken}}` syntax.
+  - **T11.9:** Implement parameterized functions for dynamic scope management.
+    - _Testable Outcome:_ `{{plugins.oauth2.getTokenWithScope('scope')}}` works correctly.
+  - **T11.10:** Add security features including token masking in verbose output.
+    - _Testable Outcome:_ Tokens are masked in logs and dry-run output.
+  - **T11.11:** Create comprehensive documentation and examples for major OAuth2 providers.
+    - _Testable Outcome:_ Documentation covers Auth0, Azure AD, Google, Okta configurations.
+  - **T11.12:** Implement comprehensive unit and integration tests for OAuth2 plugin.
+    - _Testable Outcome:_ 45+ test cases covering all OAuth2 flows and error scenarios.
+  - **T11.13:** Ensure seamless integration with existing HttpCraft features (chains, profiles, API-level config).
+    - _Testable Outcome:_ OAuth2 works correctly with all existing features.
+
+---
+
+This more detailed breakdown provides a comprehensive OAuth2 implementation that addresses enterprise authentication needs while maintaining HttpCraft's plugin-driven architecture. The OAuth2 plugin is production-ready and supports the most common authentication scenarios required by modern API consumers.
+
+---
+
 This more detailed breakdown should provide clearer, individually testable steps. The multiple profile loading logic is now integrated into Phase 4. Remember that some tasks might spawn sub-tasks as you get into the implementation details. Good luck!

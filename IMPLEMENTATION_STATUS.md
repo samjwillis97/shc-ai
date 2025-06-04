@@ -339,3 +339,58 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   All profile name completion functionality working correctly with 23 unit tests + 24 integration tests passing. T10.16 implementation complete!
 
 ---
+
+## Phase 11: OAuth2 Authentication (V1 Addition)
+
+- **Goal:** Implement comprehensive OAuth2 authentication support as a built-in plugin for HttpCraft v1 release.
+- **Status:** [x] **COMPLETED - Ready for Distribution**
+- **Tasks:**
+  - [x] **T11.1:** Research OAuth2 specification and common provider implementations.
+  - [x] **T11.2:** Design OAuth2 plugin architecture compatible with existing plugin system.
+  - [x] **T11.3:** Implement OAuth2 Client Credentials Grant flow.
+  - [x] **T11.4:** Implement OAuth2 Authorization Code Grant flow with PKCE support.
+  - [x] **T11.5:** Implement OAuth2 Refresh Token Grant flow.
+  - [x] **T11.6:** Implement intelligent token caching with expiration handling.
+  - [x] **T11.7:** Add support for multiple authentication methods (Basic and POST).
+  - [x] **T11.8:** Integrate OAuth2 plugin with variable system.
+  - [x] **T11.9:** Implement parameterized functions for dynamic scope management.
+  - [x] **T11.10:** Add security features including token masking.
+  - [x] **T11.11:** Create comprehensive documentation and examples.
+  - [x] **T11.12:** Implement comprehensive unit and integration tests.
+  - [x] **T11.13:** Ensure seamless integration with existing HttpCraft features.
+  - [x] **T11.14:** **DISTRIBUTION READY:** Convert to TypeScript and implement as built-in plugin for global distribution.
+- **Implementation Details:**
+  - **OAuth2 Plugin:** Created `src/plugins/oauth2Plugin.ts` with TypeScript support for all OAuth2 flows
+  - **Built-in Plugin System:** Enhanced PluginManager to support built-in plugins bundled with HttpCraft
+  - **Distribution Ready:** OAuth2 plugin compiles to `dist/plugins/oauth2Plugin.js` and is included in npm package
+  - **Usage:** Simply specify `name: "oauth2"` in plugin configuration - no path required
+  - **Grant Types Supported:**
+    - Client Credentials Grant (server-to-server authentication)
+    - Authorization Code Grant (user authentication with PKCE support)
+    - Refresh Token Grant (automatic token renewal)
+  - **Features Implemented:**
+    - Automatic token management with intelligent caching
+    - Token expiration handling with safety margins
+    - Multiple authentication methods (Basic Auth and POST)
+    - Variable integration: `{{plugins.oauth2.accessToken}}`, `{{plugins.oauth2.tokenType}}`
+    - Parameterized functions: `{{plugins.oauth2.getTokenWithScope('scope')}}`
+    - API-level configuration overrides
+    - Comprehensive error handling and debugging
+    - Security features including token masking in verbose output
+  - **Provider Support:** Tested configurations for Auth0, Azure AD, Google OAuth2, Okta
+  - **Documentation:** 
+    - Complete OAuth2 documentation in `docs/oauth2-plugin.md`
+    - Quick start guide in `docs/OAUTH2_QUICKSTART.md`
+    - README.md integration with OAuth2 section and built-in plugin usage
+    - Working example: `examples/oauth2_builtin_example.yaml`
+  - **Testing:** Full unit test suite in `tests/unit/oauth2Plugin.test.ts` (45+ test cases)
+  - **Integration:** Seamless integration with existing plugin system, variable resolution, and chain execution
+  - **Package Configuration:** Updated `package.json` to include `dist/**/*` ensuring plugins are distributed
+- **Distribution Methods:**
+  1. **Built Version:** `npm run build` - OAuth2 plugin available at `dist/plugins/oauth2Plugin.js`
+  2. **Global npm Installation:** `npm install -g httpcraft` - Built-in OAuth2 plugin included
+  3. **Local npm Installation:** `npm install httpcraft` - Built-in OAuth2 plugin included
+  4. **Node Package:** All distributions include OAuth2 as built-in plugin accessible via `name: "oauth2"`
+- **V1 Ready:** ✅ OAuth2 authentication is now available as a built-in plugin for the v1 release, addressing enterprise authentication needs while maintaining HttpCraft's plugin-driven architecture. No external files or configuration required - works out of the box with any HttpCraft installation.
+
+---

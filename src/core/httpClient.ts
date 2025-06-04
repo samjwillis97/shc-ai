@@ -23,7 +23,7 @@ export class HttpClient {
       // Create a mutable copy of the request for plugins to modify
       const mutableRequest: HttpRequest = {
         ...request,
-        headers: { ...request.headers }
+        headers: { ...request.headers },
       };
 
       // Execute pre-request hooks from plugins (T7.3 and T7.6)
@@ -70,4 +70,4 @@ export class HttpClient {
 }
 
 // Singleton instance
-export const httpClient = new HttpClient(); 
+export const httpClient = new HttpClient();

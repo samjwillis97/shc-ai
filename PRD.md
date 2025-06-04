@@ -205,14 +205,35 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
 - Interactive REPL mode.
 - Built-in response assertion/testing framework capabilities (e.g., `expect_status`).
 - Advanced/UI-driven file upload handling (though basic body content from a file path might be considered if simple).
-- Built-in complex authentication flows (e.g., full OAuth2 client credential grant UIs/prompts). Basic mechanisms or plugin-driven auth are in scope.
 - Advanced output templating/formatting beyond raw body or verbose structured data.
 - Concurrency within chain steps.
 - Tool behavior profiles (distinct from variable profiles).
 - Import/Export from/to other formats like Postman collections or OpenAPI specifications (though OpenAPI can inspire schema design).
 - Graphical User Interface (GUI).
 
-## 8. Future Considerations (Post-V1)
+## 8. V1 Authentication Support
+
+HttpCraft v1 includes comprehensive OAuth2 authentication support through the built-in plugin system:
+
+### OAuth2 Plugin Features
+- **Multiple Grant Types**: Client Credentials, Authorization Code, and Refresh Token flows
+- **Automatic Token Management**: Intelligent caching, expiration handling, and renewal
+- **Provider Support**: Ready-to-use configurations for Auth0, Azure AD, Google OAuth2, Okta
+- **Security Features**: Token masking in verbose output, PKCE support for enhanced security
+- **Integration**: Seamless integration with variable system, profiles, and request chains
+- **Flexibility**: API-level configuration overrides and dynamic scope management
+
+### Implementation Approach
+OAuth2 authentication is implemented as a **built-in plugin** that ships with HttpCraft v1, maintaining the clean plugin-driven architecture while providing out-of-the-box OAuth2 support. This approach allows users to:
+
+1. **Quick Setup**: Use OAuth2 immediately without additional plugin development
+2. **Standard Compliance**: Full RFC 6749 OAuth2 specification compliance
+3. **Extensibility**: Customize and extend OAuth2 behavior through the plugin system
+4. **Provider Flexibility**: Support for any OAuth2-compliant provider
+
+This satisfies the user story **US6 (Custom Authentication)** by providing a robust, production-ready OAuth2 solution while maintaining the flexibility for custom authentication schemes through the plugin system.
+
+## 9. Future Considerations (Post-V1)
 
 - Many items listed in "Out of Scope (for V1)" are prime candidates for future versions.
 - Support for other shell completions (e.g., Bash, Fish).
@@ -220,7 +241,7 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
 - Conditional logic within chains (`run_if` conditions for steps).
 - Looping/iteration constructs within chains.
 
-## 9. Success Metrics (Examples)
+## 10. Success Metrics (Examples)
 
 - Adoption rate by target users.
 - Positive feedback regarding ease of use and CLI ergonomics.

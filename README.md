@@ -16,6 +16,7 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
 - **🏃 Dry run mode**: Preview requests without sending them
 - **🔐 Secret management**: Secure handling of API keys and tokens
 - **🎯 Exit code control**: Scriptable with controllable exit codes
+- **🔐 OAuth2 Authentication**: Built-in support for multiple OAuth2 flows
 
 ## 📦 Installation
 
@@ -618,4 +619,589 @@ httpcraft --get-api-names
 
 ## 🤝 Contributing
 
-[Contributing guidelines here] 
+[Contributing guidelines here]
+
+## 🔐 OAuth2 Authentication
+
+HttpCraft includes built-in OAuth2 authentication support that works seamlessly with the plugin system:
+
+### Built-in OAuth2 Plugin
+
+The OAuth2 plugin is included with HttpCraft - no need to install or reference external files:
+
+```yaml
+plugins:
+  # OAuth2 as built-in plugin - no path required!
+  - name: "oauth2"
+    config:
+      grantType: "client_credentials"
+      tokenUrl: "https://auth.example.com/oauth2/token"
+      clientId: "{{env.OAUTH2_CLIENT_ID}}"
+      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
+      scope: "api:read api:write"
+      authMethod: "basic"
+
+apis:
+  protectedApi:
+    baseUrl: "https://api.example.com/v1"
+    endpoints:
+      getUsers:
+        method: GET
+        path: "/users"
+        # Authorization header automatically added by OAuth2 plugin
+```
+
+### OAuth2 Grant Types
+
+- **Client Credentials**: Server-to-server authentication
+- **Authorization Code**: User authentication with PKCE support  
+- **Refresh Token**: Automatic token renewal
+
+### OAuth2 Providers
+
+Ready-to-use configurations for major providers:
+
+#### Auth0
+```yaml
+plugins:
+  - name: "oauth2"
+    config:
+      grantType: "client_credentials"
+      tokenUrl: "https://{{env.AUTH0_DOMAIN}}/oauth/token"
+      clientId: "{{env.AUTH0_CLIENT_ID}}"
+      clientSecret: "{{secret.AUTH0_CLIENT_SECRET}}"
+      scope: "read:users write:users"
+      authMethod: "post"
+```
+
+#### Azure AD
+```yaml
+plugins:
+  - name: "oauth2"
+    config:
+      grantType: "client_credentials"
+      tokenUrl: "https://login.microsoftonline.com/{{env.AZURE_TENANT_ID}}/oauth2/v2.0/token"
+      clientId: "{{env.AZURE_CLIENT_ID}}"
+      clientSecret: "{{secret.AZURE_CLIENT_SECRET}}"
+      scope: "https://graph.microsoft.com/.default"
+```
+
+#### Google OAuth2
+```yaml
+plugins:
+  - name: "oauth2"
+    config:
+      grantType: "client_credentials"
+      tokenUrl: "https://oauth2.googleapis.com/token"
+      clientId: "{{env.GOOGLE_CLIENT_ID}}"
+      clientSecret: "{{secret.GOOGLE_CLIENT_SECRET}}"
+      scope: "https://www.googleapis.com/auth/cloud-platform"
+```
+
+### Manual Token Access
+
+Access tokens directly in your configurations:
+
+```yaml
+apis:
+  manualApi:
+    baseUrl: "https://api.example.com"
+    endpoints:
+      getData:
+        method: GET
+        path: "/data"
+        headers:
+          # Use plugin variables directly
+          Authorization: "{{plugins.oauth2.tokenType}} {{plugins.oauth2.accessToken}}"
+      
+      getAdminData:
+        method: GET
+        path: "/admin"
+        headers:
+          # Use parameterized functions for custom scopes
+          Authorization: "Bearer {{plugins.oauth2.getTokenWithScope('admin:read')}}"
+```
+
+### Features
+
+- **Automatic Token Management**: Intelligent caching and renewal
+- **Provider Support**: Works with any OAuth2-compliant provider
+- **Security**: Token masking in logs and dry-run output
+- **Flexibility**: API-level configuration overrides
+- **Integration**: Seamless integration with profiles, variables, and chains
+
+See `examples/oauth2_builtin_example.yaml` for a complete working example.
+
+## 🚀 Quick Start
+
+### 1. Create Configuration
+
+Create `.httpcraft.yaml` in your project directory:
+
+```yaml
+profiles:
+  dev:
+    baseUrl: "https://dev-api.example.com"
+  prod:
+    baseUrl: "https://api.example.com"
+
+apis:
+  jsonplaceholder:
+    baseUrl: "{{profile.baseUrl}}/v1"
+    endpoints:
+      getTodos:
+        method: GET
+        path: "/todos"
+      
+      getTodo:
+        method: GET
+        path: "/todos/{{todoId}}"
+      
+      createTodo:
+        method: POST
+        path: "/todos"
+        headers:
+          Content-Type: "application/json"
+        body:
+          title: "{{title}}"
+          completed: false
+```
+
+### 2. Make Requests
+
+```bash
+# Basic request
+httpcraft jsonplaceholder getTodos
+
+# With variables
+httpcraft jsonplaceholder getTodo --var todoId=1
+
+# With profile
+httpcraft --profile dev jsonplaceholder getTodos
+
+# Create a todo
+httpcraft jsonplaceholder createTodo --var title="Test Todo"
+```
+
+### 3. Use Verbose Mode
+
+```bash
+# See request/response details
+httpcraft --verbose jsonplaceholder getTodos
+
+# Dry run (see what would be sent)
+httpcraft --dry-run jsonplaceholder getTodos
+```
+
+## 📋 Configuration Structure
+
+```yaml
+# Global configuration
+config:
+  defaultProfile: "dev"
+
+# Environment profiles
+profiles:
+  dev:
+    api_base: "https://dev-api.example.com"
+    debug: true
+  prod:
+    api_base: "https://api.example.com"
+    debug: false
+
+# Global variables
+variables:
+  - "globals.yaml"
+
+# Plugin configuration
+plugins:
+  - path: "./plugins/auth.js"
+    name: "customAuth"
+    config:
+      apiKey: "{{secret.API_KEY}}"
+
+# API definitions
+apis:
+  myService:
+    baseUrl: "{{profile.api_base}}"
+    headers:
+      User-Agent: "HttpCraft/1.0"
+    variables:
+      version: "v1"
+    endpoints:
+      getUsers:
+        method: GET
+        path: "/{{version}}/users"
+
+# Request chains
+chains:
+  userWorkflow:
+    vars:
+      email: "test@example.com"
+    steps:
+      - id: createUser
+        call: myService.createUser
+      - id: getUser
+        call: myService.getUser
+        with:
+          pathParams:
+            userId: "{{steps.createUser.response.body.id}}"
+```
+
+## 🔗 Request Chaining
+
+Chain multiple requests together with data passing:
+
+```yaml
+chains:
+  userRegistration:
+    description: "Complete user registration flow"
+    vars:
+      email: "user@example.com"
+      password: "secure123"
+    
+    steps:
+      - id: register
+        call: auth.register
+        with:
+          body:
+            email: "{{email}}"
+            password: "{{password}}"
+      
+      - id: login
+        call: auth.login
+        with:
+          body:
+            email: "{{email}}"
+            password: "{{password}}"
+      
+      - id: getProfile
+        call: users.getProfile
+        with:
+          headers:
+            Authorization: "Bearer {{steps.login.response.body.token}}"
+      
+      - id: updateProfile
+        call: users.updateProfile
+        with:
+          headers:
+            Authorization: "Bearer {{steps.login.response.body.token}}"
+          body:
+            name: "{{steps.getProfile.response.body.name}}"
+            verified: true
+```
+
+```bash
+# Execute the chain
+httpcraft chain userRegistration
+
+# Chain with verbose output
+httpcraft chain userRegistration --chain-output full
+```
+
+## 🧩 Variable System
+
+HttpCraft provides a powerful variable system with multiple scopes and precedence:
+
+### Variable Precedence (highest to lowest)
+1. CLI arguments (`--var key=value`)
+2. Step `with` overrides (in chains)
+3. Chain variables
+4. Endpoint variables
+5. API variables
+6. Profile variables
+7. Global variable files
+8. Plugin variables
+9. Secret variables (`{{secret.KEY}}`)
+10. Environment variables (`{{env.KEY}}`)
+11. Dynamic variables (`{{$timestamp}}`)
+
+### Built-in Dynamic Variables
+- `{{$timestamp}}` - Unix timestamp
+- `{{$isoTimestamp}}` - ISO 8601 timestamp
+- `{{$randomInt}}` - Random integer
+- `{{$guid}}` - UUID v4
+
+### Examples
+
+```bash
+# Override variables from CLI
+httpcraft myApi getUser --var userId=123 --var format=json
+
+# Use environment variables
+export USER_ID=456
+httpcraft myApi getUser  # Uses {{env.USER_ID}}
+
+# Use secrets (masked in logs)
+export API_SECRET=secret123
+httpcraft myApi secureEndpoint  # Uses {{secret.API_SECRET}}
+```
+
+## 🔌 Plugin System
+
+Extend HttpCraft with custom plugins for authentication, response transformation, and more:
+
+### Example Plugin
+
+```javascript
+// plugins/customAuth.js
+export default {
+  async setup(context) {
+    // Pre-request hook
+    context.registerPreRequestHook(async (request) => {
+      const token = await getApiToken(context.config.apiKey);
+      request.headers['Authorization'] = `Bearer ${token}`;
+    });
+    
+    // Custom variables
+    context.registerVariableSource('apiToken', async () => {
+      return await getApiToken(context.config.apiKey);
+    });
+    
+    // Post-response hook
+    context.registerPostResponseHook(async (request, response) => {
+      if (response.headers['content-type']?.includes('xml')) {
+        response.body = convertXmlToJson(response.body);
+      }
+    });
+  }
+};
+```
+
+### Plugin Configuration
+
+```yaml
+plugins:
+  - path: "./plugins/customAuth.js"
+    name: "auth"
+    config:
+      apiKey: "{{secret.API_KEY}}"
+      timeout: 30000
+
+apis:
+  secureApi:
+    baseUrl: "https://secure-api.example.com"
+    plugins:
+      - name: "auth"
+        config:
+          # Override plugin config for this API
+          timeout: 60000
+```
+
+## 🏗️ ZSH Tab Completion
+
+Enable intelligent tab completion for faster workflows:
+
+### Setup
+
+```bash
+# Generate completion script
+httpcraft completion zsh > ~/.zsh/completions/_httpcraft
+
+# Add to .zshrc
+echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+
+# Reload shell
+source ~/.zshrc
+```
+
+### Usage
+
+```bash
+httpcraft <TAB>              # Complete API names
+httpcraft myApi <TAB>        # Complete endpoint names
+httpcraft --profile <TAB>    # Complete profile names
+httpcraft chain <TAB>        # Complete chain names
+```
+
+## 📊 Output Options
+
+### Default Output
+Raw response body sent to `stdout` (perfect for piping):
+
+```bash
+httpcraft api getUsers | jq '.[] | .name'
+```
+
+### Verbose Output
+Detailed request/response information to `stderr`:
+
+```bash
+httpcraft --verbose api getUsers
+```
+
+### Dry Run
+See what would be sent without making the request:
+
+```bash
+httpcraft --dry-run api getUsers
+```
+
+### Chain Output
+Structured JSON output for chains:
+
+```bash
+httpcraft chain workflow --chain-output full | jq .
+```
+
+## 🐛 Error Handling
+
+### Exit Codes
+- `0`: Success (including HTTP 4xx/5xx by default)
+- `1`: Tool errors, configuration errors, network failures
+
+### Custom Exit Codes
+```bash
+# Exit with non-zero for HTTP errors
+httpcraft --exit-on-http-error 4xx,5xx api getUsers
+```
+
+### Debugging
+```bash
+# Verbose mode shows request/response details
+httpcraft --verbose api getUsers
+
+# Dry run shows resolved configuration
+httpcraft --dry-run api getUsers
+
+# Check configuration loading
+httpcraft --get-api-names
+httpcraft --get-endpoint-names myApi
+```
+
+## 📁 Project Structure
+
+```
+.httpcraft.yaml          # Main configuration
+apis/                    # Modular API definitions
+  auth.yaml
+  users.yaml
+chains/                  # Modular chain definitions
+  workflows.yaml
+plugins/                 # Custom plugins
+  oauth.js
+  transforms.js
+variables/               # Global variables
+  environments.yaml
+  secrets.yaml
+```
+
+## 🔧 Development
+
+### Prerequisites
+- Node.js 18+
+- npm
+
+### Setup
+```bash
+git clone <repository>
+cd httpcraft
+npm install
+npm run build
+```
+
+### Testing
+```bash
+npm test
+npm run test:integration
+```
+
+### Development Environment (Nix)
+```bash
+nix develop
+```
+
+## 📚 Advanced Examples
+
+### Multi-Environment Setup
+
+```yaml
+profiles:
+  dev:
+    auth_url: "https://dev-auth.example.com"
+    api_url: "https://dev-api.example.com"
+  staging:
+    auth_url: "https://staging-auth.example.com"
+    api_url: "https://staging-api.example.com"
+  prod:
+    auth_url: "https://auth.example.com"
+    api_url: "https://api.example.com"
+
+plugins:
+  - name: "oauth2"
+    config:
+      tokenUrl: "{{profile.auth_url}}/oauth2/token"
+      clientId: "{{env.CLIENT_ID}}"
+      clientSecret: "{{secret.CLIENT_SECRET}}"
+
+apis:
+  users:
+    baseUrl: "{{profile.api_url}}/v1"
+    plugins:
+      - name: "oauth2"
+```
+
+### Complex Workflow Chain
+
+```yaml
+chains:
+  deploymentTest:
+    description: "End-to-end deployment testing"
+    vars:
+      version: "1.2.3"
+      environment: "staging"
+    
+    steps:
+      - id: healthCheck
+        call: monitoring.health
+      
+      - id: deploy
+        call: deployment.deploy
+        with:
+          body:
+            version: "{{version}}"
+            environment: "{{environment}}"
+      
+      - id: waitForDeployment
+        call: deployment.status
+        with:
+          pathParams:
+            deployId: "{{steps.deploy.response.body.id}}"
+      
+      - id: smokeTest
+        call: testing.smokeTest
+        with:
+          body:
+            deploymentId: "{{steps.deploy.response.body.id}}"
+            tests: ["api", "database", "cache"]
+      
+      - id: notifySuccess
+        call: notifications.slack
+        with:
+          body:
+            message: "Deployment {{version}} to {{environment}} completed successfully"
+            results: "{{steps.smokeTest.response.body}}"
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## 📄 License
+
+[License details here]
+
+## 🆘 Support
+
+- [Documentation](docs/)
+- [GitHub Issues](https://github.com/your-repo/issues)
+- [Examples](examples/)
+
+---
+
+**HttpCraft** - Making HTTP testing simple, powerful, and enjoyable! 🚀 
