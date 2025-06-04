@@ -311,3 +311,43 @@ This more detailed breakdown provides a comprehensive OAuth2 implementation that
 ---
 
 This more detailed breakdown should provide clearer, individually testable steps. The multiple profile loading logic is now integrated into Phase 4. Remember that some tasks might spawn sub-tasks as you get into the implementation details. Good luck!
+
+## Phase 12: Test Reliability & Production Readiness
+
+- **Goal:** Fix remaining test failures and improve test reliability for production readiness.
+- **Tasks:**
+  - **T12.1:** **[HIGH PRIORITY]** Replace external HTTP service dependencies with local mock server for integration tests.
+    - _Issue:_ 20+ integration tests failing due to httpbin.org returning HTTP 503 errors instead of expected JSON responses.
+    - _Testable Outcome:_ All integration tests pass consistently without relying on external services.
+  - **T12.2:** **[HIGH PRIORITY]** Fix YAML configuration generation in parameterized plugin function tests.
+    - _Issue:_ Tests generating malformed YAML configs with quote escaping and indentation problems.
+    - _Testable Outcome:_ Dynamic test configurations generate valid YAML that passes parsing.
+  - **T12.3:** **[MEDIUM PRIORITY]** Improve chain execution test reliability and error handling expectations.
+    - _Issue:_ Chain tests have inconsistent exit code expectations and service-dependent failures.
+    - _Testable Outcome:_ Chain execution tests pass reliably with proper error handling scenarios.
+  - **T12.4:** **[MEDIUM PRIORITY]** Fix exit-on-http-error test expectations and error message patterns.
+    - _Issue:_ Tests expecting specific error message formats that don't match actual output.
+    - _Testable Outcome:_ Exit-on-http-error functionality tests pass with correct error expectations.
+  - **T12.5:** **[MEDIUM PRIORITY]** Implement robust test cleanup and isolation for integration tests.
+    - _Issue:_ Some integration tests may interfere with each other due to temp file cleanup issues.
+    - _Testable Outcome:_ All integration tests run independently without side effects.
+  - **T12.6:** **[LOW PRIORITY]** Add retry logic and fallback handling for external service availability in tests.
+    - _Issue:_ Tests fail when external services are temporarily unavailable.
+    - _Testable Outcome:_ Tests have graceful fallback when external services are unreachable.
+  - **T12.7:** **[LOW PRIORITY]** Optimize test execution performance and reduce external dependencies.
+    - _Issue:_ Test suite takes considerable time due to real HTTP requests.
+    - _Testable Outcome:_ Test suite runs faster with improved mocking strategies.
+  - **T12.8:** **[CLEANUP]** Code review, cleanup, and minor performance optimizations.
+    - _Issue:_ Final code quality improvements before v1.0 release.
+    - _Testable Outcome:_ Code meets production quality standards.
+  - **T12.9:** **[RELEASE]** Prepare for V1.0 release with version bump and changelog.
+    - _Issue:_ Final release preparation tasks.
+    - _Testable Outcome:_ V1.0 release is ready for distribution.
+
+---
+
+This more detailed breakdown provides a comprehensive OAuth2 implementation that addresses enterprise authentication needs while maintaining HttpCraft's plugin-driven architecture. The OAuth2 plugin is production-ready and supports the most common authentication scenarios required by modern API consumers.
+
+---
+
+This more detailed breakdown should provide clearer, individually testable steps. The multiple profile loading logic is now integrated into Phase 4. Remember that some tasks might spawn sub-tasks as you get into the implementation details. Good luck!
