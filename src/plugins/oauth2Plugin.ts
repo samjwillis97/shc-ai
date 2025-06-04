@@ -96,6 +96,11 @@ const plugin: Plugin = {
 
 export default plugin;
 
+// Export cache clearing function for testing
+export function clearTokenCache(): void {
+  tokenCache.clear();
+}
+
 /**
  * Main function to get access token based on configured flow
  */
