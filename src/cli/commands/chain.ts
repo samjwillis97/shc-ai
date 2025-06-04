@@ -100,7 +100,8 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
       mergedProfileVars,
       args.verbose || false,
       args.dryRun || false,
-      pluginManager
+      pluginManager,
+      path.dirname(configPath)
     );
     
     // Handle execution result

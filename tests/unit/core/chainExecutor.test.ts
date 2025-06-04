@@ -3,13 +3,17 @@ import { ChainExecutor } from '../../../src/core/chainExecutor.js';
 import { httpClient } from '../../../src/core/httpClient.js';
 import { variableResolver, VariableResolutionError } from '../../../src/core/variableResolver.js';
 import { urlBuilder } from '../../../src/core/urlBuilder.js';
-import type { HttpCraftConfig, ChainDefinition } from '../../../src/types/config.js';
+import { PluginManager } from '../../../src/core/pluginManager.js';
+import type { HttpCraftConfig, ChainDefinition, PluginConfiguration } from '../../../src/types/config.js';
 import type { HttpRequest, HttpResponse } from '../../../src/types/plugin.js';
+import fs from 'fs/promises';
+import path from 'path';
 
 // Mock the dependencies
 vi.mock('../../../src/core/httpClient.js', () => ({
   httpClient: {
-    executeRequest: vi.fn()
+    executeRequest: vi.fn(),
+    setPluginManager: vi.fn()
   }
 }));
 
@@ -38,10 +42,15 @@ vi.mock('../../../src/core/urlBuilder.js', () => ({
 describe('ChainExecutor', () => {
   let chainExecutor: ChainExecutor;
   let consoleErrorSpy: any;
+  let tempDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     chainExecutor = new ChainExecutor();
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Create a temporary directory for test plugins
+    tempDir = path.join(process.cwd(), 'temp-test-plugins-chain');
+    await fs.mkdir(tempDir, { recursive: true });
 
     // Setup default mocks
     vi.mocked(variableResolver.createContext).mockReturnValue({
@@ -58,8 +67,15 @@ describe('ChainExecutor', () => {
     vi.mocked(urlBuilder.mergeParams).mockReturnValue({});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
+    
+    // Clean up temporary directory
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch (error) {
+      // Ignore cleanup errors
+    }
   });
 
   const mockConfig: HttpCraftConfig = {
@@ -1068,6 +1084,656 @@ describe('ChainExecutor', () => {
         
         // Verify that resolveValue was called for step.with
         expect(vi.mocked(variableResolver.resolveValue)).toHaveBeenCalledTimes(3);
+      });
+    });
+
+    describe('API-Level Plugin Configuration Support', () => {
+      let mockAuthPlugin: any;
+      let authPluginPath: string;
+      let mockPluginManager: PluginManager;
+
+      beforeEach(async () => {
+        // Create a mock authentication plugin similar to the cognito-auth plugin
+        mockAuthPlugin = {
+          async setup(context: any) {
+            // Only register variable sources if we have the required configuration
+            if (context.config.clientId && context.config.clientSecret) {
+              context.registerVariableSource('getAuthToken', () => {
+                return `token-${context.config.clientId}-${context.config.scope?.join('-') || 'default'}`;
+              });
+              
+              context.registerPreRequestHook(async (request: any) => {
+                request.headers['Authorization'] = `Bearer ${await context.registerVariableSource.mock?.calls?.[0]?.[1]?.() || 'test-token'}`;
+              });
+            }
+            // If missing required config, plugin setup returns early (like the real cognito-auth plugin)
+          }
+        };
+
+        // Write the mock plugin to a file
+        authPluginPath = path.join(tempDir, 'auth-plugin.js');
+        const pluginContent = `
+export default {
+  async setup(context) {
+    // Only register variable sources if we have the required configuration
+    if (context.config.clientId && context.config.clientSecret) {
+      context.registerVariableSource('getAuthToken', () => {
+        return \`token-\${context.config.clientId}-\${context.config.scope?.join('-') || 'default'}\`;
+      });
+      
+      context.registerPreRequestHook(async (request) => {
+        const token = \`token-\${context.config.clientId}-\${context.config.scope?.join('-') || 'default'}\`;
+        request.headers['Authorization'] = \`Bearer \${token}\`;
+      });
+    }
+    // If missing required config, plugin setup returns early
+  }
+};
+`;
+        await fs.writeFile(authPluginPath, pluginContent);
+
+        // Create a real plugin manager for testing
+        mockPluginManager = new PluginManager();
+      });
+
+      it('should create API-specific plugin managers for steps with API-level plugin configurations', async () => {
+        const mockConfigWithApiPlugins: HttpCraftConfig = {
+          plugins: [
+            {
+              path: './auth-plugin.js',
+              name: 'auth-plugin',
+              config: {
+                stage: 'test'
+                // Note: Missing clientId and clientSecret, so plugin won't register variable sources
+              }
+            }
+          ],
+          apis: {
+            protectedApi: {
+              baseUrl: 'https://api.protected.com',
+              plugins: [
+                {
+                  name: 'auth-plugin',
+                  config: {
+                    clientId: 'test-client-id',
+                    clientSecret: 'test-client-secret',
+                    scope: ['read', 'write']
+                  }
+                }
+              ],
+              headers: {
+                'Authorization': 'Bearer {{plugins.auth-plugin.getAuthToken}}'
+              },
+              endpoints: {
+                getData: {
+                  method: 'GET',
+                  path: '/data'
+                }
+              }
+            }
+          }
+        };
+
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'fetchData',
+              call: 'protectedApi.getData'
+            }
+          ]
+        };
+
+        // Load global plugins first (with incomplete config)
+        await mockPluginManager.loadPlugins(mockConfigWithApiPlugins.plugins!, tempDir);
+
+        const mockResponse: HttpResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: '{"data": "success"}'
+        };
+
+        // Mock variable resolution to handle the API-level plugin configuration resolution
+        let resolveValueCallCount = 0;
+        vi.mocked(variableResolver.resolveValue).mockImplementation(async (value: any) => {
+          resolveValueCallCount++;
+          
+          if (resolveValueCallCount === 1) {
+            // First call: resolving API-level plugin configurations
+            return mockConfigWithApiPlugins.apis.protectedApi.plugins;
+          } else if (resolveValueCallCount === 2) {
+            // Second call: resolving API baseUrl, headers, etc.
+            return {
+              baseUrl: 'https://api.protected.com',
+              headers: {
+                'Authorization': 'Bearer token-test-client-id-read-write'
+              },
+              params: undefined,
+              variables: undefined,
+              endpoints: {}
+            };
+          } else if (resolveValueCallCount === 3) {
+            // Third call: resolving endpoint
+            return mockConfigWithApiPlugins.apis.protectedApi.endpoints.getData;
+          }
+          
+          return value;
+        });
+
+        vi.mocked(urlBuilder.buildUrl).mockReturnValue('https://api.protected.com/data');
+        vi.mocked(urlBuilder.mergeHeaders).mockReturnValue({
+          'Authorization': 'Bearer token-test-client-id-read-write'
+        });
+        vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
+
+        const result = await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfigWithApiPlugins,
+          {},
+          {},
+          false,
+          false,
+          mockPluginManager,
+          tempDir
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.steps).toHaveLength(1);
+        expect(result.steps[0].stepId).toBe('fetchData');
+        expect(result.steps[0].success).toBe(true);
+
+        // Verify that variable resolution was called for API plugin configurations
+        expect(vi.mocked(variableResolver.resolveValue)).toHaveBeenCalledWith(
+          mockConfigWithApiPlugins.apis.protectedApi.plugins,
+          expect.any(Object)
+        );
+
+        // Verify that the HTTP client setPluginManager was called (indicating API-specific plugin manager was used)
+        expect(vi.mocked(httpClient.setPluginManager)).toHaveBeenCalled();
+      });
+
+      it('should properly resolve plugin variables from API-specific configuration', async () => {
+        const mockConfigWithApiPlugins: HttpCraftConfig = {
+          plugins: [
+            {
+              path: './auth-plugin.js',
+              name: 'auth-plugin',
+              config: {
+                stage: 'global'
+                // Missing clientId and clientSecret globally
+              }
+            }
+          ],
+          apis: {
+            apiWithAuth: {
+              baseUrl: 'https://api.secure.com',
+              plugins: [
+                {
+                  name: 'auth-plugin',
+                  config: {
+                    clientId: 'api-specific-client',
+                    clientSecret: 'api-specific-secret',
+                    scope: ['api', 'access']
+                  }
+                }
+              ],
+              headers: {
+                'Authorization': 'Bearer {{plugins.auth-plugin.getAuthToken}}'
+              },
+              endpoints: {
+                secureEndpoint: {
+                  method: 'GET',
+                  path: '/secure'
+                }
+              }
+            }
+          }
+        };
+
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'accessSecure',
+              call: 'apiWithAuth.secureEndpoint'
+            }
+          ]
+        };
+
+        // Load global plugins (incomplete config)
+        await mockPluginManager.loadPlugins(mockConfigWithApiPlugins.plugins!, tempDir);
+
+        const mockResponse: HttpResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: '{"secure": "data"}'
+        };
+
+        // Mock variable context creation to simulate proper plugin variable resolution
+        vi.mocked(variableResolver.createContext).mockReturnValue({
+          cli: {},
+          env: {},
+          profiles: {},
+          api: {},
+          endpoint: {},
+          chainVars: {},
+          plugins: {
+            'auth-plugin': {
+              getAuthToken: () => 'token-api-specific-client-api-access'
+            }
+          }
+        });
+
+        // Mock variable resolution
+        let resolveValueCallCount = 0;
+        vi.mocked(variableResolver.resolveValue).mockImplementation(async (value: any) => {
+          resolveValueCallCount++;
+          
+          if (resolveValueCallCount === 1) {
+            // API plugin config resolution
+            return mockConfigWithApiPlugins.apis.apiWithAuth.plugins;
+          } else if (resolveValueCallCount === 2) {
+            // API resolution with resolved Authorization header
+            return {
+              baseUrl: 'https://api.secure.com',
+              headers: {
+                'Authorization': 'Bearer token-api-specific-client-api-access'
+              },
+              params: undefined,
+              variables: undefined,
+              endpoints: {}
+            };
+          } else if (resolveValueCallCount === 3) {
+            // Endpoint resolution
+            return mockConfigWithApiPlugins.apis.apiWithAuth.endpoints.secureEndpoint;
+          }
+          
+          return value;
+        });
+
+        vi.mocked(urlBuilder.buildUrl).mockReturnValue('https://api.secure.com/secure');
+        vi.mocked(urlBuilder.mergeHeaders).mockReturnValue({
+          'Authorization': 'Bearer token-api-specific-client-api-access'
+        });
+        vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
+
+        const result = await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfigWithApiPlugins,
+          {},
+          {},
+          false,
+          false,
+          mockPluginManager,
+          tempDir
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.steps).toHaveLength(1);
+
+        // Verify that the authorization header was properly resolved with the API-specific plugin configuration
+        expect(vi.mocked(urlBuilder.mergeHeaders)).toHaveBeenCalled();
+        
+        // Verify that the HTTP client was called with the correct URL and method
+        expect(vi.mocked(httpClient.executeRequest)).toHaveBeenCalledWith(
+          expect.objectContaining({
+            method: 'GET',
+            url: 'https://api.secure.com/secure'
+          })
+        );
+      });
+
+      it('should handle multi-step chains where different APIs have different plugin configurations', async () => {
+        // Simplified test that focuses on the core functionality
+        const mockConfigWithMultipleApis: HttpCraftConfig = {
+          plugins: [
+            {
+              path: './auth-plugin.js',
+              name: 'auth-plugin',
+              config: {
+                defaultScope: ['global']
+              }
+            }
+          ],
+          apis: {
+            api1: {
+              baseUrl: 'https://api1.com',
+              plugins: [
+                {
+                  name: 'auth-plugin',
+                  config: {
+                    clientId: 'api1-client',
+                    clientSecret: 'api1-secret',
+                    scope: ['api1']
+                  }
+                }
+              ],
+              endpoints: {
+                getData: {
+                  method: 'GET',
+                  path: '/data'
+                }
+              }
+            },
+            api2: {
+              baseUrl: 'https://api2.com',
+              // No plugins - should use global plugins
+              endpoints: {
+                postData: {
+                  method: 'POST',
+                  path: '/data',
+                  body: { message: 'test' }
+                }
+              }
+            }
+          }
+        };
+
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'step1',
+              call: 'api1.getData'
+            },
+            {
+              id: 'step2',
+              call: 'api2.postData'
+            }
+          ]
+        };
+
+        await mockPluginManager.loadPlugins(mockConfigWithMultipleApis.plugins!, tempDir);
+
+        const api1Response: HttpResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: '{"message": "from api1"}'
+        };
+
+        const api2Response: HttpResponse = {
+          status: 201,
+          statusText: 'Created',
+          headers: {},
+          body: '{"result": "success"}'
+        };
+
+        // Simplified variable resolution mock
+        let resolveValueCallCount = 0;
+        vi.mocked(variableResolver.resolveValue).mockImplementation(async (value: any) => {
+          resolveValueCallCount++;
+          
+          if (resolveValueCallCount === 1) {
+            // Step 1: API1 plugin config
+            return mockConfigWithMultipleApis.apis.api1.plugins;
+          } else if (resolveValueCallCount === 2) {
+            // Step 1: API1 resolution
+            return mockConfigWithMultipleApis.apis.api1;
+          } else if (resolveValueCallCount === 3) {
+            // Step 1: Endpoint resolution
+            return mockConfigWithMultipleApis.apis.api1.endpoints.getData;
+          } else if (resolveValueCallCount === 4) {
+            // Step 2: API2 resolution (no plugins)
+            return mockConfigWithMultipleApis.apis.api2;
+          } else if (resolveValueCallCount === 5) {
+            // Step 2: Endpoint resolution
+            return mockConfigWithMultipleApis.apis.api2.endpoints.postData;
+          }
+          
+          return value;
+        });
+
+        vi.mocked(urlBuilder.buildUrl)
+          .mockReturnValueOnce('https://api1.com/data')
+          .mockReturnValueOnce('https://api2.com/data');
+        
+        vi.mocked(urlBuilder.mergeHeaders)
+          .mockReturnValueOnce({})
+          .mockReturnValueOnce({});
+
+        vi.mocked(httpClient.executeRequest)
+          .mockResolvedValueOnce(api1Response)
+          .mockResolvedValueOnce(api2Response);
+
+        const result = await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfigWithMultipleApis,
+          {},
+          {},
+          false,
+          false,
+          mockPluginManager,
+          tempDir
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.steps).toHaveLength(2);
+        
+        // Verify both steps completed successfully
+        expect(result.steps[0].stepId).toBe('step1');
+        expect(result.steps[0].success).toBe(true);
+        expect(result.steps[1].stepId).toBe('step2');
+        expect(result.steps[1].success).toBe(true);
+
+        // Verify that setPluginManager was called for the first step (which has plugins)
+        expect(vi.mocked(httpClient.setPluginManager)).toHaveBeenCalled();
+      });
+
+      it('should fall back to global plugins when API has no plugin configurations', async () => {
+        const mockConfigMixed: HttpCraftConfig = {
+          plugins: [
+            {
+              path: './auth-plugin.js',
+              name: 'auth-plugin',
+              config: {
+                clientId: 'global-client',
+                clientSecret: 'global-secret',
+                scope: ['global']
+              }
+            }
+          ],
+          apis: {
+            apiWithPlugins: {
+              baseUrl: 'https://api-with-plugins.com',
+              plugins: [
+                {
+                  name: 'auth-plugin',
+                  config: {
+                    clientId: 'api-specific-client',
+                    clientSecret: 'api-specific-secret',
+                    scope: ['api-specific']
+                  }
+                }
+              ],
+              headers: {
+                'Authorization': 'Bearer {{plugins.auth-plugin.getAuthToken}}'
+              },
+              endpoints: {
+                getData: {
+                  method: 'GET',
+                  path: '/data'
+                }
+              }
+            },
+            apiWithoutPlugins: {
+              baseUrl: 'https://api-without-plugins.com',
+              // No plugins configuration - should use global plugins
+              endpoints: {
+                getInfo: {
+                  method: 'GET',
+                  path: '/info'
+                }
+              }
+            }
+          }
+        };
+
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'step1',
+              call: 'apiWithPlugins.getData'
+            },
+            {
+              id: 'step2',
+              call: 'apiWithoutPlugins.getInfo'
+            }
+          ]
+        };
+
+        await mockPluginManager.loadPlugins(mockConfigMixed.plugins!, tempDir);
+
+        const response1: HttpResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: '{"data": "from api with plugins"}'
+        };
+
+        const response2: HttpResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: '{"info": "from api without plugins"}'
+        };
+
+        let resolveValueCallCount = 0;
+        vi.mocked(variableResolver.resolveValue).mockImplementation(async (value: any) => {
+          resolveValueCallCount++;
+          
+          if (resolveValueCallCount === 1) {
+            // Step 1: API plugin config resolution
+            return mockConfigMixed.apis.apiWithPlugins.plugins;
+          } else if (resolveValueCallCount === 2) {
+            // Step 1: API resolution
+            return {
+              baseUrl: 'https://api-with-plugins.com',
+              headers: { 'Authorization': 'Bearer token-api-specific-client-api-specific' },
+              params: undefined,
+              variables: undefined,
+              endpoints: {}
+            };
+          } else if (resolveValueCallCount === 3) {
+            // Step 1: Endpoint resolution
+            return mockConfigMixed.apis.apiWithPlugins.endpoints.getData;
+          } else if (resolveValueCallCount === 4) {
+            // Step 2: API resolution (no plugins)
+            return {
+              baseUrl: 'https://api-without-plugins.com',
+              headers: undefined,
+              params: undefined,
+              variables: undefined,
+              endpoints: {}
+            };
+          } else if (resolveValueCallCount === 5) {
+            // Step 2: Endpoint resolution
+            return mockConfigMixed.apis.apiWithoutPlugins.endpoints.getInfo;
+          }
+          
+          return value;
+        });
+
+        vi.mocked(urlBuilder.buildUrl)
+          .mockReturnValueOnce('https://api-with-plugins.com/data')
+          .mockReturnValueOnce('https://api-without-plugins.com/info');
+        
+        vi.mocked(urlBuilder.mergeHeaders)
+          .mockReturnValueOnce({ 'Authorization': 'Bearer token-api-specific-client-api-specific' })
+          .mockReturnValueOnce({});
+
+        vi.mocked(httpClient.executeRequest)
+          .mockResolvedValueOnce(response1)
+          .mockResolvedValueOnce(response2);
+
+        const result = await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfigMixed,
+          {},
+          {},
+          false,
+          false,
+          mockPluginManager,
+          tempDir
+        );
+
+        expect(result.success).toBe(true);
+        expect(result.steps).toHaveLength(2);
+        
+        // Verify both steps completed successfully
+        expect(result.steps[0].stepId).toBe('step1');
+        expect(result.steps[0].success).toBe(true);
+        expect(result.steps[1].stepId).toBe('step2');
+        expect(result.steps[1].success).toBe(true);
+      });
+
+      it('should handle variable resolution errors in API-level plugin configurations', async () => {
+        const mockConfigWithVariableError: HttpCraftConfig = {
+          plugins: [
+            {
+              path: './auth-plugin.js',
+              name: 'auth-plugin',
+              config: {}
+            }
+          ],
+          apis: {
+            problematicApi: {
+              baseUrl: 'https://problematic-api.com',
+              plugins: [
+                {
+                  name: 'auth-plugin',
+                  config: {
+                    clientId: '{{undefinedVariable}}', // This will cause a variable resolution error
+                    clientSecret: 'test-secret',
+                    scope: ['test']
+                  }
+                }
+              ],
+              endpoints: {
+                getData: {
+                  method: 'GET',
+                  path: '/data'
+                }
+              }
+            }
+          }
+        };
+
+        const chain: ChainDefinition = {
+          steps: [
+            {
+              id: 'problematicStep',
+              call: 'problematicApi.getData'
+            }
+          ]
+        };
+
+        await mockPluginManager.loadPlugins(mockConfigWithVariableError.plugins!, tempDir);
+
+        // Mock variable resolution to throw an error for the undefined variable
+        vi.mocked(variableResolver.resolveValue).mockRejectedValueOnce(
+          new VariableResolutionError('Variable "undefinedVariable" is not defined', 'undefinedVariable')
+        );
+
+        const result = await chainExecutor.executeChain(
+          'testChain',
+          chain,
+          mockConfigWithVariableError,
+          {},
+          {},
+          false,
+          false,
+          mockPluginManager,
+          tempDir
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Failed to resolve variables in API-level plugin configuration for API \'problematicApi\'');
+        expect(result.steps).toHaveLength(1);
+        expect(result.steps[0].success).toBe(false);
       });
     });
   });

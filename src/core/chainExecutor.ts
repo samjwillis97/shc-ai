@@ -38,7 +38,8 @@ export class ChainExecutor {
     profiles: Record<string, any> = {},
     verbose: boolean = false,
     dryRun: boolean = false,
-    pluginManager?: import('./pluginManager.js').PluginManager // T10.15: Plugin manager for variable sources
+    pluginManager?: import('./pluginManager.js').PluginManager, // T10.15: Plugin manager for variable sources
+    configDir: string = process.cwd() // Config directory for resolving plugin paths
   ): Promise<ChainExecutionResult> {
     
     const result: ChainExecutionResult = {
@@ -75,7 +76,8 @@ export class ChainExecutor {
             result.steps, // Pass completed steps for variable resolution
             verbose,
             dryRun,
-            pluginManager // T10.15: Pass plugin manager for parameterized function support
+            pluginManager, // T10.15: Pass plugin manager for parameterized function support
+            configDir // Pass config directory for plugin loading
           );
 
           result.steps.push(stepResult);
@@ -142,7 +144,8 @@ export class ChainExecutor {
     previousSteps: StepExecutionResult[], // T8.8 & T8.9: Previous step results for variable resolution
     verbose: boolean,
     dryRun: boolean,
-    pluginManager?: import('./pluginManager.js').PluginManager // T10.15: Plugin manager for variable sources
+    globalPluginManager?: import('./pluginManager.js').PluginManager, // T10.15: Global plugin manager for creating API-specific instances
+    configDir: string = process.cwd() // Config directory for resolving plugin paths
   ): Promise<StepExecutionResult> {
     
     // Parse the call to get API and endpoint names
@@ -160,14 +163,46 @@ export class ChainExecutor {
       throw new Error(`Endpoint '${endpointName}' not found in API '${apiName}'`);
     }
 
-    // T8.8 & T8.9: Create variable context for this step with access to previous steps
-    // T10.15: Include plugin variable sources if plugin manager is available
+    // Create API-specific plugin manager for this step (similar to API command)
+    let stepPluginManager = globalPluginManager;
     let pluginVariableSources: Record<string, Record<string, import('../types/plugin.js').VariableSource>> | undefined;
     let parameterizedPluginSources: Record<string, Record<string, import('../types/plugin.js').ParameterizedVariableSource>> | undefined;
     
-    if (pluginManager) {
-      pluginVariableSources = pluginManager.getVariableSources();
-      parameterizedPluginSources = pluginManager.getParameterizedVariableSources();
+    if (globalPluginManager && api.plugins && api.plugins.length > 0) {
+      // Create initial variable context for resolving API-level plugin configurations
+      const initialVariableContext = variableResolver.createContext(
+        cliVariables,
+        profiles,
+        undefined, // No API variables yet
+        undefined, // No endpoint variables yet
+        undefined, // No plugin variables yet (we're setting them up)
+        config.globalVariables
+      );
+
+      // Add chain variables and step data to the context
+      initialVariableContext.chainVars = chainVars;
+      initialVariableContext.steps = previousSteps;
+
+      try {
+        // Resolve variables in API-level plugin configurations
+        const resolvedApiPluginConfigs = await variableResolver.resolveValue(api.plugins, initialVariableContext) as import('../types/config.js').PluginConfiguration[];
+        
+        // Create API-specific plugin manager with merged configurations
+        stepPluginManager = await globalPluginManager.loadApiPlugins(resolvedApiPluginConfigs, configDir);
+        
+        // Get plugin variable sources from the API-specific plugin manager
+        pluginVariableSources = stepPluginManager.getVariableSources();
+        parameterizedPluginSources = stepPluginManager.getParameterizedVariableSources();
+      } catch (error) {
+        if (error instanceof VariableResolutionError) {
+          throw new Error(`Failed to resolve variables in API-level plugin configuration for API '${apiName}': ${error.message}`);
+        }
+        throw error;
+      }
+    } else if (globalPluginManager) {
+      // No API-specific plugins, use global plugin manager
+      pluginVariableSources = globalPluginManager.getVariableSources();
+      parameterizedPluginSources = globalPluginManager.getParameterizedVariableSources();
     }
     
     const variableContext = variableResolver.createContext(
@@ -175,7 +210,7 @@ export class ChainExecutor {
       profiles,
       api.variables,
       endpoint.variables,
-      pluginVariableSources, // T10.15: Plugin variable sources
+      pluginVariableSources, // T10.15: Plugin variable sources from API-specific manager
       config.globalVariables, // T9.3: Global variables
       parameterizedPluginSources // T10.15: Parameterized plugin variable sources
     );
@@ -288,6 +323,11 @@ export class ChainExecutor {
           response: mockResponse,
           success: true
         };
+      }
+
+      // Set the API-specific plugin manager on HTTP client for this request
+      if (stepPluginManager) {
+        httpClient.setPluginManager(stepPluginManager);
       }
 
       // Execute the HTTP request
