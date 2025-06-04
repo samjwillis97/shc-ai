@@ -267,6 +267,9 @@
   - **T10.13:** Code review, cleanup, and minor performance optimizations if identified as necessary.
     - _Testable Outcome:_ Code quality meets standards.
   - **T10.14:** Prepare for V1 release (e.g., version bump, changelog).
+  - **T10.15:** Implement parameterized plugin functions to support function call syntax with arguments like `{{plugins.myPlugin.getKey("keyName", "environment")}}` for enhanced plugin flexibility and reusability.
+  - **T10.16:** Implement profile name completion for `--profile` option in ZSH tab completion.
+    - _Testable Outcome:_ `httpcraft --profile <TAB>` completes with available profile names from configuration.
 
 ---
 

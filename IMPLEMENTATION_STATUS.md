@@ -208,6 +208,8 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [ ] **T10.13:** Code review, cleanup, performance optimizations.
   - [ ] **T10.14:** Prepare for V1 release.
   - [x] **T10.15:** Implement parameterized plugin functions to support function call syntax with arguments like `{{plugins.myPlugin.getKey("keyName", "environment")}}` for enhanced plugin flexibility and reusability.
+  - [x] **T10.16:** Implement profile name completion for `--profile` option in ZSH tab completion.
+    - _Testable Outcome:_ `httpcraft --profile <TAB>` completes with available profile names from configuration.
 - **Notes/Blockers:** T10.1 completed successfully! Implemented complete post-response hook system with:
   - **PostResponseHook Type:** Added PostResponseHook type definition and support in PluginInstance interface
   - **PluginManager Integration:** Updated PluginManager to register and execute post-response hooks in sequence
@@ -321,5 +323,19 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
     2. JSONPath assumptions about httpbin.org response structure in chain test
     3. Error message format expectations in exit-on-http-error test
   All end-to-end testing complete and HttpCraft ready for production use. Ready to proceed to T10.13.
+
+  T10.16 completed successfully! Implemented profile name completion for `--profile` option with:
+  - **New Hidden Command:** Added `--get-profile-names` hidden command following same pattern as other completion commands
+  - **Interface Implementation:** Added `GetProfileNamesArgs` interface and `handleGetProfileNamesCommand` function 
+  - **CLI Integration:** Integrated new command into main CLI parser with proper argument handling
+  - **Enhanced ZSH Completion:** Updated ZSH completion script to include `_httpcraft_profiles()` function that dynamically fetches profile names
+  - **Dynamic Profile Completion:** `--profile` option now uses `:profile:_httpcraft_profiles` for dynamic completion
+  - **Comprehensive Testing:** Added 5 unit tests and 5 integration tests covering all profile completion scenarios
+  - **Error Handling:** Graceful handling of missing configs and malformed files to avoid breaking tab completion
+  - **Global Config Handling:** Fixed integration tests to handle existing global HttpCraft config by temporarily moving it during tests
+  - **Testable Outcome Achieved:** `httpcraft --profile <TAB>` correctly completes with available profile names from configuration
+  - **Backward Compatibility:** All existing completion functionality remains unchanged and working
+  - **Feature Integration:** Profile completion works with config file override: `httpcraft --config myconfig.yaml --profile <TAB>`
+  All profile name completion functionality working correctly with 23 unit tests + 24 integration tests passing. T10.16 implementation complete!
 
 ---

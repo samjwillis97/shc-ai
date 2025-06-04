@@ -61,9 +61,6 @@ apis:
     endpoints:
       get-post:
         path: "/posts/:id"
-        method: "GET"
-      create-post:
-        path: "/posts"
         method: "POST"`;
 
   await fs.writeFile(filename, content);
@@ -76,6 +73,17 @@ describe('Completion Integration Tests', () => {
   beforeEach(async () => {
     // Create a test config file
     await writeFileSync(testConfigFile, `
+profiles:
+  dev:
+    baseUrl: "https://api-dev.example.com"
+    apiKey: "dev-key-123"
+  staging:
+    baseUrl: "https://api-staging.example.com"
+    apiKey: "staging-key-456"
+  prod:
+    baseUrl: "https://api.example.com"
+    apiKey: "{{secret.PROD_API_KEY}}"
+
 apis:
   github-api:
     baseUrl: "https://api.github.com"
@@ -127,9 +135,11 @@ chains:
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('#compdef httpcraft');
       expect(result.stdout).toContain('_httpcraft()');
+      expect(result.stdout).toContain('_httpcraft_profiles()');
       expect(result.stdout).toContain('--config');
       expect(result.stdout).toContain('--var');
       expect(result.stdout).toContain('--profile');
+      expect(result.stdout).toContain(':profile:_httpcraft_profiles');
       expect(result.stdout).toContain('--verbose');
       expect(result.stdout).toContain('--dry-run');
       expect(result.stdout).toContain('--exit-on-http-error');
@@ -138,6 +148,7 @@ chains:
       expect(result.stdout).toContain('httpcraft --get-api-names');
       expect(result.stdout).toContain('httpcraft --get-endpoint-names');
       expect(result.stdout).toContain('httpcraft --get-chain-names');
+      expect(result.stdout).toContain('httpcraft --get-profile-names');
     });
 
     it('should error for unsupported shells', async () => {
@@ -320,11 +331,31 @@ chains:
     });
 
     it('should silently exit when no default config exists', async () => {
-      const result = await runCli(['--get-chain-names']);
+      // Temporarily move any global config that might interfere
+      const globalConfigPath = join(process.env.HOME || '~', '.config', 'httpcraft', 'config.yaml');
+      const backupPath = globalConfigPath + '.test-backup-chain-no-config';
+      let needsRestore = false;
+      
+      try {
+        if (existsSync(globalConfigPath)) {
+          if (existsSync(backupPath)) {
+            unlinkSync(backupPath);
+          }
+          await fs.rename(globalConfigPath, backupPath);
+          needsRestore = true;
+        }
+        
+        const result = await runCli(['--get-chain-names']);
 
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toBe('');
-      expect(result.stderr).toBe('');
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toBe('');
+      } finally {
+        // Restore global config if we moved it
+        if (needsRestore && existsSync(backupPath)) {
+          await fs.rename(backupPath, globalConfigPath);
+        }
+      }
     });
 
     it('should handle config with no chains', async () => {
@@ -348,6 +379,165 @@ apis:
         // Clean up
         if (existsSync('no-chains-config.yaml')) {
           unlinkSync('no-chains-config.yaml');
+        }
+      }
+    });
+  });
+
+  describe('--get-profile-names command', () => {
+    it('should list profile names from config file', async () => {
+      const result = await runCli(['--get-profile-names', '--config', testConfigFile]);
+
+      expect(result.exitCode).toBe(0);
+      const lines = result.stdout.trim().split('\n');
+      expect(lines).toContain('dev');
+      expect(lines).toContain('staging');
+      expect(lines).toContain('prod');
+      expect(lines).toHaveLength(3);
+    });
+
+    it('should silently exit when config file does not exist', async () => {
+      // Temporarily move any global config that might interfere
+      const globalConfigPath = join(process.env.HOME || '~', '.config', 'httpcraft', 'config.yaml');
+      const backupPath = globalConfigPath + '.test-backup-profile-nonexistent';
+      let needsRestore = false;
+      
+      try {
+        if (existsSync(globalConfigPath)) {
+          if (existsSync(backupPath)) {
+            unlinkSync(backupPath);
+          }
+          await fs.rename(globalConfigPath, backupPath);
+          needsRestore = true;
+        }
+        
+        const result = await runCli(['--get-profile-names', '--config', 'nonexistent.yaml']);
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toBe('');
+      } finally {
+        // Restore global config if we moved it
+        if (needsRestore && existsSync(backupPath)) {
+          await fs.rename(backupPath, globalConfigPath);
+        }
+      }
+    });
+
+    it('should use default config when no config specified', async () => {
+      // Temporarily move any global config that might interfere
+      const globalConfigPath = join(process.env.HOME || '~', '.config', 'httpcraft', 'config.yaml');
+      const backupPath = globalConfigPath + '.test-backup-default-config';
+      let needsRestore = false;
+      
+      try {
+        if (existsSync(globalConfigPath)) {
+          if (existsSync(backupPath)) {
+            unlinkSync(backupPath);
+          }
+          await fs.rename(globalConfigPath, backupPath);
+          needsRestore = true;
+        }
+        
+        // Create a default config file with profiles
+        await writeFileSync('.httpcraft.yaml', `
+profiles:
+  local:
+    baseUrl: "http://localhost:3000"
+    debug: true
+
+apis:
+  test-api:
+    baseUrl: "https://api.test.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+`);
+
+        const result = await runCli(['--get-profile-names']);
+
+        expect(result.exitCode).toBe(0);
+        const lines = result.stdout.trim().split('\n');
+        expect(lines).toContain('local');
+      } finally {
+        // Clean up
+        if (existsSync('.httpcraft.yaml')) {
+          unlinkSync('.httpcraft.yaml');
+        }
+        // Restore global config if we moved it
+        if (needsRestore && existsSync(backupPath)) {
+          await fs.rename(backupPath, globalConfigPath);
+        }
+      }
+    });
+
+    it('should silently exit when no default config exists', async () => {
+      // Temporarily move any global config that might interfere
+      const globalConfigPath = join(process.env.HOME || '~', '.config', 'httpcraft', 'config.yaml');
+      const backupPath = globalConfigPath + '.test-backup';
+      let needsRestore = false;
+      
+      try {
+        if (existsSync(globalConfigPath)) {
+          if (existsSync(backupPath)) {
+            unlinkSync(backupPath);
+          }
+          await fs.rename(globalConfigPath, backupPath);
+          needsRestore = true;
+        }
+        
+        const result = await runCli(['--get-profile-names']);
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toBe('');
+      } finally {
+        // Restore global config if we moved it
+        if (needsRestore && existsSync(backupPath)) {
+          await fs.rename(backupPath, globalConfigPath);
+        }
+      }
+    });
+
+    it('should handle config with no profiles', async () => {
+      // Temporarily move any global config that might interfere
+      const globalConfigPath = join(process.env.HOME || '~', '.config', 'httpcraft', 'config.yaml');
+      const backupPath = globalConfigPath + '.test-backup-no-profiles';
+      let needsRestore = false;
+      
+      try {
+        if (existsSync(globalConfigPath)) {
+          if (existsSync(backupPath)) {
+            unlinkSync(backupPath);
+          }
+          await fs.rename(globalConfigPath, backupPath);
+          needsRestore = true;
+        }
+        
+        await writeFileSync('no-profiles-config.yaml', `
+apis:
+  test-api:
+    baseUrl: "https://api.test.com"
+    endpoints:
+      test:
+        method: GET
+        path: "/test"
+`);
+
+        const result = await runCli(['--get-profile-names', '--config', 'no-profiles-config.yaml']);
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toBe('');
+      } finally {
+        // Clean up
+        if (existsSync('no-profiles-config.yaml')) {
+          unlinkSync('no-profiles-config.yaml');
+        }
+        // Restore global config if we moved it
+        if (needsRestore && existsSync(backupPath)) {
+          await fs.rename(backupPath, globalConfigPath);
         }
       }
     });

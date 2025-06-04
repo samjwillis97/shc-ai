@@ -9,7 +9,8 @@ import {
   handleCompletionCommand, 
   handleGetApiNamesCommand, 
   handleGetEndpointNamesCommand,
-  handleGetChainNamesCommand 
+  handleGetChainNamesCommand,
+  handleGetProfileNamesCommand
 } from './commands/completion.js';
 
 async function main() {
@@ -149,6 +150,11 @@ async function main() {
       type: 'boolean',
       hidden: true,
     })
+    .option('get-profile-names', {
+      describe: 'Get list of profile names (hidden, for completion)',
+      type: 'boolean',
+      hidden: true,
+    })
     .help()
     .alias('help', 'h')
     .version('1.0.0')
@@ -172,6 +178,11 @@ async function main() {
 
   if (argv['get-chain-names']) {
     await handleGetChainNamesCommand({ config: argv.config as string | undefined });
+    return;
+  }
+
+  if (argv['get-profile-names']) {
+    await handleGetProfileNamesCommand({ config: argv.config as string | undefined });
     return;
   }
 

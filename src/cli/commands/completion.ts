@@ -18,6 +18,10 @@ export interface GetChainNamesArgs {
   config?: string;
 }
 
+export interface GetProfileNamesArgs {
+  config?: string;
+}
+
 /**
  * Handle the completion zsh command that outputs the ZSH completion script
  */
@@ -37,6 +41,12 @@ export async function handleCompletionCommand(args: CompletionCommandArgs): Prom
 function generateZshCompletionScript(): string {
   return `#compdef httpcraft
 
+_httpcraft_profiles() {
+    local -a profile_names
+    profile_names=($(httpcraft --get-profile-names 2>/dev/null))
+    _describe 'profile' profile_names
+}
+
 _httpcraft() {
     local state line
     typeset -A opt_args
@@ -46,7 +56,7 @@ _httpcraft() {
         '2: :->subcommand' \\
         '--config[Path to configuration file]:config file:_files -g "*.yaml"' \\
         '--var[Set or override a variable]:variable:' \\
-        '--profile[Select profile(s) to use]:profile:' \\
+        '--profile[Select profile(s) to use]:profile:_httpcraft_profiles' \\
         '--verbose[Output detailed request and response information]' \\
         '--dry-run[Display the request without sending it]' \\
         '--exit-on-http-error[Exit with non-zero code for HTTP errors]:error pattern:' \\
@@ -194,6 +204,36 @@ export async function handleGetChainNamesCommand(args: GetChainNamesArgs): Promi
     const chainNames = Object.keys(config.chains || {});
     for (const chainName of chainNames) {
       console.log(chainName);
+    }
+  } catch (error) {
+    // Silently fail for completion - errors would break tab completion
+    // User can use regular commands to see actual errors
+  }
+}
+
+/**
+ * Handle the hidden --get-profile-names command
+ */
+export async function handleGetProfileNamesCommand(args: GetProfileNamesArgs): Promise<void> {
+  try {
+    // Load configuration
+    let config: HttpCraftConfig;
+    
+    if (args.config) {
+      config = await configLoader.loadConfig(args.config);
+    } else {
+      const defaultConfigResult = await configLoader.loadDefaultConfig();
+      if (!defaultConfigResult) {
+        // Silently exit if no config found - completion should not error
+        return;
+      }
+      config = defaultConfigResult.config;
+    }
+    
+    // Output profile names, one per line
+    const profileNames = Object.keys(config.profiles || {});
+    for (const profileName of profileNames) {
+      console.log(profileName);
     }
   } catch (error) {
     // Silently fail for completion - errors would break tab completion

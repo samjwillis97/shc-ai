@@ -89,6 +89,7 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
   - Provide ZSH tab completion for `<endpoint_name>` (contextual to the selected `<api_name>`).
   - Provide ZSH tab completion for `<chain_name>`.
   - Provide ZSH tab completion for CLI options.
+  - Provide ZSH tab completion for profile names when using `--profile` option.
   - A command `httpcraft completion zsh` shall output the ZSH completion script.
 - **FR2.4 (Options):**
   - `--var <key>=<value>`: Set/override a variable from the command line.
