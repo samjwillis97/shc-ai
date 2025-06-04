@@ -1583,4 +1583,278 @@ describe('VariableResolver', () => {
       expect(precedenceOrder[9]).toContain('{{$dynamic}}');
     });
   });
+
+  describe('T10.16: Nested Variable Resolution', () => {
+    it('should resolve simple nested variables', async () => {
+      const context = resolver.createContext(
+        { index: '2', value: 'test' },
+        {},
+        {},
+        {},
+        undefined,
+        {}
+      );
+
+      const result = await resolver.resolve('data.{{index}}.{{value}}', context);
+      expect(result).toBe('data.2.test');
+    });
+
+    it('should resolve nested variables in step JSONPath expressions', async () => {
+      const mockSteps: StepExecutionResult[] = [
+        {
+          stepId: 'getClaims',
+          request: { method: 'GET', url: 'https://api.test.com/claims', headers: {}, body: undefined },
+          response: {
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            body: '{"data": [{"id": 100}, {"id": 200}, {"id": 300}]}'
+          },
+          success: true
+        }
+      ];
+
+      const context = resolver.createContext(
+        { claimIndex: '1' },
+        {},
+        {},
+        {},
+        undefined,
+        {}
+      );
+      context.steps = mockSteps;
+
+      const result = await resolver.resolve('{{steps.getClaims.response.body.data.{{claimIndex}}.id}}', context);
+      expect(result).toBe('200');
+    });
+
+    it('should resolve multiple nested variables in the same expression', async () => {
+      const context = resolver.createContext(
+        { 
+          section: 'claims',
+          index: '0',
+          field: 'id'
+        },
+        {},
+        {},
+        {},
+        undefined,
+        {}
+      );
+
+      const result = await resolver.resolve('api/{{section}}/{{index}}/{{field}}', context);
+      expect(result).toBe('api/claims/0/id');
+    });
+
+    it('should resolve nested variables with different scopes', async () => {
+      const context = resolver.createContext(
+        { userId: '123' },
+        { environment: 'prod' },
+        {},
+        {},
+        undefined,
+        {}
+      );
+
+      const result = await resolver.resolve('{{profile.environment}}/users/{{userId}}/data', context);
+      expect(result).toBe('prod/users/123/data');
+    });
+
+    it('should resolve complex nested variable expressions', async () => {
+      const mockSteps: StepExecutionResult[] = [
+        {
+          stepId: 'getUsers',
+          request: { method: 'GET', url: 'https://api.test.com/users', headers: {}, body: undefined },
+          response: {
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            body: '{"users": [{"name": "john", "posts": [{"title": "First Post"}, {"title": "Second Post"}]}, {"name": "jane", "posts": [{"title": "Jane Post"}]}]}'
+          },
+          success: true
+        }
+      ];
+
+      const context = resolver.createContext(
+        { 
+          userIndex: '0',
+          postIndex: '1'
+        },
+        {},
+        {},
+        {},
+        undefined,
+        {}
+      );
+      context.steps = mockSteps;
+
+      const result = await resolver.resolve('{{steps.getUsers.response.body.users.{{userIndex}}.posts.{{postIndex}}.title}}', context);
+      expect(result).toBe('Second Post');
+    });
+
+    it('should handle environment variables in nested expressions', async () => {
+      process.env.TEST_INDEX = '2';
+      
+      const mockSteps: StepExecutionResult[] = [
+        {
+          stepId: 'getData',
+          request: { method: 'GET', url: 'https://api.test.com/data', headers: {}, body: undefined },
+          response: {
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            body: '{"items": ["item0", "item1", "item2", "item3"]}'
+          },
+          success: true
+        }
+      ];
+
+      const context = resolver.createContext(
+        {},
+        {},
+        {},
+        {},
+        undefined,
+        {}
+      );
+      context.steps = mockSteps;
+
+      const result = await resolver.resolve('{{steps.getData.response.body.items.{{env.TEST_INDEX}}}}', context);
+      expect(result).toBe('item2');
+
+      delete process.env.TEST_INDEX;
+    });
+
+    it('should resolve profile variables in nested expressions', async () => {
+      const mockSteps: StepExecutionResult[] = [
+        {
+          stepId: 'getProducts',
+          request: { method: 'GET', url: 'https://api.test.com/products', headers: {}, body: undefined },
+          response: {
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            body: '{"categories": {"electronics": ["phone", "laptop"], "books": ["fiction", "non-fiction"]}}'
+          },
+          success: true
+        }
+      ];
+
+      const context = resolver.createContext(
+        {},
+        { category: 'electronics', productIndex: '1' },
+        {},
+        {},
+        undefined,
+        {}
+      );
+      context.steps = mockSteps;
+
+      const result = await resolver.resolve('{{steps.getProducts.response.body.categories.{{profile.category}}.{{profile.productIndex}}}}', context);
+      expect(result).toBe('laptop');
+    });
+
+    it('should prevent infinite loops with circular references', async () => {
+      const context = resolver.createContext(
+        { 
+          a: '{{b}}',
+          b: '{{a}}'
+        },
+        {},
+        {},
+        {},
+        undefined,
+        {}
+      );
+
+      await expect(resolver.resolve('{{a}}', context))
+        .rejects.toThrow(VariableResolutionError);
+      
+      await expect(resolver.resolve('{{a}}', context))
+        .rejects.toThrow('Maximum variable resolution iterations reached');
+    });
+
+    it('should handle deeply nested variables', async () => {
+      const context = resolver.createContext(
+        { 
+          level1: '{{level2}}',
+          level2: '{{level3}}',
+          level3: 'final_value'
+        },
+        {},
+        {},
+        {},
+        undefined,
+        {}
+      );
+
+      const result = await resolver.resolve('{{level1}}', context);
+      expect(result).toBe('final_value');
+    });
+
+    it('should throw error when nested variable cannot be resolved', async () => {
+      const context = resolver.createContext(
+        { index: '1' },
+        {},
+        {},
+        {},
+        undefined,
+        {}
+      );
+
+      await expect(resolver.resolve('data.{{undefinedVar}}.value', context))
+        .rejects.toThrow(VariableResolutionError);
+      
+      await expect(resolver.resolve('data.{{undefinedVar}}.value', context))
+        .rejects.toThrow("Variable 'undefinedVar' could not be resolved");
+    });
+
+    it('should work with dynamic variables in nested expressions', async () => {
+      const context = resolver.createContext(
+        { prefix: '$timestamp' },
+        {},
+        {},
+        {},
+        undefined,
+        {}
+      );
+
+      const result = await resolver.resolve('{{{{prefix}}}}', context);
+      expect(result).toMatch(/^\d+$/); // Should be a timestamp
+    });
+
+    it('should handle multiple levels of nesting', async () => {
+      const context = resolver.createContext(
+        { 
+          arrayIndex: '0',
+          objectKey: 'name'
+        },
+        {},
+        {},
+        {},
+        undefined,
+        {}
+      );
+
+      const mockSteps: StepExecutionResult[] = [
+        {
+          stepId: 'complexData',
+          request: { method: 'GET', url: 'https://api.test.com/complex', headers: {}, body: undefined },
+          response: {
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            body: '{"data": [{"name": "first"}, {"name": "second"}]}'
+          },
+          success: true
+        }
+      ];
+      context.steps = mockSteps;
+
+      // This resolves: steps.complexData.response.body.data.{{arrayIndex}}.{{objectKey}}
+      // Which becomes: steps.complexData.response.body.data.0.name
+      const result = await resolver.resolve('{{steps.complexData.response.body.data.{{arrayIndex}}.{{objectKey}}}}', context);
+      expect(result).toBe('first');
+    });
+  });
 }); 

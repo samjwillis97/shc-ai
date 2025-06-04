@@ -84,57 +84,173 @@ export class VariableResolver {
    * Resolves variables in a string using {{variable}} syntax
    * Phase 8 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Plugins > Environment
    * T10.15: Enhanced to support parameterized plugin function calls
+   * T10.16: Enhanced to support nested variable resolution
    */
   async resolve(template: string, context: VariableContext): Promise<string> {
     let resolvedTemplate = template;
+    let iterationCount = 0;
+    const maxIterations = 10; // Prevent infinite loops
     
-    // Process variables sequentially to handle async plugin variables
-    // Use a more sophisticated approach to handle nested braces
-    const matches = this.extractVariableMatches(template);
-    
-    for (const match of matches) {
-      const variableName = match.content.trim();
+    while (iterationCount < maxIterations) {
+      const originalTemplate = resolvedTemplate;
       
-      // Validate that variable name is not empty
-      if (!variableName) {
-        throw new VariableResolutionError(
-          'Variable name cannot be empty',
-          variableName
-        );
+      // T10.16: First pass - resolve any nested variables within variable names
+      resolvedTemplate = await this.resolveNestedVariables(resolvedTemplate, context);
+      
+      // Process variables sequentially to handle async plugin variables
+      const matches = this.extractVariableMatches(resolvedTemplate);
+      
+      for (const match of matches) {
+        const variableName = match.content.trim();
+        
+        // Validate that variable name is not empty
+        if (!variableName) {
+          throw new VariableResolutionError(
+            'Variable name cannot be empty',
+            variableName
+          );
+        }
+        
+        let resolvedValue: string;
+        
+        // T10.15: Check if this is a parameterized function call
+        if (this.isParameterizedFunctionCall(variableName)) {
+          resolvedValue = await this.resolveParameterizedFunctionCall(variableName, context);
+        }
+        // Handle scoped variables (e.g., env.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable, steps.stepId.*)
+        else if (variableName.includes('.')) {
+          resolvedValue = await this.resolveScopedVariable(variableName, context);
+        } else {
+          // T9.6: Handle built-in dynamic variables first (they start with $)
+          if (variableName.startsWith('$')) {
+            resolvedValue = this.resolveDynamicVariable(variableName, '', variableName);
+          } else {
+            // Handle unscoped variables with precedence
+            const value = this.resolveUnscopedVariable(variableName, context);
+            if (value !== undefined) {
+              resolvedValue = this.stringifyValue(value);
+            } else {
+              throw new VariableResolutionError(
+                `Variable '${variableName}' could not be resolved`,
+                variableName
+              );
+            }
+          }
+        }
+        
+        // Replace this specific variable match
+        resolvedTemplate = resolvedTemplate.replace(match.fullMatch, resolvedValue);
       }
       
-      let resolvedValue: string;
+      // T10.16: Check if the resolved template contains new variables to resolve
+      // This handles cases where a variable's value is itself a variable reference
+      const hasVariables = this.extractVariableMatches(resolvedTemplate).length > 0;
+      
+      // If no more variables or no change in this iteration, we're done
+      if (!hasVariables || resolvedTemplate === originalTemplate) {
+        break;
+      }
+      
+      iterationCount++;
+    }
+    
+    if (iterationCount >= maxIterations) {
+      throw new VariableResolutionError(
+        'Maximum variable resolution iterations reached. Check for circular references.',
+        template
+      );
+    }
+    
+    return resolvedTemplate;
+  }
+  
+  /**
+   * T10.16: Resolves nested variables within variable names only
+   * This handles constructs like {{steps.getRecentClaims.response.body.data.{{claimIndex}}.id}}
+   */
+  private async resolveNestedVariables(template: string, context: VariableContext): Promise<string> {
+    let resolvedTemplate = template;
+    let changed = true;
+    
+    while (changed) {
+      changed = false;
+      
+      // Find variables that contain other variables inside their names
+      const matches = this.extractVariableMatches(resolvedTemplate);
+      
+      for (const match of matches) {
+        const variableName = match.content.trim();
+        
+        // Check if this variable name contains nested variables (has {{ inside the variable name)
+        if (this.containsNestedVariables(variableName)) {
+          // Resolve inner variables first
+          const resolvedVariableName = await this.resolveInnerVariables(variableName, context);
+          
+          // Replace the variable name with the resolved one
+          const newVariableMatch = `{{${resolvedVariableName}}}`;
+          resolvedTemplate = resolvedTemplate.replace(match.fullMatch, newVariableMatch);
+          changed = true;
+          break; // Process one at a time to avoid conflicts
+        }
+      }
+    }
+    
+    return resolvedTemplate;
+  }
+  
+  /**
+   * T10.16: Checks if a variable name contains nested variables
+   */
+  private containsNestedVariables(variableName: string): boolean {
+    // Look for {{ inside the variable name (excluding the outer braces)
+    const innerMatches = this.extractVariableMatches(variableName);
+    return innerMatches.length > 0;
+  }
+  
+  /**
+   * T10.16: Resolves inner variables within a variable name
+   */
+  private async resolveInnerVariables(variableName: string, context: VariableContext): Promise<string> {
+    let resolvedVariableName = variableName;
+    
+    // Find and resolve inner variables
+    const innerMatches = this.extractVariableMatches(variableName);
+    
+    for (const innerMatch of innerMatches) {
+      const innerVariableName = innerMatch.content.trim();
+      
+      let resolvedInnerValue: string;
       
       // T10.15: Check if this is a parameterized function call
-      if (this.isParameterizedFunctionCall(variableName)) {
-        resolvedValue = await this.resolveParameterizedFunctionCall(variableName, context);
+      if (this.isParameterizedFunctionCall(innerVariableName)) {
+        resolvedInnerValue = await this.resolveParameterizedFunctionCall(innerVariableName, context);
       }
-      // Handle scoped variables (e.g., env.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable, steps.stepId.*)
-      else if (variableName.includes('.')) {
-        resolvedValue = await this.resolveScopedVariable(variableName, context);
+      // Handle scoped variables
+      else if (innerVariableName.includes('.')) {
+        resolvedInnerValue = await this.resolveScopedVariable(innerVariableName, context);
       } else {
         // T9.6: Handle built-in dynamic variables first (they start with $)
-        if (variableName.startsWith('$')) {
-          resolvedValue = this.resolveDynamicVariable(variableName, '', variableName);
+        if (innerVariableName.startsWith('$')) {
+          resolvedInnerValue = this.resolveDynamicVariable(innerVariableName, '', innerVariableName);
         } else {
           // Handle unscoped variables with precedence
-          const value = this.resolveUnscopedVariable(variableName, context);
+          const value = this.resolveUnscopedVariable(innerVariableName, context);
           if (value !== undefined) {
-            resolvedValue = this.stringifyValue(value);
+            resolvedInnerValue = this.stringifyValue(value);
           } else {
             throw new VariableResolutionError(
-              `Variable '${variableName}' could not be resolved`,
-              variableName
+              `Nested variable '${innerVariableName}' could not be resolved`,
+              innerVariableName
             );
           }
         }
       }
       
-      // Replace this specific variable match
-      resolvedTemplate = resolvedTemplate.replace(match.fullMatch, resolvedValue);
+      // Replace the inner variable with its resolved value
+      resolvedVariableName = resolvedVariableName.replace(innerMatch.fullMatch, resolvedInnerValue);
     }
     
-    return resolvedTemplate;
+    return resolvedVariableName;
   }
   
   /**
@@ -767,6 +883,11 @@ export class VariableResolver {
       if (char === '"' && (i === 0 || argsStr[i - 1] !== '\\')) {
         inQuotes = !inQuotes;
         current += char;
+      } else if (char === '\\' && i + 1 < argsStr.length && argsStr[i + 1] === '"') {
+        // Handle escaped quotes - add both the backslash and quote
+        current += char;
+        current += argsStr[i + 1];
+        i++; // Skip the next character since we processed it
       } else if (char === ',' && !inQuotes) {
         if (current.trim()) {
           args.push(current.trim());

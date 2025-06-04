@@ -861,10 +861,10 @@ chains:
       expect(firstStep.response).toHaveProperty('headers');
       expect(firstStep.response).toHaveProperty('body');
       
-      // Parse the response body to verify it's valid JSON
-      const postData = JSON.parse(firstStep.response.body);
-      expect(postData).toHaveProperty('id', 1);
-      expect(postData).toHaveProperty('title');
+      // Verify response body is already parsed as JSON object (JSON formatting feature)
+      expect(firstStep.response.body).toBeInstanceOf(Object);
+      expect(firstStep.response.body).toHaveProperty('id', 1);
+      expect(firstStep.response.body).toHaveProperty('title');
       
       // Verify second step (getUser)
       const secondStep = output.steps[1];
@@ -882,11 +882,11 @@ chains:
       expect(secondStep.response).toHaveProperty('headers');
       expect(secondStep.response).toHaveProperty('body');
       
-      // Parse the response body to verify it's valid JSON
-      const userData = JSON.parse(secondStep.response.body);
-      expect(userData).toHaveProperty('id', 1);
-      expect(userData).toHaveProperty('name');
-      expect(userData).toHaveProperty('email');
+      // Verify response body is already parsed as JSON object (JSON formatting feature)
+      expect(secondStep.response.body).toBeInstanceOf(Object);
+      expect(secondStep.response.body).toHaveProperty('id', 1);
+      expect(secondStep.response.body).toHaveProperty('name');
+      expect(secondStep.response.body).toHaveProperty('email');
     });
 
     it('should output structured JSON for single step chains when using --chain-output full', async () => {
@@ -940,10 +940,10 @@ chains:
       expect(step.response).toHaveProperty('headers');
       expect(step.response).toHaveProperty('body');
       
-      // Parse the response body to verify it's valid JSON
-      const postData = JSON.parse(step.response.body);
-      expect(postData).toHaveProperty('id', 1);
-      expect(postData).toHaveProperty('title');
+      // Verify response body is already parsed as JSON object (JSON formatting feature)
+      expect(step.response.body).toBeInstanceOf(Object);
+      expect(step.response.body).toHaveProperty('id', 1);
+      expect(step.response.body).toHaveProperty('title');
     });
 
     it('should default to last step body output when --chain-output is not specified', async () => {
@@ -1092,6 +1092,225 @@ chains:
       expect(result.stderr).toContain('Variable resolution failed');
       expect(result.stderr).toContain('JSONPath');
       expect(result.stderr).toContain('found no matches');
+    });
+  });
+
+  describe('T10.16: Nested Variable Resolution', () => {
+    it('should resolve nested variables in chain step configurations', async () => {
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getUsers:
+        method: GET
+        path: "/users"
+      getUserPosts:
+        method: GET
+        path: "/users/{{userId}}/posts"
+
+chains:
+  nestedVariableTest:
+    description: "Test nested variable resolution"
+    vars:
+      userIndex: "0"
+      userProperty: "id"
+    steps:
+      - id: getUsers
+        call: jsonplaceholder.getUsers
+      - id: getUserPosts
+        call: jsonplaceholder.getUserPosts
+        with:
+          pathParams:
+            userId: "{{steps.getUsers.response.body.{{userIndex}}.{{userProperty}}}}"
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'nestedVariableTest', '--config', testChainConfigFile]);
+
+      expect(result.exitCode).toBe(0);
+      
+      // The output should be an array of posts for the first user
+      const output = JSON.parse(result.stdout);
+      expect(Array.isArray(output)).toBe(true);
+      if (output.length > 0) {
+        expect(output[0]).toHaveProperty('userId', 1); // First user should have ID 1
+      }
+    });
+
+    it('should resolve complex nested expressions with multiple levels', async () => {
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getUsers:
+        method: GET
+        path: "/users"
+      getUser:
+        method: GET
+        path: "/users/{{userId}}"
+
+chains:
+  complexNested:
+    description: "Complex nested variable resolution"
+    vars:
+      userIndex: "0"
+      idProperty: "id"
+    steps:
+      - id: getUsers
+        call: jsonplaceholder.getUsers
+      - id: getUser
+        call: jsonplaceholder.getUser
+        with:
+          pathParams:
+            userId: "{{steps.getUsers.response.body.{{userIndex}}.{{idProperty}}}}"
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'complexNested', '--config', testChainConfigFile]);
+
+      expect(result.exitCode).toBe(0);
+      
+      // Verify the nested variable was resolved correctly - should get first user
+      const output = JSON.parse(result.stdout);
+      expect(output).toHaveProperty('id', 1); // Should be user ID 1 from first user
+      expect(output).toHaveProperty('name'); // Should have user name
+    });
+
+    it('should handle environment variables in nested expressions', async () => {
+      // Set up test environment variable
+      process.env.TEST_CHAIN_INDEX = '0';
+
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getUsers:
+        method: GET
+        path: "/users"
+      getUser:
+        method: GET
+        path: "/users/{{userId}}"
+
+chains:
+  envNestedTest:
+    description: "Test environment variables in nested expressions"
+    steps:
+      - id: getUsers
+        call: jsonplaceholder.getUsers
+      - id: getUser
+        call: jsonplaceholder.getUser
+        with:
+          pathParams:
+            userId: "{{steps.getUsers.response.body.{{env.TEST_CHAIN_INDEX}}.id}}"
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'envNestedTest', '--config', testChainConfigFile]);
+
+      expect(result.exitCode).toBe(0);
+      
+      // The output should be the first user's data
+      const output = JSON.parse(result.stdout);
+      expect(output).toHaveProperty('id', 1);
+      expect(output).toHaveProperty('name');
+
+      // Clean up
+      delete process.env.TEST_CHAIN_INDEX;
+    });
+  });
+
+  describe('T10.16: JSON Formatting in Chain Output', () => {
+    it('should format JSON response bodies when using --chain-output full', async () => {
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getPost:
+        method: GET
+        path: "/posts/1"
+      getUser:
+        method: GET
+        path: "/users/1"
+
+chains:
+  jsonFormattingTest:
+    description: "Test JSON formatting in chain output"
+    steps:
+      - id: getPost
+        call: jsonplaceholder.getPost
+      - id: getUser
+        call: jsonplaceholder.getUser
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'jsonFormattingTest', '--config', testChainConfigFile, '--chain-output', 'full']);
+
+      expect(result.exitCode).toBe(0);
+      
+      // Parse the structured JSON output
+      const output = JSON.parse(result.stdout);
+      
+      // Verify the structure
+      expect(output).toHaveProperty('chainName', 'jsonFormattingTest');
+      expect(output).toHaveProperty('success', true);
+      expect(output).toHaveProperty('steps');
+      expect(Array.isArray(output.steps)).toBe(true);
+      expect(output.steps).toHaveLength(2);
+      
+      // Verify first step response body is parsed as JSON object, not string
+      const firstStep = output.steps[0];
+      expect(firstStep.response.body).toBeInstanceOf(Object);
+      expect(firstStep.response.body).toHaveProperty('id', 1);
+      expect(firstStep.response.body).toHaveProperty('title');
+      
+      // Verify second step response body is also parsed as JSON object
+      const secondStep = output.steps[1];
+      expect(secondStep.response.body).toBeInstanceOf(Object);
+      expect(secondStep.response.body).toHaveProperty('id', 1);
+      expect(secondStep.response.body).toHaveProperty('name');
+      expect(typeof secondStep.response.body.name).toBe('string');
+    });
+
+    it('should keep default output mode unchanged', async () => {
+      const config = `
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      getPost:
+        method: GET
+        path: "/posts/1"
+
+chains:
+  defaultOutputTest:
+    description: "Test default output mode"
+    steps:
+      - id: getPost
+        call: jsonplaceholder.getPost
+`;
+
+      writeFileSync(testChainConfigFile, config);
+
+      const result = await runCli(['chain', 'defaultOutputTest', '--config', testChainConfigFile]);
+
+      expect(result.exitCode).toBe(0);
+      
+      // Should output raw JSON string (not parsed object)
+      const output = JSON.parse(result.stdout);
+      expect(output).toHaveProperty('id', 1);
+      expect(output).toHaveProperty('title');
+      
+      // But the stdout itself should be a JSON string, not the structured format
+      expect(result.stdout).not.toContain('"chainName"');
+      expect(result.stdout).not.toContain('"steps"');
     });
   });
 }); 

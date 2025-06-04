@@ -364,8 +364,8 @@ apis:
         method: GET
         path: "/headers"
         headers:
-          X-API-Key: "{{plugins.cache.getKey('key', '{{profile.environment}}')}}"
-          Authorization: "{{plugins.cache.buildAuthHeader('{{plugins.cache.getKey('key', 'prod')}}', 'Token')}}"
+          X-API-Key: "{{plugins.cache.getKey(\\"key\\", \\"{{profile.environment}}\\\")}}"
+          Authorization: "{{plugins.cache.buildAuthHeader(\\"{{plugins.cache.getKey(\\"key\\", \\"prod\\\")}}\", \\"Token\\")}}"
 `;
 
       await fs.writeFile(configFile, config);

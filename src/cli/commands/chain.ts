@@ -108,26 +108,53 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
     if (result.success) {
       if (args.chainOutput === 'full') {
         // T10.3: Output structured JSON of all steps' resolved requests and responses
+        // T10.16: Attempt to format response bodies as JSON if possible
         const structuredOutput = {
           chainName: result.chainName,
           success: result.success,
-          steps: result.steps.map(step => ({
-            stepId: step.stepId,
-            request: {
-              method: step.request.method,
-              url: step.request.url,
-              headers: step.request.headers,
-              body: step.request.body
-            },
-            response: {
-              status: step.response.status,
-              statusText: step.response.statusText,
-              headers: step.response.headers,
-              body: step.response.body
-            },
-            success: step.success,
-            error: step.error
-          }))
+          steps: result.steps.map(step => {
+            // Attempt to parse and format response body as JSON
+            let formattedResponseBody = step.response.body;
+            try {
+              if (typeof step.response.body === 'string' && step.response.body.trim()) {
+                const parsed = JSON.parse(step.response.body);
+                formattedResponseBody = parsed;
+              }
+            } catch {
+              // If parsing fails, keep the original string
+              formattedResponseBody = step.response.body;
+            }
+
+            // Attempt to parse and format request body as JSON if it exists
+            let formattedRequestBody = step.request.body;
+            try {
+              if (typeof step.request.body === 'string' && step.request.body.trim()) {
+                const parsed = JSON.parse(step.request.body);
+                formattedRequestBody = parsed;
+              }
+            } catch {
+              // If parsing fails, keep the original value (string or undefined)
+              formattedRequestBody = step.request.body;
+            }
+
+            return {
+              stepId: step.stepId,
+              request: {
+                method: step.request.method,
+                url: step.request.url,
+                headers: step.request.headers,
+                body: formattedRequestBody
+              },
+              response: {
+                status: step.response.status,
+                statusText: step.response.statusText,
+                headers: step.response.headers,
+                body: formattedResponseBody
+              },
+              success: step.success,
+              error: step.error
+            };
+          })
         };
         console.log(JSON.stringify(structuredOutput, null, 2));
       } else {
@@ -139,6 +166,9 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
       }
     } else {
       console.error(`Chain execution failed: ${result.error}`);
+      if (args.verbose) {
+        console.error('Debug - result object:', JSON.stringify(result, null, 2));
+      }
       process.exit(1);
     }
     

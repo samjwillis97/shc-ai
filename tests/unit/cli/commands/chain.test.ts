@@ -5,7 +5,7 @@ import { chainExecutor } from '../../../../src/core/chainExecutor.js';
 import { variableResolver } from '../../../../src/core/variableResolver.js';
 import { PluginManager } from '../../../../src/core/pluginManager.js';
 import { httpClient } from '../../../../src/core/httpClient.js';
-import type { HttpCraftConfig } from '../../../../src/types/config.js';
+import type { HttpCraftConfig, ChainDefinition } from '../../../../src/types/config.js';
 import type { ChainExecutionResult } from '../../../../src/core/chainExecutor.js';
 
 // Mock the dependencies
@@ -127,6 +127,78 @@ describe('Chain Command', () => {
         steps: [
           {
             id: 'step1',
+            call: 'testApi.getUser'
+          }
+        ]
+      },
+      testChain: {
+        steps: [
+          {
+            id: 'testStep',
+            call: 'testApi.getUser'
+          }
+        ]
+      },
+      singleChain: {
+        steps: [
+          {
+            id: 'singleStep',
+            call: 'testApi.getUser'
+          }
+        ]
+      },
+      jsonTest: {
+        steps: [
+          {
+            id: 'jsonStep',
+            call: 'testApi.createUser'
+          }
+        ]
+      },
+      nonJsonTest: {
+        steps: [
+          {
+            id: 'textStep',
+            call: 'testApi.getUser'
+          }
+        ]
+      },
+      malformedTest: {
+        steps: [
+          {
+            id: 'malformedStep',
+            call: 'testApi.createUser'
+          }
+        ]
+      },
+      emptyTest: {
+        steps: [
+          {
+            id: 'emptyStep',
+            call: 'testApi.createUser'
+          },
+          {
+            id: 'undefinedStep',
+            call: 'testApi.getUser'
+          }
+        ]
+      },
+      mixedTest: {
+        steps: [
+          {
+            id: 'jsonStep',
+            call: 'testApi.createUser'
+          },
+          {
+            id: 'textStep',
+            call: 'testApi.getUser'
+          }
+        ]
+      },
+      defaultTest: {
+        steps: [
+          {
+            id: 'defaultStep',
             call: 'testApi.getUser'
           }
         ]
@@ -477,34 +549,25 @@ describe('Chain Command', () => {
         vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
         
         const mockResult: ChainExecutionResult = {
-          chainName: 'simpleChain',
           success: true,
-          steps: [
-            {
-              stepId: 'createUser',
-              request: { method: 'POST', url: 'https://api.test.com/users', headers: {}, body: {} },
-              response: { status: 201, statusText: 'Created', headers: {}, body: '{"id": 123, "name": "testuser"}' },
-              success: true
-            },
-            {
-              stepId: 'getUser',
-              request: { method: 'GET', url: 'https://api.test.com/users/123', headers: {}, body: undefined },
-              response: { status: 200, statusText: 'OK', headers: {}, body: '{"id": 123, "name": "testuser", "email": "test@example.com"}' },
-              success: true
-            }
-          ]
+          chainName: 'testChain',
+          steps: [{
+            stepId: 'testStep',
+            request: { method: 'GET', url: 'https://api.test.com/test', headers: {}, body: undefined },
+            response: { status: 200, statusText: 'OK', headers: {}, body: '{"message": "success"}' },
+            success: true
+          }]
         };
-        
+
         vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
 
         await handleChainCommand({
-          chainName: 'simpleChain',
-          config: 'test-config.yaml',
+          chainName: 'testChain',
+          config: 'test.yaml',
           chainOutput: 'default'
         });
 
-        // Should output the last step's response body (default behavior)
-        expect(consoleLogSpy).toHaveBeenCalledWith('{"id": 123, "name": "testuser", "email": "test@example.com"}');
+        expect(consoleLogSpy).toHaveBeenCalledWith('{"message": "success"}');
       });
 
       it('should output structured JSON when chainOutput is full', async () => {
@@ -512,56 +575,8 @@ describe('Chain Command', () => {
         vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
         
         const mockResult: ChainExecutionResult = {
-          chainName: 'simpleChain',
           success: true,
-          steps: [
-            {
-              stepId: 'createUser',
-              request: { 
-                method: 'POST', 
-                url: 'https://api.test.com/users', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: '{"name": "testuser", "email": "test@example.com"}' 
-              },
-              response: { 
-                status: 201, 
-                statusText: 'Created', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: '{"id": 123, "name": "testuser"}' 
-              },
-              success: true
-            },
-            {
-              stepId: 'getUser',
-              request: { 
-                method: 'GET', 
-                url: 'https://api.test.com/users/123', 
-                headers: { 'Authorization': 'Bearer token' }, 
-                body: undefined 
-              },
-              response: { 
-                status: 200, 
-                statusText: 'OK', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: '{"id": 123, "name": "testuser", "email": "test@example.com"}' 
-              },
-              success: true
-            }
-          ]
-        };
-        
-        vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
-
-        await handleChainCommand({
-          chainName: 'simpleChain',
-          config: 'test-config.yaml',
-          chainOutput: 'full'
-        });
-
-        // Should output structured JSON of all steps
-        const expectedOutput = {
-          chainName: 'simpleChain',
-          success: true,
+          chainName: 'testChain',
           steps: [
             {
               stepId: 'createUser',
@@ -577,15 +592,14 @@ describe('Chain Command', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: '{"id": 123, "name": "testuser"}'
               },
-              success: true,
-              error: undefined
+              success: true
             },
             {
               stepId: 'getUser',
               request: {
                 method: 'GET',
                 url: 'https://api.test.com/users/123',
-                headers: { 'Authorization': 'Bearer token' },
+                headers: {},
                 body: undefined
               },
               response: {
@@ -594,8 +608,54 @@ describe('Chain Command', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: '{"id": 123, "name": "testuser", "email": "test@example.com"}'
               },
-              success: true,
-              error: undefined
+              success: true
+            }
+          ]
+        };
+
+        vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
+
+        await handleChainCommand({
+          chainName: 'testChain',
+          config: 'test.yaml',
+          chainOutput: 'full'
+        });
+
+        const expectedOutput = {
+          chainName: 'testChain',
+          success: true,
+          steps: [
+            {
+              stepId: 'createUser',
+              request: {
+                method: 'POST',
+                url: 'https://api.test.com/users',
+                headers: { 'Content-Type': 'application/json' },
+                body: { name: 'testuser', email: 'test@example.com' }
+              },
+              response: {
+                status: 201,
+                statusText: 'Created',
+                headers: { 'Content-Type': 'application/json' },
+                body: { id: 123, name: 'testuser' }
+              },
+              success: true
+            },
+            {
+              stepId: 'getUser',
+              request: {
+                method: 'GET',
+                url: 'https://api.test.com/users/123',
+                headers: {},
+                body: undefined
+              },
+              response: {
+                status: 200,
+                statusText: 'OK',
+                headers: { 'Content-Type': 'application/json' },
+                body: { id: 123, name: 'testuser', email: 'test@example.com' }
+              },
+              success: true
             }
           ]
         };
@@ -608,46 +668,33 @@ describe('Chain Command', () => {
         vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
         
         const mockResult: ChainExecutionResult = {
-          chainName: 'minimalChain',
           success: true,
-          steps: [
-            {
-              stepId: 'step1',
-              request: { 
-                method: 'GET', 
-                url: 'https://api.test.com/users/123', 
-                headers: {}, 
-                body: undefined 
-              },
-              response: { 
-                status: 200, 
-                statusText: 'OK', 
-                headers: {}, 
-                body: '{"id": 123}' 
-              },
-              success: true
-            }
-          ]
+          chainName: 'singleChain',
+          steps: [{
+            stepId: 'singleStep',
+            request: { method: 'GET', url: 'https://api.test.com/test', headers: {}, body: undefined },
+            response: { status: 200, statusText: 'OK', headers: {}, body: '{"id": 123}' },
+            success: true
+          }]
         };
-        
+
         vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
 
         await handleChainCommand({
-          chainName: 'minimalChain',
-          config: 'test-config.yaml',
+          chainName: 'singleChain',
+          config: 'test.yaml',
           chainOutput: 'full'
         });
 
-        // Should output structured JSON for single step
         const expectedOutput = {
-          chainName: 'minimalChain',
+          chainName: 'singleChain',
           success: true,
           steps: [
             {
-              stepId: 'step1',
+              stepId: 'singleStep',
               request: {
                 method: 'GET',
-                url: 'https://api.test.com/users/123',
+                url: 'https://api.test.com/test',
                 headers: {},
                 body: undefined
               },
@@ -655,10 +702,9 @@ describe('Chain Command', () => {
                 status: 200,
                 statusText: 'OK',
                 headers: {},
-                body: '{"id": 123}'
+                body: { id: 123 }
               },
-              success: true,
-              error: undefined
+              success: true
             }
           ]
         };
@@ -706,6 +752,292 @@ describe('Chain Command', () => {
         // Should still show the error, not structured output when chain fails
         expect(consoleErrorSpy).toHaveBeenCalledWith("Chain execution failed: Step 'createUser' failed: HTTP 400: Bad Request");
         expect(consoleLogSpy).not.toHaveBeenCalled(); // No structured output on failure
+      });
+
+      describe('T10.16: JSON Formatting in Chain Output', () => {
+        it('should format response bodies as JSON objects when possible in full output', async () => {
+          vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
+          vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
+          
+          const mockResult: ChainExecutionResult = {
+            success: true,
+            chainName: 'jsonTest',
+            steps: [{
+              stepId: 'jsonStep',
+              request: { 
+                method: 'POST', 
+                url: 'https://api.test.com/data', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: '{"input": "test"}' 
+              },
+              response: { 
+                status: 200, 
+                statusText: 'OK', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: '{"result": "success", "id": 456}' 
+              },
+              success: true
+            }]
+          };
+
+          vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
+
+          await handleChainCommand({
+            chainName: 'jsonTest',
+            config: 'test.yaml',
+            chainOutput: 'full'
+          });
+
+          // Verify that JSON was properly formatted as objects
+          const loggedOutput = consoleLogSpy.mock.calls[0][0];
+          const parsedOutput = JSON.parse(loggedOutput);
+          
+          expect(parsedOutput.steps[0].request.body).toEqual({ input: 'test' });
+          expect(parsedOutput.steps[0].response.body).toEqual({ result: 'success', id: 456 });
+        });
+
+        it('should keep non-JSON response bodies as strings in full output', async () => {
+          vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
+          vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
+          
+          const mockResult: ChainExecutionResult = {
+            success: true,
+            chainName: 'nonJsonTest',
+            steps: [{
+              stepId: 'textStep',
+              request: { 
+                method: 'GET', 
+                url: 'https://api.test.com/text', 
+                headers: {}, 
+                body: undefined 
+              },
+              response: { 
+                status: 200, 
+                statusText: 'OK', 
+                headers: { 'Content-Type': 'text/plain' }, 
+                body: 'plain text response' 
+              },
+              success: true
+            }]
+          };
+
+          vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
+
+          await handleChainCommand({
+            chainName: 'nonJsonTest',
+            config: 'test.yaml',
+            chainOutput: 'full'
+          });
+
+          // Verify that non-JSON stayed as string
+          const loggedOutput = consoleLogSpy.mock.calls[0][0];
+          const parsedOutput = JSON.parse(loggedOutput);
+          
+          expect(parsedOutput.steps[0].response.body).toBe('plain text response');
+        });
+
+        it('should handle malformed JSON gracefully in full output', async () => {
+          vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
+          vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
+          
+          const mockResult: ChainExecutionResult = {
+            success: true,
+            chainName: 'malformedTest',
+            steps: [{
+              stepId: 'malformedStep',
+              request: { 
+                method: 'POST', 
+                url: 'https://api.test.com/bad', 
+                headers: {}, 
+                body: '{"malformed": json}' 
+              },
+              response: { 
+                status: 200, 
+                statusText: 'OK', 
+                headers: {}, 
+                body: '{"incomplete": }' 
+              },
+              success: true
+            }]
+          };
+
+          vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
+
+          await handleChainCommand({
+            chainName: 'malformedTest',
+            config: 'test.yaml',
+            chainOutput: 'full'
+          });
+
+          // Verify that malformed JSON stayed as strings
+          const loggedOutput = consoleLogSpy.mock.calls[0][0];
+          const parsedOutput = JSON.parse(loggedOutput);
+          
+          expect(parsedOutput.steps[0].request.body).toBe('{"malformed": json}');
+          expect(parsedOutput.steps[0].response.body).toBe('{"incomplete": }');
+        });
+
+        it('should handle empty and whitespace-only bodies in full output', async () => {
+          vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
+          vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
+          
+          const mockResult: ChainExecutionResult = {
+            success: true,
+            chainName: 'emptyTest',
+            steps: [
+              {
+                stepId: 'emptyStep',
+                request: { 
+                  method: 'POST', 
+                  url: 'https://api.test.com/empty', 
+                  headers: {}, 
+                  body: '' 
+                },
+                response: { 
+                  status: 204, 
+                  statusText: 'No Content', 
+                  headers: {}, 
+                  body: '   ' 
+                },
+                success: true
+              },
+              {
+                stepId: 'undefinedStep',
+                request: { 
+                  method: 'GET', 
+                  url: 'https://api.test.com/undefined', 
+                  headers: {}, 
+                  body: undefined 
+                },
+                response: { 
+                  status: 200, 
+                  statusText: 'OK', 
+                  headers: {}, 
+                  body: '' 
+                },
+                success: true
+              }
+            ]
+          };
+
+          vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
+
+          await handleChainCommand({
+            chainName: 'emptyTest',
+            config: 'test.yaml',
+            chainOutput: 'full'
+          });
+
+          // Verify empty/whitespace bodies are handled correctly
+          const loggedOutput = consoleLogSpy.mock.calls[0][0];
+          const parsedOutput = JSON.parse(loggedOutput);
+          
+          expect(parsedOutput.steps[0].request.body).toBe('');
+          expect(parsedOutput.steps[0].response.body).toBe('   ');
+          expect(parsedOutput.steps[1].request.body).toBe(undefined);
+          expect(parsedOutput.steps[1].response.body).toBe('');
+        });
+
+        it('should handle mixed JSON and non-JSON bodies across multiple steps', async () => {
+          vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
+          vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
+          
+          const mockResult: ChainExecutionResult = {
+            success: true,
+            chainName: 'mixedTest',
+            steps: [
+              {
+                stepId: 'jsonStep',
+                request: { 
+                  method: 'POST', 
+                  url: 'https://api.test.com/json', 
+                  headers: {}, 
+                  body: '{"type": "json"}' 
+                },
+                response: { 
+                  status: 200, 
+                  statusText: 'OK', 
+                  headers: {}, 
+                  body: '{"result": "json"}' 
+                },
+                success: true
+              },
+              {
+                stepId: 'textStep',
+                request: { 
+                  method: 'GET', 
+                  url: 'https://api.test.com/text', 
+                  headers: {}, 
+                  body: undefined 
+                },
+                response: { 
+                  status: 200, 
+                  statusText: 'OK', 
+                  headers: {}, 
+                  body: 'plain text' 
+                },
+                success: true
+              }
+            ]
+          };
+
+          vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
+
+          await handleChainCommand({
+            chainName: 'mixedTest',
+            config: 'test.yaml',
+            chainOutput: 'full'
+          });
+
+          // Verify mixed content is handled correctly
+          const loggedOutput = consoleLogSpy.mock.calls[0][0];
+          const parsedOutput = JSON.parse(loggedOutput);
+          
+          // JSON step should have parsed objects
+          expect(parsedOutput.steps[0].request.body).toEqual({ type: 'json' });
+          expect(parsedOutput.steps[0].response.body).toEqual({ result: 'json' });
+          
+          // Text step should have strings
+          expect(parsedOutput.steps[1].request.body).toBe(undefined);
+          expect(parsedOutput.steps[1].response.body).toBe('plain text');
+        });
+
+        it('should not affect default output mode (non-full)', async () => {
+          vi.mocked(configLoader.loadConfig).mockResolvedValue(mockConfig);
+          vi.mocked(variableResolver.mergeProfiles).mockReturnValue({});
+          
+          const mockResult: ChainExecutionResult = {
+            success: true,
+            chainName: 'defaultTest',
+            steps: [{
+              stepId: 'defaultStep',
+              request: { 
+                method: 'GET', 
+                url: 'https://api.test.com/default', 
+                headers: {}, 
+                body: undefined 
+              },
+              response: { 
+                status: 200, 
+                statusText: 'OK', 
+                headers: {}, 
+                body: '{"result": "default"}' 
+              },
+              success: true
+            }]
+          };
+
+          vi.mocked(chainExecutor.executeChain).mockResolvedValue(mockResult);
+
+          await handleChainCommand({
+            chainName: 'defaultTest',
+            config: 'test.yaml'
+            // chainOutput not specified, should default to 'default'
+          });
+
+          // Should output the raw response body as string (default behavior)
+          expect(consoleLogSpy).toHaveBeenCalledWith('{"result": "default"}');
+        });
       });
     });
   });
