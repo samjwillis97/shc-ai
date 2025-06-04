@@ -578,4 +578,20 @@ apis:
       expect(result.stdout).toContain('[choices: "default", "full"]');
     });
   });
+
+  describe('ZSH completion script', () => {
+    it('should support multiple --profile flags', async () => {
+      const result = await runCli(['completion', 'zsh']);
+      
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("'*--profile[Select profile(s) to use]:profile:_httpcraft_profiles'");
+    });
+
+    it('should support multiple --var flags', async () => {
+      const result = await runCli(['completion', 'zsh']);
+      
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("'*--var[Set or override a variable]:variable:'");
+    });
+  });
 }); 

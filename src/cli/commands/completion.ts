@@ -55,8 +55,8 @@ _httpcraft() {
         '1: :->command' \\
         '2: :->subcommand' \\
         '--config[Path to configuration file]:config file:_files -g "*.yaml"' \\
-        '--var[Set or override a variable]:variable:' \\
-        '--profile[Select profile(s) to use]:profile:_httpcraft_profiles' \\
+        '*--var[Set or override a variable]:variable:' \\
+        '*--profile[Select profile(s) to use]:profile:_httpcraft_profiles' \\
         '--verbose[Output detailed request and response information]' \\
         '--dry-run[Display the request without sending it]' \\
         '--exit-on-http-error[Exit with non-zero code for HTTP errors]:error pattern:' \\
