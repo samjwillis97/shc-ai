@@ -92,8 +92,33 @@ export class PluginManager {
     // Get merged configurations for this API
     const mergedConfigs = this.getMergedPluginConfigurations(apiPluginConfigs);
     
-    // Load plugins with merged configurations
-    await apiPluginManager.loadPlugins(mergedConfigs, configDir);
+    // If no API-level plugin configurations, we can reuse existing plugin instances
+    if (!apiPluginConfigs || apiPluginConfigs.length === 0) {
+      // Copy all existing plugin instances to the new manager
+      apiPluginManager.plugins = [...this.plugins];
+      apiPluginManager.globalPluginConfigs = [...this.globalPluginConfigs];
+      return apiPluginManager;
+    }
+    
+    // Create a map of API-level plugin names for quick lookup
+    const apiPluginNames = new Set(apiPluginConfigs.map(config => config.name));
+    
+    // For each merged config, either copy existing plugin or load with new config
+    for (const mergedConfig of mergedConfigs) {
+      if (apiPluginNames.has(mergedConfig.name)) {
+        // This plugin has API-level configuration, so we need to reload it with merged config
+        await apiPluginManager.loadPlugin(mergedConfig, configDir);
+      } else {
+        // This plugin is global-only, copy the existing instance
+        const existingPlugin = this.plugins.find(p => p.name === mergedConfig.name);
+        if (existingPlugin) {
+          apiPluginManager.plugins.push(existingPlugin);
+        } else {
+          // Fallback: load the plugin (shouldn't normally happen)
+          await apiPluginManager.loadPlugin(mergedConfig, configDir);
+        }
+      }
+    }
     
     return apiPluginManager;
   }
@@ -102,7 +127,7 @@ export class PluginManager {
    * Load a single plugin from configuration
    * T10.7: Support loading from both local files and npm packages
    */
-  private async loadPlugin(pluginConfig: PluginConfiguration, configDir: string): Promise<void> {
+  async loadPlugin(pluginConfig: PluginConfiguration, configDir: string): Promise<void> {
     try {
       let pluginPath: string;
       let pluginSource: string;

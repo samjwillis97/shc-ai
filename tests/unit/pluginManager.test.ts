@@ -1142,4 +1142,202 @@ export default {
       vi.doUnmock('test-npm-plugin');
     });
   });
+
+  describe('Bug Fix: Plugin setup should not be called twice', () => {
+    it('should not call plugin setup twice when using API-level configurations', async () => {
+      let setupCallCount = 0;
+      
+      // Create a test plugin that tracks setup calls
+      const trackingPluginPath = path.join(tempDir, 'tracking-plugin.js');
+      const trackingPluginContent = `
+let setupCallCount = 0;
+
+export default {
+  async setup(context) {
+    setupCallCount++;
+    // Store the count on the plugin instance for verification
+    this.setupCallCount = setupCallCount;
+    
+    context.registerPreRequestHook(async (request) => {
+      request.headers['X-Setup-Call-Count'] = setupCallCount.toString();
+    });
+  }
+};
+`;
+      await fs.writeFile(trackingPluginPath, trackingPluginContent);
+
+      // Setup global plugins
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './tracking-plugin.js',
+          name: 'trackingPlugin',
+          config: { globalKey: 'globalValue' }
+        }
+      ];
+
+      // Setup API-level plugin override
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          path: '', // Path comes from global config
+          name: 'trackingPlugin',
+          config: { apiKey: 'apiValue' }
+        }
+      ];
+
+      // Load global plugins first
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      // Verify global plugin was loaded
+      expect(pluginManager.getPlugins()).toHaveLength(1);
+      
+      // Load API-specific plugins (this should not call setup again for plugins without config changes)
+      const apiPluginManager = await pluginManager.loadApiPlugins(apiConfigs, tempDir);
+      
+      // Verify API plugin manager has the plugin
+      expect(apiPluginManager.getPlugins()).toHaveLength(1);
+      
+      // Test that setup was called exactly once for the API-level configured plugin
+      // (it should be called once for global, then once more for API-level with different config)
+      const request = {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {}
+      };
+
+      await apiPluginManager.executePreRequestHooks(request);
+      
+      // The setup should have been called exactly twice:
+      // 1. Once during global plugin loading
+      // 2. Once during API plugin loading (because it has different config)
+      expect(request.headers['X-Setup-Call-Count']).toBe('2');
+    });
+
+    it('should not reload plugins when no API-level configurations are provided', async () => {
+      // Create a test plugin that tracks setup calls - with unique filename
+      const trackingPluginPath = path.join(tempDir, 'tracking-plugin-2.js');
+      const trackingPluginContent = `
+let setupCallCount = 0;
+
+export default {
+  async setup(context) {
+    setupCallCount++;
+    
+    context.registerPreRequestHook(async (request) => {
+      request.headers['X-Setup-Call-Count'] = setupCallCount.toString();
+    });
+  }
+};
+`;
+      await fs.writeFile(trackingPluginPath, trackingPluginContent);
+
+      // Setup global plugins
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './tracking-plugin-2.js',
+          name: 'trackingPlugin',
+          config: { globalKey: 'globalValue' }
+        }
+      ];
+
+      // Load global plugins first
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      // Load API-specific plugins with no API-level configurations
+      const apiPluginManager = await pluginManager.loadApiPlugins(undefined, tempDir);
+      
+      // Test that the original plugin instance was reused
+      const globalPlugins = pluginManager.getPlugins();
+      const apiPlugins = apiPluginManager.getPlugins();
+      
+      expect(apiPlugins).toHaveLength(1);
+      expect(apiPlugins[0]).toBe(globalPlugins[0]); // Should be the same instance
+      
+      // Test that setup was called exactly once
+      const request = {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {}
+      };
+
+      await apiPluginManager.executePreRequestHooks(request);
+      expect(request.headers['X-Setup-Call-Count']).toBe('1');
+    });
+
+    it('should only reload plugins that have API-level configurations', async () => {
+      // Create two test plugins that track setup calls - with unique filenames
+      const plugin1Path = path.join(tempDir, 'plugin1-unique.js');
+      const plugin1Content = `
+let setupCallCount = 0;
+
+export default {
+  async setup(context) {
+    setupCallCount++;
+    
+    context.registerPreRequestHook(async (request) => {
+      request.headers['X-Plugin1-Setup-Count'] = setupCallCount.toString();
+    });
+  }
+};
+`;
+      await fs.writeFile(plugin1Path, plugin1Content);
+
+      const plugin2Path = path.join(tempDir, 'plugin2-unique.js');
+      const plugin2Content = `
+let setupCallCount = 0;
+
+export default {
+  async setup(context) {
+    setupCallCount++;
+    
+    context.registerPreRequestHook(async (request) => {
+      request.headers['X-Plugin2-Setup-Count'] = setupCallCount.toString();
+    });
+  }
+};
+`;
+      await fs.writeFile(plugin2Path, plugin2Content);
+
+      // Setup global plugins
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './plugin1-unique.js',
+          name: 'plugin1',
+          config: { key: 'global1' }
+        },
+        {
+          path: './plugin2-unique.js',
+          name: 'plugin2',
+          config: { key: 'global2' }
+        }
+      ];
+
+      // Only override plugin1 at API level
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          path: '',
+          name: 'plugin1',
+          config: { key: 'api1' }
+        }
+      ];
+
+      // Load global plugins first
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      // Load API-specific plugins
+      const apiPluginManager = await pluginManager.loadApiPlugins(apiConfigs, tempDir);
+      
+      // Test the hooks
+      const request = {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {}
+      };
+
+      await apiPluginManager.executePreRequestHooks(request);
+      
+      // Plugin1 should have been setup twice (global + API), plugin2 only once (global)
+      expect(request.headers['X-Plugin1-Setup-Count']).toBe('2');
+      expect(request.headers['X-Plugin2-Setup-Count']).toBe('1');
+    });
+  });
 }); 
