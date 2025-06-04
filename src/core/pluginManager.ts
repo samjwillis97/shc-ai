@@ -60,7 +60,9 @@ export class PluginManager {
 
       // T10.3: Merge configurations (API-level overwrites global keys)
       const mergedConfig: PluginConfiguration = {
-        path: globalConfig.path, // Path always comes from global config
+        // T10.7: Copy the source field (path or npmPackage) from global config
+        path: globalConfig.path,
+        npmPackage: globalConfig.npmPackage,
         name: apiConfig.name,
         config: {
           ...globalConfig.config, // Start with global config
@@ -98,11 +100,31 @@ export class PluginManager {
 
   /**
    * Load a single plugin from configuration
+   * T10.7: Support loading from both local files and npm packages
    */
   private async loadPlugin(pluginConfig: PluginConfiguration, configDir: string): Promise<void> {
     try {
-      // Resolve plugin path relative to config file directory
-      const pluginPath = path.resolve(configDir, pluginConfig.path);
+      let pluginPath: string;
+      let pluginSource: string;
+
+      // Validate that either path or npmPackage is specified
+      if (!pluginConfig.path && !pluginConfig.npmPackage) {
+        throw new Error(`Plugin '${pluginConfig.name}' must specify either 'path' or 'npmPackage'`);
+      }
+
+      if (pluginConfig.path && pluginConfig.npmPackage) {
+        throw new Error(`Plugin '${pluginConfig.name}' cannot specify both 'path' and 'npmPackage'`);
+      }
+
+      // T10.7: Handle npm package loading
+      if (pluginConfig.npmPackage) {
+        pluginPath = pluginConfig.npmPackage;
+        pluginSource = `npm package '${pluginConfig.npmPackage}'`;
+      } else {
+        // Handle local file loading
+        pluginPath = path.resolve(configDir, pluginConfig.path!);
+        pluginSource = `local file '${pluginPath}'`;
+      }
       
       // Dynamic import of the plugin module
       const pluginModule = await import(pluginPath);
@@ -111,7 +133,7 @@ export class PluginManager {
       const plugin: Plugin = pluginModule.default || pluginModule;
       
       if (!plugin || typeof plugin.setup !== 'function') {
-        throw new Error(`Plugin at ${pluginPath} does not export a valid Plugin object with a setup method`);
+        throw new Error(`Plugin from ${pluginSource} does not export a valid Plugin object with a setup method`);
       }
 
       // Create plugin instance
@@ -148,10 +170,11 @@ export class PluginManager {
       
       // Use process.stderr.write instead of console.debug to avoid polluting stdout
       if (process.env.NODE_ENV === 'development') {
-        process.stderr.write(`[PluginManager] Loaded plugin '${pluginConfig.name}' from ${pluginPath}\n`);
+        process.stderr.write(`[PluginManager] Loaded plugin '${pluginConfig.name}' from ${pluginSource}\n`);
       }
     } catch (error) {
-      throw new Error(`Failed to load plugin '${pluginConfig.name}' from ${pluginConfig.path}: ${error instanceof Error ? error.message : String(error)}`);
+      const source = pluginConfig.npmPackage ? `npm package '${pluginConfig.npmPackage}'` : `local file '${pluginConfig.path}'`;
+      throw new Error(`Failed to load plugin '${pluginConfig.name}' from ${source}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

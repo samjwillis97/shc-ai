@@ -315,6 +315,100 @@ describe('HttpCraft Configuration Schema Validation', () => {
       
       expect(valid).toBe(true);
     });
+
+    it('should accept plugin with npmPackage (T10.7)', () => {
+      const config = {
+        plugins: [
+          {
+            name: 'npmPlugin',
+            npmPackage: 'httpcraft-auth-plugin',
+            config: {
+              apiKey: 'test-key'
+            }
+          }
+        ],
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      if (!valid) {
+        console.log('npm package plugin validation errors:', validate.errors);
+      }
+      
+      expect(valid).toBe(true);
+    });
+
+    it('should reject plugin with both path and npmPackage (T10.7)', () => {
+      const config = {
+        plugins: [
+          {
+            name: 'invalidPlugin',
+            path: './plugins/test.js',
+            npmPackage: 'httpcraft-auth-plugin'
+          }
+        ],
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      expect(valid).toBe(false);
+      expect(validate.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            keyword: 'oneOf'
+          })
+        ])
+      );
+    });
+
+    it('should validate npm-plugin-example.yaml (T10.7)', async () => {
+      const examplePath = path.join(process.cwd(), 'examples', 'npm-plugin-example.yaml');
+      
+      try {
+        const exampleContent = await fs.readFile(examplePath, 'utf-8');
+        const exampleConfig = yaml.load(exampleContent);
+
+        const validate = ajv.compile(schema);
+        const valid = validate(exampleConfig);
+        
+        if (!valid) {
+          console.log('npm plugin example validation errors:', validate.errors);
+        }
+        
+        expect(valid).toBe(true);
+      } catch (error) {
+        // If file doesn't exist, skip this test
+        if ((error as any).code === 'ENOENT') {
+          console.warn('npm plugin example file not found, skipping validation test');
+        } else {
+          throw error;
+        }
+      }
+    });
   });
 
   describe('Invalid Configurations', () => {

@@ -44,7 +44,8 @@ export interface SecretsConfiguration {
 }
 
 export interface PluginConfiguration {
-  path: string;
+  path?: string;
+  npmPackage?: string;
   name: string;
   config?: Record<string, any>;
 }

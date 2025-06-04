@@ -881,4 +881,265 @@ export default {
       expect(apiConfigsWithVariables[0].config?.nested).toEqual({ value: '{{nestedVar}}' });
     });
   });
+
+  describe('T10.7: npm Plugin Loading', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should validate that either path or npmPackage is specified', async () => {
+      const pluginConfig: PluginConfiguration = {
+        name: 'invalidPlugin'
+        // Missing both path and npmPackage
+      };
+
+      await expect(pluginManager.loadPlugins([pluginConfig], process.cwd()))
+        .rejects.toThrow("Plugin 'invalidPlugin' must specify either 'path' or 'npmPackage'");
+    });
+
+    it('should validate that both path and npmPackage cannot be specified', async () => {
+      const pluginConfig: PluginConfiguration = {
+        path: './test-plugin.js',
+        npmPackage: 'test-npm-plugin',
+        name: 'invalidPlugin'
+      };
+
+      await expect(pluginManager.loadPlugins([pluginConfig], process.cwd()))
+        .rejects.toThrow("Plugin 'invalidPlugin' cannot specify both 'path' and 'npmPackage'");
+    });
+
+    it('should attempt to load plugin from npm package', async () => {
+      // Mock the npm plugin module
+      const mockPlugin = {
+        async setup(context: any) {
+          context.registerPreRequestHook(async (request: any) => {
+            request.headers['X-NPM-Plugin'] = 'npm-loaded';
+          });
+        }
+      };
+
+      // Mock the dynamic import for this specific package
+      vi.doMock('test-npm-plugin', () => ({ default: mockPlugin }));
+
+      const pluginConfig: PluginConfiguration = {
+        npmPackage: 'test-npm-plugin',
+        name: 'npmPlugin',
+        config: { testConfig: 'npm-test' }
+      };
+
+      await pluginManager.loadPlugins([pluginConfig], process.cwd());
+
+      // Verify the plugin was loaded
+      const plugins = pluginManager.getPlugins();
+      expect(plugins).toHaveLength(1);
+      expect(plugins[0].name).toBe('npmPlugin');
+      expect(plugins[0].config).toEqual({ testConfig: 'npm-test' });
+
+      // Test that the plugin hooks work
+      const request = {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {}
+      };
+
+      await pluginManager.executePreRequestHooks(request);
+      expect(request.headers['X-NPM-Plugin']).toBe('npm-loaded');
+
+      // Clean up the mock
+      vi.doUnmock('test-npm-plugin');
+    });
+
+    it('should handle npm package not found error', async () => {
+      const pluginConfig: PluginConfiguration = {
+        npmPackage: 'nonexistent-plugin',
+        name: 'missingPlugin'
+      };
+
+      await expect(pluginManager.loadPlugins([pluginConfig], process.cwd()))
+        .rejects.toThrow("Failed to load plugin 'missingPlugin' from npm package 'nonexistent-plugin'");
+    });
+
+    it('should handle npm plugin without valid setup method', async () => {
+      // Mock an npm package that doesn't export a valid plugin
+      const invalidNpmPlugin = {
+        someOtherMethod() {}
+        // Missing setup method
+      };
+
+      vi.doMock('invalid-npm-plugin', () => ({ default: invalidNpmPlugin }));
+
+      const pluginConfig: PluginConfiguration = {
+        npmPackage: 'invalid-npm-plugin',
+        name: 'invalidNpmPlugin'
+      };
+
+      await expect(pluginManager.loadPlugins([pluginConfig], process.cwd()))
+        .rejects.toThrow("Plugin from npm package 'invalid-npm-plugin' does not export a valid Plugin object with a setup method");
+
+      // Clean up the mock
+      vi.doUnmock('invalid-npm-plugin');
+    });
+
+    it('should support npm packages in API-level plugin configuration merging', async () => {
+      // Create a mock npm plugin
+      const mockNpmPlugin = {
+        async setup(context: any) {
+          // Mock plugin setup
+        }
+      };
+
+      vi.doMock('global-npm-plugin', () => ({ default: mockNpmPlugin }));
+
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          npmPackage: 'global-npm-plugin',
+          name: 'npmPlugin',
+          config: {
+            globalKey: 'globalValue',
+            sharedKey: 'globalSharedValue'
+          }
+        }
+      ];
+
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          // API configs don't specify npmPackage - it comes from global
+          name: 'npmPlugin',
+          config: {
+            apiKey: 'apiValue',
+            sharedKey: 'apiSharedValue' // Should override global value
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, process.cwd());
+      
+      const mergedConfigs = pluginManager.getMergedPluginConfigurations(apiConfigs);
+      
+      expect(mergedConfigs).toHaveLength(1);
+      expect(mergedConfigs[0].name).toBe('npmPlugin');
+      expect(mergedConfigs[0].npmPackage).toBe('global-npm-plugin'); // From global config
+      expect(mergedConfigs[0].path).toBeUndefined(); // Should not have path
+      expect(mergedConfigs[0].config).toEqual({
+        globalKey: 'globalValue',
+        sharedKey: 'apiSharedValue', // API value should override global
+        apiKey: 'apiValue'
+      });
+
+      // Clean up the mock
+      vi.doUnmock('global-npm-plugin');
+    });
+
+    it('should load npm plugins with named exports', async () => {
+      // Mock an npm package that has the plugin as a named export
+      // We'll mock it with a default export that is undefined, so the fallback logic kicks in
+      const mockPlugin = {
+        async setup(context: any) {
+          context.registerPreRequestHook(async (request: any) => {
+            request.headers['X-Named-Export'] = 'named-export-loaded';
+          });
+        }
+      };
+
+      // Mock a module where default is undefined but the module itself is the plugin
+      vi.doMock('named-export-plugin', () => ({
+        default: undefined,
+        ...mockPlugin  // Spread the plugin properties directly on the module
+      }));
+
+      const pluginConfig: PluginConfiguration = {
+        npmPackage: 'named-export-plugin',
+        name: 'namedExportPlugin'
+      };
+
+      await pluginManager.loadPlugins([pluginConfig], process.cwd());
+
+      // Verify the plugin was loaded
+      const plugins = pluginManager.getPlugins();
+      expect(plugins).toHaveLength(1);
+      expect(plugins[0].name).toBe('namedExportPlugin');
+
+      // Test that the plugin hooks work
+      const request = {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {}
+      };
+
+      await pluginManager.executePreRequestHooks(request);
+      expect(request.headers['X-Named-Export']).toBe('named-export-loaded');
+
+      // Clean up the mock
+      vi.doUnmock('named-export-plugin');
+    });
+
+    it('should preserve npm package source in error messages', async () => {
+      // Mock import to throw during plugin setup
+      const mockPlugin = {
+        async setup(context: any) {
+          throw new Error('Plugin setup failed');
+        }
+      };
+
+      vi.doMock('failing-npm-plugin', () => ({ default: mockPlugin }));
+
+      const pluginConfig: PluginConfiguration = {
+        npmPackage: 'failing-npm-plugin',
+        name: 'failingPlugin'
+      };
+
+      await expect(pluginManager.loadPlugins([pluginConfig], process.cwd()))
+        .rejects.toThrow("Failed to load plugin 'failingPlugin' from npm package 'failing-npm-plugin': Plugin setup failed");
+
+      // Clean up the mock
+      vi.doUnmock('failing-npm-plugin');
+    });
+
+    it('should create API-specific plugin manager with npm package configurations', async () => {
+      // Mock npm plugin
+      const mockNpmPlugin = {
+        async setup(context: any) {
+          // Store config for verification
+          this.mergedConfig = context.config;
+        }
+      };
+
+      vi.doMock('test-npm-plugin', () => ({ default: mockNpmPlugin }));
+
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          npmPackage: 'test-npm-plugin',
+          name: 'testNpmPlugin',
+          config: {
+            globalKey: 'globalValue'
+          }
+        }
+      ];
+
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          name: 'testNpmPlugin',
+          config: {
+            apiKey: 'apiValue'
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, process.cwd());
+      
+      const apiPluginManager = await pluginManager.loadApiPlugins(apiConfigs, process.cwd());
+      
+      // Verify that the API plugin manager was created with merged configurations
+      const apiPlugins = apiPluginManager.getPlugins();
+      expect(apiPlugins).toHaveLength(1);
+      expect(apiPlugins[0].name).toBe('testNpmPlugin');
+      expect(apiPlugins[0].config).toEqual({
+        globalKey: 'globalValue',
+        apiKey: 'apiValue'
+      });
+
+      // Clean up the mock
+      vi.doUnmock('test-npm-plugin');
+    });
+  });
 }); 

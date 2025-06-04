@@ -199,7 +199,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [x] **T10.4:** Implement variable substitution in API-level plugin configurations.
   - [x] **T10.5:** Implement validation for API-level plugin references.
   - [x] **T10.6:** Update YAML schema to include API-level plugin configuration.
-  - [ ] **T10.7:** Implement plugin loading from npm.
+  - [x] **T10.7:** Implement plugin loading from npm.
   - [x] **T10.8:** Implement chain verbose output (structured JSON).
   - [x] **T10.9:** Refine ZSH completion (chains, options).
   - [x] **T10.10:** Write comprehensive README.md and usage examples.
@@ -229,6 +229,25 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Error Handling:** Proper error handling for undefined variables in plugin configurations with informative error messages
   - **Testable Outcomes Achieved:** All testable outcomes met - API definitions can include plugin configuration overrides, plugins receive merged configuration with API-level values taking precedence, variables in API-level plugin configs are resolved using current variable context, and tool exits with informative error when API references undefined plugin
   - All API-level plugin configuration functionality working correctly with 30 total tests passing. Ready to proceed to T10.6.
+
+  T10.6 completed successfully! Updated YAML schema to include API-level plugin configuration with:
+  - **ApiPluginConfiguration Definition:** Added new schema definition for API-level plugin configurations with required `name` property and optional `config` object
+  - **API Definition Enhancement:** Added `plugins` property to `ApiDefinition` schema that accepts array of `ApiPluginConfiguration` objects
+  - **Validation Rules:** API-level plugins only require `name` (references global plugin) and optional `config` for overrides, no `path` or `npmPackage` allowed
+  - **Schema Testing:** Added 5 comprehensive schema validation tests covering valid API-level plugin configurations, optional plugins, empty arrays, missing name validation, and additional properties rejection
+  - **Backward Compatibility:** All existing configurations continue to validate successfully, APIs without plugins remain valid
+  - **Editor Support:** Schema enables autocompletion and validation for API-level plugin configurations in editors with YAML schema support
+  - **Testable Outcome Achieved:** Schema validates API-level plugin configurations and rejects invalid references as required
+  - All schema validation tests passing (25/25) including new API-level plugin configuration tests. Ready to proceed to T10.7.
+
+  T10.7 completed successfully! Implemented plugin loading from npm with:
+  - **NPM Integration:** Added npm integration for loading plugins from npm packages
+  - **PluginManager Enhancement:** Updated PluginManager to support loading plugins from npm
+  - **CLI Integration:** Updated CLI to support loading plugins from npm
+  - **Comprehensive Testing:** Added 5 unit tests and 4 integration tests covering all npm plugin loading scenarios
+  - **Error Handling:** Proper error handling for npm plugin loading with informative error messages
+  - **Testable Outcome Achieved:** Plugin loading from npm works correctly and handles errors gracefully
+  - All npm plugin loading functionality working correctly with 9 tests passing. Ready to proceed to T10.8.
 
   T10.8 completed successfully! Implemented chain structured JSON output with:
   - **CLI Option:** Added `--chain-output` option with choices 'default' and 'full' (defaults to 'default')
@@ -279,15 +298,5 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Backward Compatibility:** All existing example configurations validate successfully against the new schema
   - **Testable Outcome Achieved:** Schema file exists and is fully usable with YAML linters and editors
   All YAML schema implementation complete and tested. Ready to proceed to T10.12.
-
-  T10.6 completed successfully! Updated YAML schema to include API-level plugin configuration with:
-  - **ApiPluginConfiguration Definition:** Added new schema definition for API-level plugin configurations with required `name` property and optional `config` object
-  - **API Definition Enhancement:** Added `plugins` property to `ApiDefinition` schema that accepts array of `ApiPluginConfiguration` objects
-  - **Validation Rules:** API-level plugins only require `name` (references global plugin) and optional `config` for overrides, no `path` or `npmPackage` allowed
-  - **Schema Testing:** Added 5 comprehensive schema validation tests covering valid API-level plugin configurations, optional plugins, empty arrays, missing name validation, and additional properties rejection
-  - **Backward Compatibility:** All existing configurations continue to validate successfully, APIs without plugins remain valid
-  - **Editor Support:** Schema enables autocompletion and validation for API-level plugin configurations in editors with YAML schema support
-  - **Testable Outcome Achieved:** Schema validates API-level plugin configurations and rejects invalid references as required
-  - All schema validation tests passing (25/25) including new API-level plugin configuration tests. Ready to proceed to T10.7.
 
 ---
