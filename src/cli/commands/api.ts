@@ -41,10 +41,6 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     const globalPluginManager = new PluginManager();
     let configDir = path.dirname(configPath);
     
-    if (config.plugins && config.plugins.length > 0) {
-      await globalPluginManager.loadPlugins(config.plugins, configDir);
-    }
-    
     // Find API
     const api = config.apis[args.apiName];
     if (!api) {
@@ -92,7 +88,7 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       mergedProfileVars = variableResolver.mergeProfiles(profileNames, config.profiles);
     }
     
-    // Create initial variable context (without plugin variables since we need to resolve API plugin configs first)
+    // Create initial variable context for global plugin configuration resolution
     const initialVariableContext = variableResolver.createContext(
       args.variables || {},
       mergedProfileVars,
@@ -101,6 +97,26 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       undefined, // No plugin variables yet
       config.globalVariables // T9.3: Global variables
     );
+    
+    // Resolve variables in global plugin configurations before loading plugins
+    let resolvedGlobalPluginConfigs: PluginConfiguration[] | undefined;
+    if (config.plugins && config.plugins.length > 0) {
+      try {
+        resolvedGlobalPluginConfigs = await variableResolver.resolveValue(config.plugins, initialVariableContext) as PluginConfiguration[];
+      } catch (error) {
+        if (error instanceof VariableResolutionError) {
+          console.error(`Error: Failed to resolve variables in global plugin configuration: ${error.message}`);
+          process.exit(1);
+        } else {
+          throw error;
+        }
+      }
+    }
+    
+    // Load global plugins with resolved configurations
+    if (resolvedGlobalPluginConfigs && resolvedGlobalPluginConfigs.length > 0) {
+      await globalPluginManager.loadPlugins(resolvedGlobalPluginConfigs, configDir);
+    }
     
     // T10.4: Apply variable substitution to API-level plugin configurations
     let resolvedApiPluginConfigs: PluginConfiguration[] | undefined;
