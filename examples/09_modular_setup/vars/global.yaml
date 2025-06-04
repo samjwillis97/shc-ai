@@ -1,0 +1,3 @@
+# Global variables for the modular setup example
+globalTimeout: 30000
+globalRetries: 3

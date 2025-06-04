@@ -1,2 +1,12 @@
 .direnv/
 .env
+dist/
+node_modules/
+
+# Test files (should be in tests/fixtures/ or cleaned up)
+*test*.yaml
+.httpcraft-test-*.yaml
+test-*.yaml
+
+# Temporary httpcraft config files
+.httpcraft.yaml

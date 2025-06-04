@@ -1,0 +1,60 @@
+# Example configuration demonstrating T10.15 parameterized plugin functions
+# This shows how to use functions with arguments in plugin variables
+
+profiles:
+  dev:
+    environment: "dev"
+    username: "alice"
+  prod:
+    environment: "prod"
+    username: "bob"
+
+plugins:
+  - path: ./examples/plugins/cachePlugin.js
+    name: cache
+    config:
+      defaultEnvironment: "dev"
+
+apis:
+  example-api:
+    # Use parameterized function to get environment-specific base URL
+    baseUrl: "{{plugins.cache.buildUrl('{{environment}}', '/api/v1')}}"
+    headers:
+      Authorization: "Bearer {{plugins.cache.getToken('{{username}}', 'user')}}"
+      X-API-Key: "{{plugins.cache.get('api-key', '{{environment}}')}}"
+      X-Request-ID: "{{plugins.cache.timestamp}}"
+    endpoints:
+      get-user:
+        method: GET
+        path: "/users/{{userId}}"
+      create-user:
+        method: POST
+        path: "/users"
+        headers:
+          # Override with different token type for admin operations
+          Authorization: "Bearer {{plugins.cache.getToken('{{username}}', 'admin')}}"
+        body:
+          name: "{{userName}}"
+          email: "{{userEmail}}"
+          created_at: "{{plugins.cache.timestamp}}"
+
+chains:
+  user-workflow:
+    description: "Demonstrates parameterized functions in chains"
+    vars:
+      userId: "123"
+      userName: "John Doe"
+      userEmail: "john@example.com"
+    steps:
+      - id: create-user
+        call: example-api.create-user
+        with:
+          headers:
+            # Use variable in function argument
+            Authorization: "Bearer {{plugins.cache.getToken('{{username}}', 'admin')}}"
+      - id: get-user
+        call: example-api.get-user
+        with:
+          # Use response from previous step
+          pathParams:
+            userId: "{{steps.create-user.response.body.id}}" 

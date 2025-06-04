@@ -1,0 +1,118 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Code Style and Formatting
+
+This rule defines the code style and formatting standards for HttpCraft.
+
+## TypeScript Configuration
+
+1. Use strict TypeScript settings:
+   - `strict: true`
+   - `noImplicitAny: true`
+   - `strictNullChecks: true`
+   - `strictFunctionTypes: true`
+
+2. Use modern TypeScript features:
+   - ES2020 or later
+   - Decorators
+   - Type assertions
+   - Type guards
+
+## Code Formatting
+
+1. Use Prettier for code formatting:
+   - Single quotes for strings
+   - Double quotes for JSX
+   - 2 spaces for indentation
+   - 80 character line length
+   - Semicolons required
+   - Trailing commas in multiline
+
+2. File formatting:
+   - UTF-8 encoding
+   - LF line endings
+   - No BOM
+   - No trailing whitespace
+
+## Code Style
+
+1. Functions:
+   - Use arrow functions for callbacks
+   - Use function declarations for hoisting
+   - Keep functions focused and small
+   - Document parameters and return types
+
+2. Variables:
+   - Use `const` by default
+   - Use `let` when reassignment is needed
+   - Avoid `var`
+   - Initialize variables when declared
+
+3. Classes:
+   - Use PascalCase for class names
+   - Document public methods
+   - Keep classes focused
+   - Use interfaces for public APIs
+
+4. Types:
+   - Use interfaces for object types
+   - Use type aliases for unions/intersections
+   - Use enums for constants
+   - Document complex types
+
+## Error Handling
+
+1. Use custom error classes:
+   - Extend `Error`
+   - Include error codes
+   - Provide helpful messages
+   - Include stack traces
+
+2. Error handling patterns:
+   - Use try/catch blocks
+   - Handle specific error types
+   - Log errors appropriately
+   - Clean up resources
+
+## Documentation
+
+1. JSDoc comments:
+   - Document public APIs
+   - Include parameter types
+   - Include return types
+   - Include examples
+
+2. Code comments:
+   - Explain complex logic
+   - Document assumptions
+   - Explain workarounds
+   - Keep comments up to date
+
+## Best Practices
+
+1. Code organization:
+   - One class per file
+   - Related functions together
+   - Clear file structure
+   - Logical grouping
+
+2. Naming:
+   - Clear and descriptive
+   - Consistent with conventions
+   - Avoid abbreviations
+   - Use domain terminology
+
+3. Performance:
+   - Avoid unnecessary operations
+   - Use appropriate data structures
+   - Cache expensive operations
+   - Profile when needed
+
+4. Security:
+   - Validate input
+   - Sanitize output
+   - Handle sensitive data
+   - Follow security best practices

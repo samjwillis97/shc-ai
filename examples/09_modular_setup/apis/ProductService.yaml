@@ -1,0 +1,11 @@
+# examples/09_modular_setup/apis/ProductService.yaml
+# Defines the 'productService' API
+productService:
+  baseUrl: "{{profile.productBaseUrl}}"
+  endpoints:
+    getProducts:
+      method: GET
+      path: "/products"
+    getProduct:
+      method: GET
+      path: "/products/{{productId}}"

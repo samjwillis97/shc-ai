@@ -1,0 +1,143 @@
+# HttpCraft Comprehensive Example Configuration
+# This file demonstrates all major features of HttpCraft
+
+config:
+  defaultProfile: "dev"
+
+profiles:
+  dev:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    apiKey: "dev-key-123"
+  staging:
+    baseUrl: "https://staging-api.example.com"
+    apiKey: "staging-key-456" 
+  prod:
+    baseUrl: "https://api.example.com"
+    apiKey: "{{secret.PROD_API_KEY}}"
+
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    headers:
+      User-Agent: "HttpCraft/1.0"
+    variables:
+      version: "v1"
+    endpoints:
+      getTodo:
+        description: "Fetches a single todo item"
+        method: GET
+        path: "/todos/{{todoId}}"
+        variables:
+          todoId: 1
+        
+      listTodos:
+        description: "Lists all todos"
+        method: GET
+        path: "/todos"
+        
+      createPost:
+        description: "Creates a new post"
+        method: POST
+        path: "/posts"
+        headers:
+          Content-Type: "application/json; charset=UTF-8"
+        body:
+          title: "{{title}}"
+          body: "{{body}}"
+          userId: "{{userId}}"
+        variables:
+          title: "Default Title"
+          body: "Default body content"
+          userId: 1
+          
+      getPost:
+        description: "Fetches a single post"
+        method: GET
+        path: "/posts/{{postId}}"
+        
+      getUser:
+        description: "Fetches user information"
+        method: GET
+        path: "/users/{{userId}}"
+
+  myapi:
+    baseUrl: "{{profile.baseUrl}}"
+    headers:
+      Authorization: "Bearer {{profile.apiKey}}"
+    variables:
+      version: "v1"
+    endpoints:
+      getUser:
+        method: GET
+        path: "/{{api.version}}/users/{{userId}}"
+      createUser:
+        method: POST
+        path: "/{{api.version}}/users"
+        headers:
+          Content-Type: "application/json"
+        body:
+          name: "{{userName}}"
+          email: "{{userEmail}}"
+
+chains:
+  createAndGetPost:
+    description: "Creates a new post and then immediately fetches it using the returned ID"
+    vars:
+      postTitle: "My Chain Post {{$randomInt}}"
+      postBody: "This post was created by a HttpCraft chain at {{$isoTimestamp}}"
+      postUserId: 101
+    steps:
+      - id: createPost
+        description: "Create a new post"
+        call: jsonplaceholder.createPost
+        with:
+          body:
+            title: "{{postTitle}}"
+            body: "{{postBody}}"
+            userId: "{{postUserId}}"
+            
+      - id: getCreatedPost
+        description: "Fetch the created post by ID"
+        call: jsonplaceholder.getPost
+        with:
+          pathParams:
+            postId: "{{steps.createPost.response.body.id}}"
+            
+  userWorkflow:
+    description: "Complete user registration and profile workflow"
+    vars:
+      userName: "Test User"
+      userEmail: "test@example.com"
+    steps:
+      - id: createUser
+        call: myapi.createUser
+        with:
+          body:
+            name: "{{userName}}"
+            email: "{{userEmail}}"
+            
+      - id: getUser
+        call: myapi.getUser
+        with:
+          pathParams:
+            userId: "{{steps.createUser.response.body.id}}"
+            
+  todoWorkflow:
+    description: "Fetch multiple todos and a user"
+    vars:
+      targetUserId: 1
+    steps:
+      - id: getTodos
+        call: jsonplaceholder.listTodos
+        
+      - id: getFirstTodo
+        call: jsonplaceholder.getTodo
+        with:
+          pathParams:
+            todoId: "{{steps.getTodos.response.body[0].id}}"
+            
+      - id: getTodoUser
+        call: jsonplaceholder.getUser
+        with:
+          pathParams:
+            userId: "{{steps.getFirstTodo.response.body.userId}}" 

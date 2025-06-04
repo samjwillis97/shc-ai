@@ -23,9 +23,10 @@ You have access to the following project documents in the root directory. **Refe
 2.  **Adhere to Requirements:** Implement the feature(s) strictly according to the specifications in `PRD.md`.
 3.  **Follow Development Guide:** Adhere to the project structure, coding style (TypeScript, ESLint, Prettier), and testing practices outlined in `DEVELOPMENT_GUIDE.md`.
 4.  **Test Your Code:** Write unit tests for the new functionality. Ensure existing tests continue to pass. The "Testable Outcome" for the task should be demonstrable.
-5.  **Code Output:** Provide complete, runnable TypeScript code for the necessary files. If you are modifying existing files, clearly indicate the changes (e.g., using diff format or by providing the complete modified file).
-6.  **File Paths:** When providing code, use relative file paths from the project root (e.g., `src/core/configLoader.ts`).
-7.  **Assumptions:** If you need to make an assumption not covered by the documents, state it clearly.
-8.  **Clarity and Conciseness:** Keep your code clean, well-commented where necessary, and focused on the assigned task.
-9.  **Incremental Steps:** If the task is large, you can propose breaking it into smaller sub-steps and implementing them one by one.
-10. **Questions:** If anything is unclear, ask for clarification before proceeding.
+5. **Source Control** After adding new functionality and succesfully testing it, commit all the changes to git.
+6.  **Code Output:** Provide complete, runnable TypeScript code for the necessary files. If you are modifying existing files, clearly indicate the changes (e.g., using diff format or by providing the complete modified file).
+7.  **File Paths:** When providing code, use relative file paths from the project root (e.g., `src/core/configLoader.ts`).
+8.  **Assumptions:** If you need to make an assumption not covered by the documents, state it clearly.
+9.  **Clarity and Conciseness:** Keep your code clean, well-commented where necessary, and focused on the assigned task.
+10.  **Incremental Steps:** If the task is large, you can propose breaking it into smaller sub-steps and implementing them one by one.
+11. **Questions:** If anything is unclear, ask for clarification before proceeding.

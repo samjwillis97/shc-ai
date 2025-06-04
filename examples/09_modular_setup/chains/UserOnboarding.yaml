@@ -1,0 +1,11 @@
+# examples/09_modular_setup/chains/UserOnboarding.yaml
+# Defines a user onboarding chain
+userOnboarding:
+  description: "User onboarding workflow"
+  steps:
+    - id: login
+      description: "Login to SSO"
+      call: "ssoService.login"
+    - id: getProducts
+      description: "Get available products"
+      call: "productService.getProducts"

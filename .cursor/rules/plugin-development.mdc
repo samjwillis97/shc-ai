@@ -1,0 +1,143 @@
+---
+description: When developing plugins
+globs: 
+alwaysApply: false
+---
+# Plugin Development Standards
+
+This rule defines the standards and best practices for developing HttpCraft plugins.
+
+## Plugin Structure
+
+1. Plugin Directory:
+   - Use `plugins/` directory for local plugins
+   - One plugin per directory
+   - Include `package.json`
+   - Include `README.md`
+
+2. Plugin Files:
+   - `index.ts` - Main plugin entry point
+   - `types.ts` - Type definitions
+   - `config.ts` - Configuration schema
+   - `README.md` - Documentation
+
+## Plugin Interface
+
+1. Required Exports:
+   ```typescript
+   export interface Plugin {
+     name: string;
+     version: string;
+     hooks?: {
+       preRequest?: (context: PluginContext) => Promise<void>;
+       postResponse?: (context: PluginContext) => Promise<void>;
+     };
+     variables?: {
+       [key: string]: () => Promise<string>;
+     };
+   }
+   ```
+
+2. Plugin Context:
+   ```typescript
+   export interface PluginContext {
+     request: HttpRequest;
+     response?: HttpResponse;
+     config: PluginConfig;
+     variables: VariableResolver;
+   }
+   ```
+
+## Plugin Development
+
+1. Configuration:
+   - Define configuration schema
+   - Validate configuration
+   - Provide defaults
+   - Document options
+
+2. Hooks:
+   - Keep hooks focused
+   - Handle errors gracefully
+   - Clean up resources
+   - Log important events
+
+3. Variables:
+   - Use descriptive names
+   - Document variable purpose
+   - Handle errors
+   - Cache expensive operations
+
+## Testing Plugins
+
+1. Unit Tests:
+   - Test each hook
+   - Test variable resolution
+   - Test configuration
+   - Test error cases
+
+2. Integration Tests:
+   - Test with real requests
+   - Test with different configs
+   - Test error handling
+   - Test cleanup
+
+## Documentation
+
+1. README.md:
+   - Plugin description
+   - Installation instructions
+   - Configuration options
+   - Usage examples
+
+2. Code Documentation:
+   - JSDoc comments
+   - Type definitions
+   - Error handling
+   - Examples
+
+## Best Practices
+
+1. Error Handling:
+   - Use custom error types
+   - Provide helpful messages
+   - Log errors appropriately
+   - Clean up on errors
+
+2. Performance:
+   - Cache expensive operations
+   - Use appropriate data structures
+   - Avoid blocking operations
+   - Profile when needed
+
+3. Security:
+   - Validate input
+   - Sanitize output
+   - Handle sensitive data
+   - Follow security best practices
+
+4. Maintenance:
+   - Keep dependencies updated
+   - Follow semantic versioning
+   - Document changes
+   - Test thoroughly
+
+## Publishing
+
+1. Package.json:
+   - Correct name and version
+   - Required dependencies
+   - Correct entry point
+   - TypeScript types
+
+2. NPM:
+   - Use scoped package name
+   - Include keywords
+   - Add repository link
+   - Add license
+
+3. Documentation:
+   - Clear installation steps
+   - Usage examples
+   - Configuration options
+   - Troubleshooting guide

@@ -1,0 +1,92 @@
+# Example configuration demonstrating npm plugin usage (T10.7)
+# This shows how to configure and use plugins from npm packages
+
+# Global plugin configuration using npm packages
+plugins:
+  - npmPackage: "httpcraft-auth-plugin"  # Example npm package
+    name: "authPlugin"
+    config:
+      apiKey: "{{env.API_KEY}}"
+      tokenType: "Bearer"
+      
+  - npmPackage: "httpcraft-logging-plugin"  # Example logging plugin
+    name: "loggerPlugin"
+    config:
+      logLevel: "info"
+      includeHeaders: true
+
+# Profile configurations for different environments
+profiles:
+  development:
+    apiHost: "dev-api.example.com"
+    logLevel: "debug"
+  
+  production:
+    apiHost: "api.example.com"
+    logLevel: "error"
+
+# API definitions with plugin overrides
+apis:
+  exampleApi:
+    baseUrl: "https://{{profile.apiHost}}/v1"
+    
+    # API-level plugin configuration overrides
+    plugins:
+      - name: "authPlugin"
+        config:
+          # Override the token type for this specific API
+          tokenType: "ApiKey"
+          apiKey: "{{secret.EXAMPLE_API_KEY}}"
+          
+      - name: "loggerPlugin"
+        config:
+          # Use profile-specific log level
+          logLevel: "{{profile.logLevel}}"
+          includeTimestamp: true
+    
+    endpoints:
+      getUsers:
+        method: GET
+        path: "/users"
+        description: "Get all users (uses npm plugins for auth and logging)"
+        
+      createUser:
+        method: POST
+        path: "/users"
+        description: "Create a new user"
+        body:
+          name: "{{userName}}"
+          email: "{{userEmail}}"
+          
+      getUserById:
+        method: GET
+        path: "/users/{{userId}}"
+        description: "Get user by ID with path parameter"
+
+# Example chain using API with npm plugins
+chains:
+  userWorkflow:
+    description: "Demonstrate npm plugin usage in chains"
+    vars:
+      userName: "John Doe"
+      userEmail: "john.doe@example.com"
+      
+    steps:
+      - id: "createUser"
+        call: "exampleApi.createUser"
+        description: "Create a new user (auth and logging via npm plugins)"
+        
+      - id: "getCreatedUser"
+        call: "exampleApi.getUserById"
+        with:
+          pathParams:
+            userId: "{{steps.createUser.response.body.id}}"
+        description: "Fetch the created user to verify"
+
+# This configuration demonstrates:
+# 1. Loading plugins from npm packages using 'npmPackage' field
+# 2. Global plugin configuration with environment variables
+# 3. API-level plugin configuration overrides
+# 4. Variable substitution in plugin configurations
+# 5. Integration with profiles for environment-specific settings
+# 6. Usage in both single requests and chains 

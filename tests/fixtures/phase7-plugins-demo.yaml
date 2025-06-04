@@ -1,0 +1,31 @@
+# Phase 7 Plugin System Demo Configuration
+# This demonstrates plugin loading, pre-request hooks, and custom variables
+
+plugins:
+  - path: "./examples/plugins/dummyAuthPlugin.js"
+    name: "dummyAuth"
+    config:
+      tokenPrefix: "Bearer_"
+      defaultUserId: "user_123"
+
+apis:
+  httpbin:
+    baseUrl: "https://httpbin.org"
+    endpoints:
+      testPluginHooks:
+        method: GET
+        path: "/get"
+        headers:
+          X-User-ID: "{{plugins.dummyAuth.getUserId}}"
+          X-Custom-Token: "{{plugins.dummyAuth.getToken}}"
+          X-Timestamp: "{{plugins.dummyAuth.timestamp}}"
+      
+      testPluginAuth:
+        method: POST
+        path: "/post"
+        headers:
+          Content-Type: "application/json"
+        body:
+          message: "Hello from HttpCraft with plugins!"
+          userId: "{{plugins.dummyAuth.getUserId}}"
+          timestamp: "{{plugins.dummyAuth.timestamp}}" 

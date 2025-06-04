@@ -31,6 +31,7 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
 - **US4 (Profiles/Environments):** As a developer, I want to define "profiles" (e.g., `dev`, `staging`, `prod` or `user_A`, `user_B`) that set specific variables, and easily switch between them using a CLI flag, so I can test against different environments or user contexts without modifying my core endpoint definitions.
 - **US5 (Chained Requests):** As a QA engineer, I want to define a sequence of HTTP requests where data from one request's response (e.g., an ID or token) is used in a subsequent request, so I can model and automate complex user workflows.
 - **US6 (Custom Authentication):** As a developer working with a proprietary authentication scheme, I want to write a plugin that handles the authentication logic and automatically applies it to my requests, so I don't have to manually manage auth headers for every call.
+- **US6a (API-Specific Plugin Configuration):** As a developer working with multiple APIs that require different plugin configurations (e.g., different OAuth2 scopes per API), I want to configure plugins at the API level with settings that override global plugin configuration, so I can customize plugin behavior per API without duplicating plugin definitions.
 - **US7 (Output Piping):** As a scripter, I want the default output of a successful request to be the raw response body sent to `stdout`, so I can easily pipe it to tools like `jq` for further processing.
 - **US8 (Plugin Discovery):** As a user, I want to be able to load plugins from a package registry (like npm) or from my local filesystem, so I can extend the tool's functionality.
 - **US9 (Secret Management):** As a security-conscious user, I want to reference secrets (like API keys) from environment variables or a secure store (via plugins) using a special syntax (e.g., `{{secret.API_KEY}}`) and have them masked in verbose logs.
@@ -60,6 +61,7 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
   - Default `headers` (map).
   - Default `queryParams` (map).
   - API-level `variables` (map).
+  - API-level `plugins` configuration (list), allowing override of global plugin configurations for this specific API.
   - A list of `endpoints`.
 - **FR1.6 (Endpoint Definition):** Each endpoint definition shall support:
   - A unique name within its API.
@@ -71,6 +73,11 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
   - Endpoint-level `variables` (map).
 - **FR1.7 (Schema):** A YAML schema for the configuration files shall be provided to aid validation and editor integration.
 - **FR1.8 (Descriptions):** The schema shall allow for optional `description` fields for APIs, endpoints, chains, etc., for documentation.
+- **FR1.9 (Configuration File Locations):** The tool shall search for configuration files in the following order of precedence:
+  1. File specified via `--config <path>` command line option (highest priority)
+  2. `.httpcraft.yaml` or `.httpcraft.yml` in the current working directory
+  3. `$HOME/.config/httpcraft/config.yaml` (default global configuration location)
+  If no configuration file is found in any of these locations, the tool shall report an error and exit.
 
 ### 5.2. CLI (Command Line Interface)
 
@@ -82,6 +89,7 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
   - Provide ZSH tab completion for `<endpoint_name>` (contextual to the selected `<api_name>`).
   - Provide ZSH tab completion for `<chain_name>`.
   - Provide ZSH tab completion for CLI options.
+  - Provide ZSH tab completion for profile names when using `--profile` option.
   - A command `httpcraft completion zsh` shall output the ZSH completion script.
 - **FR2.4 (Options):**
   - `--var <key>=<value>`: Set/override a variable from the command line.
@@ -149,6 +157,12 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
   - **Post-response:** Access and potentially transform the response object (status, headers, body) before it's processed for output or chaining.
 - **FR5.4 (Custom Variables/Functions):** Plugins shall be able to expose custom functions or variables accessible via the templating engine (e.g., `{{myAuthPlugin.getToken()}}`). These functions will be executed each time they are referenced.
 - **FR5.5 (Configuration):** Plugins can have their own configuration sections within the main tool configuration.
+- **FR5.5a (API-Level Plugin Configuration):** 
+  - APIs may define plugin configurations that override global plugin settings for that specific API.
+  - API-level plugin configurations shall reference plugins by name and provide configuration overrides.
+  - Configuration merging shall follow the pattern: API-level plugin config overwrites matching keys from global plugin config.
+  - API-level plugin configurations shall support variable substitution using the same `{{variable}}` syntax.
+  - If an API references a plugin name that was not defined in the global plugins section, the tool shall report an error and halt execution.
 - **FR5.6 (Execution Order):** If multiple plugins hook into the same event, they shall execute in the order they are defined in the configuration.
 - **FR5.7 (Async Operations):** The plugin system and core tool must support asynchronous operations within plugins (e.g., fetching a token).
 

@@ -1,0 +1,116 @@
+---
+description: Use writing tests
+globs: 
+alwaysApply: false
+---
+# Testing Standards
+
+This rule defines the testing standards and requirements for HttpCraft.
+
+## Test Organization
+
+1. Test files should be co-located with the code they test
+2. Use the `.test.ts` extension for test files
+3. Mirror the source directory structure in the test directory
+
+## Test Structure
+
+1. Each test file should:
+   - Import the module being tested
+   - Import test utilities and fixtures
+   - Group related tests using `describe` blocks
+   - Use clear, descriptive test names
+
+2. Test cases should:
+   - Test one specific behavior
+   - Have a clear setup, action, and assertion
+   - Use descriptive names that explain the expected behavior
+
+## Test Coverage Requirements
+
+1. Minimum coverage requirements:
+   - Statements: 90%
+   - Branches: 85%
+   - Functions: 90%
+   - Lines: 90%
+
+2. Critical paths must have 100% coverage:
+   - HTTP request handling
+   - Variable resolution
+   - Chain execution
+   - Plugin hooks
+
+## Test Types
+
+1. Unit Tests:
+   - Test individual functions and classes
+   - Mock external dependencies
+   - Focus on edge cases and error conditions
+
+2. Integration Tests:
+   - Test interactions between components
+   - Use real HTTP clients with mock servers
+   - Test configuration loading and validation
+
+3. End-to-End Tests:
+   - Test complete workflows
+   - Use real configuration files
+   - Test CLI commands
+
+## Test Utilities
+
+1. Use the following test utilities:
+   - `vitest` for test running
+   - `@vitest/coverage-v8` for coverage
+   - `msw` for HTTP mocking
+   - `@testing-library/jest-dom` for DOM testing
+
+## Mocking Guidelines
+
+1. HTTP Requests:
+   - Use MSW for HTTP mocking
+   - Mock both success and error responses
+   - Test timeout and network error scenarios
+
+2. File System:
+   - Mock file system operations
+   - Test file not found scenarios
+   - Test permission errors
+
+3. Environment:
+   - Mock environment variables
+   - Test different environment configurations
+   - Clean up mocks after tests
+
+## Test Data
+
+1. Use fixtures for test data:
+   - Store in `tests/fixtures/`
+   - Use descriptive names
+   - Include both valid and invalid data
+
+2. Test Configuration:
+   - Use minimal test configurations
+   - Test all configuration options
+   - Include edge cases
+
+## Best Practices
+
+1. Tests should be:
+   - Fast
+   - Independent
+   - Repeatable
+   - Self-validating
+   - Timely
+
+2. Avoid:
+   - Testing implementation details
+   - Brittle tests
+   - Slow tests
+   - Flaky tests
+
+3. Use:
+   - Clear assertions
+   - Descriptive error messages
+   - Proper cleanup
+   - Appropriate test isolation

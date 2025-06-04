@@ -1,0 +1,172 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Nix Development Environment Standards
+
+This rule defines the standards for managing development environment dependencies using Nix flakes in HttpCraft.
+
+## Flake Structure
+
+1. Required Files:
+   - `flake.nix` - Main flake definition
+   - `flake.lock` - Locked dependencies (do not edit manually)
+   - `.envrc` - Direnv configuration
+
+2. Flake Inputs:
+   ```nix
+   {
+     inputs = {
+       nixpkgs.url = "github:nixos/nixpkgs";
+       flake-utils.url = "github:numtide/flake-utils";
+     };
+   }
+   ```
+
+3. Flake Outputs using flake-utils:
+   ```nix
+   {
+     outputs = { self, nixpkgs, flake-utils, ... }:
+       flake-utils.lib.eachDefaultSystem (system: {
+         devShells.default = pkgs.mkShell {
+           packages = with pkgs; [
+             nodejs_22
+             git
+           ];
+         };
+       });
+   }
+   ```
+
+## Development Dependencies
+
+1. System Dependencies:
+   - Node.js (v22.x)
+   - Git
+   - Development tools (gcc, make, etc.)
+   - System libraries
+
+2. Development Tools:
+   - direnv (for automatic shell activation)
+   - nix-direnv (for faster direnv)
+   - pre-commit hooks
+   - development utilities
+
+## Environment Setup
+
+1. `.envrc` Configuration:
+   ```bash
+   use flake
+   ```
+
+2. Shell Configuration:
+   - Set required environment variables
+   - Configure development tools
+   - Set up PATH and other shell variables
+
+## Dependency Management
+
+1. Node.js Dependencies:
+   - Managed by npm/yarn
+   - Not included in flake.nix
+   - Use package.json for versioning
+
+2. System Dependencies:
+   - Managed by Nix
+   - Specified in flake.nix
+   - Versioned in flake.lock
+
+3. Development Tools:
+   - Managed by Nix
+   - Specified in flake.nix
+   - Versioned in flake.lock
+
+## Best Practices
+
+1. Flake Updates:
+   - Update nixpkgs regularly
+   - Keep flake.lock in version control
+   - Document dependency changes
+
+2. Shell Configuration:
+   - Keep shell startup fast
+   - Use direnv for automatic activation
+   - Document environment variables
+
+3. Cross-Platform Support:
+   - Use flake-utils for system handling
+   - Support all target platforms
+   - Test on each platform
+   - Handle platform-specific dependencies
+
+## Common Commands
+
+1. Development:
+   ```bash
+   # Enter development shell
+   nix develop
+
+   # Update dependencies
+   nix flake update
+
+   # Show dependency tree
+   nix flake show
+   ```
+
+2. Building:
+   ```bash
+   # Build the project
+   nix build
+
+   # Build for specific system
+   nix build .#packages.x86_64-linux.default
+   ```
+
+## Troubleshooting
+
+1. Common Issues:
+   - Shell not activating: Check .envrc
+   - Missing dependencies: Check flake.nix
+   - Build failures: Check system compatibility
+
+2. Solutions:
+   - Clear nix store: `nix store gc`
+   - Rebuild shell: `nix develop`
+   - Update flake: `nix flake update`
+
+## Documentation
+
+1. Required Documentation:
+   - Development setup instructions
+   - Dependency management guide
+   - Troubleshooting guide
+   - Platform-specific notes
+
+2. Maintenance:
+   - Keep documentation up to date
+   - Document dependency changes
+   - Update platform support status
+
+## Adding New Dependencies
+
+1. System Packages:
+   ```nix
+   devShells.default = pkgs.mkShell {
+     packages = with pkgs; [
+       nodejs_22
+       git
+       # Add new packages here
+     ];
+   };
+   ```
+
+2. Development Tools:
+   - Add to packages list in flake.nix
+   - Update flake.lock with `nix flake update`
+   - Test on all supported platforms
+
+3. Node.js Dependencies:
+   - Add to package.json
+   - Run npm install
+   - Do not add to flake.nix
