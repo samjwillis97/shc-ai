@@ -23,6 +23,7 @@ export interface PluginContext {
   registerPreRequestHook: (hook: PreRequestHook) => void;
   registerPostResponseHook: (hook: PostResponseHook) => void;
   registerVariableSource: (name: string, source: VariableSource) => void;
+  registerParameterizedVariableSource: (name: string, source: ParameterizedVariableSource) => void;
 }
 
 export interface PluginConfig {
@@ -32,6 +33,7 @@ export interface PluginConfig {
 export type PreRequestHook = (request: HttpRequest) => Promise<void>;
 export type PostResponseHook = (request: HttpRequest, response: HttpResponse) => Promise<void>;
 export type VariableSource = () => Promise<string> | string;
+export type ParameterizedVariableSource = (...args: any[]) => Promise<string> | string;
 
 export interface Plugin {
   setup(context: PluginContext): void | Promise<void>;
@@ -44,4 +46,5 @@ export interface PluginInstance {
   preRequestHooks: PreRequestHook[];
   postResponseHooks: PostResponseHook[];
   variableSources: Record<string, VariableSource>;
+  parameterizedVariableSources: Record<string, ParameterizedVariableSource>;
 } 

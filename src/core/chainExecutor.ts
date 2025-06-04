@@ -26,7 +26,9 @@ export interface ChainExecutionResult {
 export class ChainExecutor {
   
   /**
-   * Executes a chain by sequentially executing each step
+   * Executes a chain of HTTP requests in sequence
+   * T8.8 & T8.9: Enhanced to pass step results for variable resolution
+   * T10.15: Enhanced to support plugin variable sources
    */
   async executeChain(
     chainName: string,
@@ -35,7 +37,8 @@ export class ChainExecutor {
     cliVariables: Record<string, string> = {},
     profiles: Record<string, any> = {},
     verbose: boolean = false,
-    dryRun: boolean = false
+    dryRun: boolean = false,
+    pluginManager?: import('./pluginManager.js').PluginManager // T10.15: Plugin manager for variable sources
   ): Promise<ChainExecutionResult> {
     
     const result: ChainExecutionResult = {
@@ -71,7 +74,8 @@ export class ChainExecutor {
             chain.vars || {},
             result.steps, // Pass completed steps for variable resolution
             verbose,
-            dryRun
+            dryRun,
+            pluginManager // T10.15: Pass plugin manager for parameterized function support
           );
 
           result.steps.push(stepResult);
@@ -127,6 +131,7 @@ export class ChainExecutor {
 
   /**
    * Executes a single step in the chain
+   * T10.15: Enhanced to support plugin variable sources
    */
   private async executeStep(
     step: ChainStep,
@@ -136,7 +141,8 @@ export class ChainExecutor {
     chainVars: Record<string, any>,
     previousSteps: StepExecutionResult[], // T8.8 & T8.9: Previous step results for variable resolution
     verbose: boolean,
-    dryRun: boolean
+    dryRun: boolean,
+    pluginManager?: import('./pluginManager.js').PluginManager // T10.15: Plugin manager for variable sources
   ): Promise<StepExecutionResult> {
     
     // Parse the call to get API and endpoint names
@@ -155,13 +161,23 @@ export class ChainExecutor {
     }
 
     // T8.8 & T8.9: Create variable context for this step with access to previous steps
+    // T10.15: Include plugin variable sources if plugin manager is available
+    let pluginVariableSources: Record<string, Record<string, import('../types/plugin.js').VariableSource>> | undefined;
+    let parameterizedPluginSources: Record<string, Record<string, import('../types/plugin.js').ParameterizedVariableSource>> | undefined;
+    
+    if (pluginManager) {
+      pluginVariableSources = pluginManager.getVariableSources();
+      parameterizedPluginSources = pluginManager.getParameterizedVariableSources();
+    }
+    
     const variableContext = variableResolver.createContext(
       cliVariables,
       profiles,
       api.variables,
       endpoint.variables,
-      undefined, // No plugins in chain execution yet
-      config.globalVariables // T9.3: Global variables
+      pluginVariableSources, // T10.15: Plugin variable sources
+      config.globalVariables, // T9.3: Global variables
+      parameterizedPluginSources // T10.15: Parameterized plugin variable sources
     );
     
     // Add chain variables to the context

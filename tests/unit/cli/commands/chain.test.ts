@@ -165,7 +165,8 @@ describe('Chain Command', () => {
         {},
         {},
         false,
-        false
+        false,
+        expect.any(Object)
       );
       expect(consoleLogSpy).toHaveBeenCalledWith('{"id": 123, "name": "testuser", "email": "test@example.com"}');
     });
@@ -349,7 +350,8 @@ describe('Chain Command', () => {
         { key: 'value' },
         { env: 'test' },
         true,  // verbose
-        true   // dryRun
+        true,  // dryRun
+        expect.any(Object) // T10.15: Plugin manager parameter
       );
     });
 

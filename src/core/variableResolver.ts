@@ -7,6 +7,18 @@ import { VariableSource } from '../types/plugin.js';
 import { JSONPath } from 'jsonpath-plus';
 import type { StepExecutionResult } from './chainExecutor.js';
 
+// T10.15: Types for parameterized function calls
+export interface FunctionCall {
+  pluginName: string;
+  functionName: string;
+  arguments: FunctionArgument[];
+}
+
+export interface FunctionArgument {
+  type: 'string' | 'variable';
+  value: string;
+}
+
 export interface VariableContext {
   cli: Record<string, string>;
   stepWith?: Record<string, any>; // For future chain steps
@@ -16,6 +28,7 @@ export interface VariableContext {
   profiles?: Record<string, any>; // Merged profile variables
   globalVariables?: Record<string, any>; // T9.3: Global variable files
   plugins?: Record<string, Record<string, VariableSource>>; // Plugin variable sources
+  parameterizedPlugins?: Record<string, Record<string, import('../types/plugin.js').ParameterizedVariableSource>>; // T10.15: Parameterized plugin variable sources
   env: Record<string, string>;
   steps?: StepExecutionResult[]; // T8.8 & T8.9: Step execution results for chains
 }
@@ -70,16 +83,17 @@ export class VariableResolver {
   /**
    * Resolves variables in a string using {{variable}} syntax
    * Phase 8 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Plugins > Environment
+   * T10.15: Enhanced to support parameterized plugin function calls
    */
   async resolve(template: string, context: VariableContext): Promise<string> {
-    const variablePattern = /\{\{([^}]*)\}\}/g;
     let resolvedTemplate = template;
     
     // Process variables sequentially to handle async plugin variables
-    const matches = Array.from(template.matchAll(variablePattern));
+    // Use a more sophisticated approach to handle nested braces
+    const matches = this.extractVariableMatches(template);
     
     for (const match of matches) {
-      const variableName = match[1].trim();
+      const variableName = match.content.trim();
       
       // Validate that variable name is not empty
       if (!variableName) {
@@ -91,8 +105,12 @@ export class VariableResolver {
       
       let resolvedValue: string;
       
+      // T10.15: Check if this is a parameterized function call
+      if (this.isParameterizedFunctionCall(variableName)) {
+        resolvedValue = await this.resolveParameterizedFunctionCall(variableName, context);
+      }
       // Handle scoped variables (e.g., env.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable, steps.stepId.*)
-      if (variableName.includes('.')) {
+      else if (variableName.includes('.')) {
         resolvedValue = await this.resolveScopedVariable(variableName, context);
       } else {
         // T9.6: Handle built-in dynamic variables first (they start with $)
@@ -113,10 +131,61 @@ export class VariableResolver {
       }
       
       // Replace this specific variable match
-      resolvedTemplate = resolvedTemplate.replace(match[0], resolvedValue);
+      resolvedTemplate = resolvedTemplate.replace(match.fullMatch, resolvedValue);
     }
     
     return resolvedTemplate;
+  }
+  
+  /**
+   * T10.15: Extracts variable matches from a template, handling nested braces correctly
+   * Returns array of matches with full match string and content
+   */
+  private extractVariableMatches(template: string): Array<{ fullMatch: string; content: string }> {
+    const matches: Array<{ fullMatch: string; content: string }> = [];
+    let i = 0;
+    
+    while (i < template.length) {
+      // Look for opening {{
+      if (i < template.length - 1 && template[i] === '{' && template[i + 1] === '{') {
+        const startIndex = i;
+        i += 2; // Skip the {{
+        
+        let braceCount = 1; // We've seen one opening {{
+        let content = '';
+        
+        // Find the matching }}
+        while (i < template.length && braceCount > 0) {
+          if (i < template.length - 1 && template[i] === '{' && template[i + 1] === '{') {
+            braceCount++;
+            content += '{{';
+            i += 2;
+          } else if (i < template.length - 1 && template[i] === '}' && template[i + 1] === '}') {
+            braceCount--;
+            if (braceCount > 0) {
+              content += '}}';
+            }
+            i += 2;
+          } else {
+            content += template[i];
+            i++;
+          }
+        }
+        
+        if (braceCount === 0) {
+          // Found a complete variable
+          const fullMatch = template.substring(startIndex, i);
+          matches.push({ fullMatch, content });
+        } else {
+          // Unclosed variable, treat as literal text
+          i = startIndex + 1;
+        }
+      } else {
+        i++;
+      }
+    }
+    
+    return matches;
   }
   
   /**
@@ -408,6 +477,7 @@ export class VariableResolver {
   /**
    * Creates a variable context from CLI arguments and environment variables
    * Enhanced for Phase 9 with global variables support
+   * Enhanced for T10.15 with parameterized plugin support
    */
   createContext(
     cliVars: Record<string, string>,
@@ -415,7 +485,8 @@ export class VariableResolver {
     api?: Record<string, any>,
     endpoint?: Record<string, any>,
     plugins?: Record<string, Record<string, VariableSource>>,
-    globalVariables?: Record<string, any> // T9.3: Global variables
+    globalVariables?: Record<string, any>, // T9.3: Global variables
+    parameterizedPlugins?: Record<string, Record<string, import('../types/plugin.js').ParameterizedVariableSource>> // T10.15: Parameterized plugins
   ): VariableContext {
     return {
       cli: { ...cliVars },
@@ -423,6 +494,7 @@ export class VariableResolver {
       api: api ? { ...api } : undefined,
       endpoint: endpoint ? { ...endpoint } : undefined,
       plugins: plugins ? { ...plugins } : undefined,
+      parameterizedPlugins: parameterizedPlugins ? { ...parameterizedPlugins } : undefined, // T10.15
       globalVariables: globalVariables ? { ...globalVariables } : undefined, // T9.3
       env: { ...process.env } as Record<string, string>
     };
@@ -505,6 +577,214 @@ export class VariableResolver {
       const v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
     });
+  }
+
+  /**
+   * T10.15: Checks if a variable name represents a parameterized function call
+   * Function calls have the pattern: plugins.pluginName.functionName(args...)
+   * Enhanced to handle nested parentheses and complex arguments
+   */
+  private isParameterizedFunctionCall(variableName: string): boolean {
+    // Check if it starts with plugins.pluginName.functionName(
+    const startPattern = /^plugins\.\w+\.\w+\(/;
+    if (!startPattern.test(variableName)) {
+      return false;
+    }
+    
+    // Check if it ends with ) and has balanced parentheses
+    if (!variableName.endsWith(')')) {
+      return false;
+    }
+    
+    // Find the opening parenthesis
+    const openParenIndex = variableName.indexOf('(');
+    if (openParenIndex === -1) {
+      return false;
+    }
+    
+    // Check if parentheses are balanced
+    let parenCount = 0;
+    for (let i = openParenIndex; i < variableName.length; i++) {
+      if (variableName[i] === '(') {
+        parenCount++;
+      } else if (variableName[i] === ')') {
+        parenCount--;
+        if (parenCount === 0 && i === variableName.length - 1) {
+          return true; // Balanced and ends correctly
+        } else if (parenCount < 0) {
+          return false; // Unbalanced
+        }
+      }
+    }
+    
+    return false; // Unbalanced or doesn't end correctly
+  }
+
+  /**
+   * T10.15: Resolves a parameterized function call
+   * Parses function arguments, resolves any variable references, and calls the plugin function
+   */
+  private async resolveParameterizedFunctionCall(variableName: string, context: VariableContext): Promise<string> {
+    const functionCall = this.parseFunctionCall(variableName);
+    
+    if (!context.parameterizedPlugins || !context.parameterizedPlugins[functionCall.pluginName]) {
+      throw new VariableResolutionError(
+        `Plugin '${functionCall.pluginName}' not found or has no parameterized functions`,
+        variableName
+      );
+    }
+    
+    const pluginFunctions = context.parameterizedPlugins[functionCall.pluginName];
+    if (!pluginFunctions[functionCall.functionName]) {
+      throw new VariableResolutionError(
+        `Parameterized function '${functionCall.functionName}' not found in plugin '${functionCall.pluginName}'`,
+        variableName
+      );
+    }
+    
+    // Resolve function arguments
+    const resolvedArgs: any[] = [];
+    for (const arg of functionCall.arguments) {
+      if (arg.type === 'string') {
+        resolvedArgs.push(arg.value);
+      } else if (arg.type === 'variable') {
+        // Recursively resolve variable arguments
+        const resolvedValue = await this.resolve(arg.value, context);
+        resolvedArgs.push(resolvedValue);
+      }
+    }
+    
+    // Call the parameterized function
+    try {
+      const parameterizedFunction = pluginFunctions[functionCall.functionName];
+      const result = await parameterizedFunction(...resolvedArgs);
+      return this.stringifyValue(result);
+    } catch (error) {
+      throw new VariableResolutionError(
+        `Parameterized function '${variableName}' failed to execute: ${error instanceof Error ? error.message : String(error)}`,
+        variableName
+      );
+    }
+  }
+
+  /**
+   * T10.15: Parses a function call string into a FunctionCall object
+   * Supports syntax: plugins.pluginName.functionName("arg1", "{{variable}}", "arg3")
+   * Enhanced to handle nested parentheses and complex arguments
+   */
+  private parseFunctionCall(variableName: string): FunctionCall {
+    // Extract the basic parts using a more flexible approach
+    const basicMatch = variableName.match(/^plugins\.(\w+)\.(\w+)\(/);
+    if (!basicMatch) {
+      throw new VariableResolutionError(
+        `Invalid function call syntax '${variableName}'. Expected: plugins.pluginName.functionName(args...)`,
+        variableName
+      );
+    }
+    
+    const [, pluginName, functionName] = basicMatch;
+    
+    // Find the opening parenthesis
+    const openParenIndex = variableName.indexOf('(');
+    if (openParenIndex === -1 || !variableName.endsWith(')')) {
+      throw new VariableResolutionError(
+        `Invalid function call syntax '${variableName}'. Expected: plugins.pluginName.functionName(args...)`,
+        variableName
+      );
+    }
+    
+    // Extract the arguments string (everything between the outermost parentheses)
+    const argsStr = variableName.substring(openParenIndex + 1, variableName.length - 1);
+    const args: FunctionArgument[] = [];
+    
+    if (argsStr.trim()) {
+      // Parse function arguments
+      const argMatches = this.parseArguments(argsStr);
+      for (const argMatch of argMatches) {
+        const trimmedArg = argMatch.trim();
+        
+        if (trimmedArg.startsWith('"') && trimmedArg.endsWith('"')) {
+          // String literal argument
+          const stringValue = trimmedArg.slice(1, -1); // Remove quotes
+          
+          // Check if the string contains variable references
+          if (stringValue.includes('{{') && stringValue.includes('}}')) {
+            args.push({
+              type: 'variable',
+              value: stringValue
+            });
+          } else {
+            args.push({
+              type: 'string',
+              value: stringValue
+            });
+          }
+        } else if (trimmedArg.startsWith('\\"') && trimmedArg.endsWith('\\"')) {
+          // Handle escaped quotes (from nested function calls)
+          const stringValue = trimmedArg.slice(2, -2); // Remove escaped quotes
+          
+          // Check if the string contains variable references
+          if (stringValue.includes('{{') && stringValue.includes('}}')) {
+            args.push({
+              type: 'variable',
+              value: stringValue
+            });
+          } else {
+            args.push({
+              type: 'string',
+              value: stringValue
+            });
+          }
+        } else {
+          throw new VariableResolutionError(
+            `Invalid argument '${trimmedArg}' in function call '${variableName}'. Arguments must be quoted strings.`,
+            variableName
+          );
+        }
+      }
+    }
+    
+    return {
+      pluginName,
+      functionName,
+      arguments: args
+    };
+  }
+
+  /**
+   * T10.15: Parses function arguments, handling quoted strings with commas
+   * Returns array of argument strings (including quotes)
+   */
+  private parseArguments(argsStr: string): string[] {
+    const args: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    let i = 0;
+    
+    while (i < argsStr.length) {
+      const char = argsStr[i];
+      
+      if (char === '"' && (i === 0 || argsStr[i - 1] !== '\\')) {
+        inQuotes = !inQuotes;
+        current += char;
+      } else if (char === ',' && !inQuotes) {
+        if (current.trim()) {
+          args.push(current.trim());
+          current = '';
+        }
+      } else {
+        current += char;
+      }
+      
+      i++;
+    }
+    
+    // Add the last argument
+    if (current.trim()) {
+      args.push(current.trim());
+    }
+    
+    return args;
   }
 }
 

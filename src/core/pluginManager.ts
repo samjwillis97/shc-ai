@@ -13,7 +13,8 @@ import {
   PostResponseHook,
   VariableSource,
   HttpRequest,
-  HttpResponse
+  HttpResponse,
+  ParameterizedVariableSource
 } from '../types/plugin.js';
 import { PluginConfiguration } from '../types/config.js';
 
@@ -168,7 +169,8 @@ export class PluginManager {
         config: pluginConfig.config || {},
         preRequestHooks: [],
         postResponseHooks: [],
-        variableSources: {}
+        variableSources: {},
+        parameterizedVariableSources: {}
       };
 
       // Create context for plugin setup
@@ -184,6 +186,9 @@ export class PluginManager {
         },
         registerVariableSource: (name: string, source: VariableSource) => {
           pluginInstance.variableSources[name] = source;
+        },
+        registerParameterizedVariableSource: (name: string, source: ParameterizedVariableSource) => {
+          pluginInstance.parameterizedVariableSources[name] = source;
         }
       };
 
@@ -241,6 +246,19 @@ export class PluginManager {
     
     for (const pluginInstance of this.plugins) {
       allSources[pluginInstance.name] = pluginInstance.variableSources;
+    }
+    
+    return allSources;
+  }
+
+  /**
+   * Get all parameterized variable sources from all plugins
+   */
+  getParameterizedVariableSources(): Record<string, Record<string, ParameterizedVariableSource>> {
+    const allSources: Record<string, Record<string, ParameterizedVariableSource>> = {};
+    
+    for (const pluginInstance of this.plugins) {
+      allSources[pluginInstance.name] = pluginInstance.parameterizedVariableSources;
     }
     
     return allSources;

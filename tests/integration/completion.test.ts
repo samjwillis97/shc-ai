@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawn } from 'child_process';
 import { promisify } from 'util';
-import { writeFile, unlink, mkdir, readFile } from 'fs/promises';
-import { join } from 'path';
+import { spawn } from 'child_process';
+import path, { join } from 'path';
 import { writeFileSync, existsSync, unlinkSync } from 'fs';
+import * as fs from 'fs/promises';
 
 const execFile = promisify(spawn);
 
@@ -66,7 +66,7 @@ apis:
         path: "/posts"
         method: "POST"`;
 
-  await writeFile(filename, content);
+  await fs.writeFile(filename, content);
   return filename;
 }
 
@@ -196,11 +196,31 @@ apis:
     });
 
     it('should silently exit when no default config exists', async () => {
-      const result = await runCli(['--get-api-names']);
+      // Temporarily move any global config that might interfere
+      const globalConfigPath = join(process.env.HOME || '~', '.config', 'httpcraft', 'config.yaml');
+      const backupPath = globalConfigPath + '.test-backup';
+      let needsRestore = false;
+      
+      try {
+        if (existsSync(globalConfigPath)) {
+          if (existsSync(backupPath)) {
+            unlinkSync(backupPath);
+          }
+          await fs.rename(globalConfigPath, backupPath);
+          needsRestore = true;
+        }
+        
+        const result = await runCli(['--get-api-names']);
 
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toBe('');
-      expect(result.stderr).toBe('');
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toBe('');
+      } finally {
+        // Restore global config if we moved it
+        if (needsRestore && existsSync(backupPath)) {
+          await fs.rename(backupPath, globalConfigPath);
+        }
+      }
     });
   });
 

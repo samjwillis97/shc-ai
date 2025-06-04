@@ -99,7 +99,8 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
       args.variables || {},
       mergedProfileVars,
       args.verbose || false,
-      args.dryRun || false
+      args.dryRun || false,
+      pluginManager
     );
     
     // Handle execution result
