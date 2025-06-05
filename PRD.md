@@ -28,7 +28,7 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
 - **US1 (Endpoint Definition):** As a developer, I want to define a set of related API endpoints (e.g., for a specific microservice) in a YAML file, specifying URL, method, default headers, and query parameters, so I can easily manage and invoke them.
 - **US2 (CLI Invocation & Completion):** As a CLI user, I want to invoke a specific endpoint using `httpcraft <api_name> <endpoint_name>` and benefit from ZSH tab completion for both API and endpoint names, so I can work quickly and avoid typos.
 - **US3 (Variable Management):** As a user, I want to define variables (e.g., `member_id`, `base_url`, `auth_token`) at different scopes (global, profile, API, endpoint, chain) and have them substituted into requests, so I can reuse configurations and avoid hardcoding values.
-- **US4 (Profiles/Environments):** As a developer, I want to define "profiles" (e.g., `dev`, `staging`, `prod` or `user_A`, `user_B`) that set specific variables, and easily switch between them using a CLI flag, so I can test against different environments or user contexts without modifying my core endpoint definitions.
+- **US4 (Profiles/Environments):** As a developer, I want to define "profiles" (e.g., `dev`, `staging`, `prod` or `user_A`, `user_B`) that set specific variables, and easily switch between them using a CLI flag. When I specify a profile via CLI, it should combine with any default profile from configuration rather than replacing it, so I can have base environment settings and layer user-specific variables on top without repeating common configuration.
 - **US5 (Chained Requests):** As a QA engineer, I want to define a sequence of HTTP requests where data from one request's response (e.g., an ID or token) is used in a subsequent request, so I can model and automate complex user workflows.
 - **US6 (Custom Authentication):** As a developer working with a proprietary authentication scheme, I want to write a plugin that handles the authentication logic and automatically applies it to my requests, so I don't have to manually manage auth headers for every call.
 - **US6a (API-Specific Plugin Configuration):** As a developer working with multiple APIs that require different plugin configurations (e.g., different OAuth2 scopes per API), I want to configure plugins at the API level with settings that override global plugin configuration, so I can customize plugin behavior per API without duplicating plugin definitions.
@@ -93,7 +93,8 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
   - A command `httpcraft completion zsh` shall output the ZSH completion script.
 - **FR2.4 (Options):**
   - `--var <key>=<value>`: Set/override a variable from the command line.
-  - `--profile <name>`: Select a profile to use for this invocation.
+  - `--profile <name>`: Select a profile to use for this invocation. Can be specified multiple times. Profiles specified via CLI are combined with any `defaultProfile` from configuration, with CLI profiles taking precedence for conflicting variables.
+  - `--no-default-profile`: Ignore default profiles from configuration and use only profiles specified via `--profile` flags. Useful for testing isolated profile configurations.
   - `--verbose`: Output detailed request and response information (headers, status, timing) to `stderr`.
   - `--dry-run`: Resolve and display the request that would be sent (to `stdout` or `stderr`), without actually sending it. Sensitive values should be masked.
   - `--exit-on-http-error <codes>` (or similar): Optional flag to make the tool exit with a non-zero code if specified HTTP error status codes (e.g., "4xx", "5xx", "401,403") are received.

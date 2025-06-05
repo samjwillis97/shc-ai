@@ -346,8 +346,161 @@ This more detailed breakdown should provide clearer, individually testable steps
 
 ---
 
+## Phase 13: Enhanced Profile Merging & User Experience Improvements
+
+- **Goal:** Improve profile handling by combining default profiles with CLI-specified profiles for a more intuitive and user-friendly experience.
+- **Tasks:**
+  - **T13.1:** **[ENHANCEMENT]** Implement additive profile merging behavior.
+    - _Current Issue:_ CLI `--profile` completely overrides `config.defaultProfile`, requiring users to specify all needed profiles explicitly
+    - _User Impact:_ Users must remember to include base profiles (e.g., `--profile kaos --profile me`) even when they just want to add user-specific variables
+    - _Implementation:_ Modify profile loading logic to combine default profiles with CLI profiles
+    - _Logic Flow:_
+      1. Start with profiles from `config.defaultProfile` (if any)
+      2. Add profiles specified via CLI `--profile` flags
+      3. Merge all profiles using existing precedence rules (later profiles override earlier ones for conflicting keys)
+    - _Testable Outcome:_ `httpcraft --profile me myapi endpoint` loads both default `kaos` profile (base config) and `me` profile (user config), with `me` taking precedence for conflicts
+  - **T13.2:** **[IMPLEMENTATION]** Update CLI command handlers for additive profile behavior.
+    - _Files to Modify:_
+      - `src/cli/commands/api.ts`: Update profile loading logic around lines 67-95
+      - `src/cli/commands/chain.ts`: Update profile loading logic around lines 51-94
+    - _Current Code Pattern:_
+      ```typescript
+      let profileNames: string[] = [];
+      if (args.profiles && args.profiles.length > 0) {
+        // Use profiles specified via CLI
+        profileNames = args.profiles;
+      } else if (config.config?.defaultProfile) {
+        // Use default profile(s) from config
+        profileNames = Array.isArray(config.config.defaultProfile) 
+          ? config.config.defaultProfile 
+          : [config.config.defaultProfile];
+      }
+      ```
+    - _Enhanced Code Pattern:_
+      ```typescript
+      let profileNames: string[] = [];
+      
+      // Always start with default profiles (if any)
+      if (config.config?.defaultProfile) {
+        profileNames = Array.isArray(config.config.defaultProfile) 
+          ? [...config.config.defaultProfile] 
+          : [config.config.defaultProfile];
+      }
+      
+      // Add CLI-specified profiles (unless --no-default-profile is used)
+      if (args.profiles && args.profiles.length > 0) {
+        if (args.noDefaultProfile) {
+          // Override: use only CLI profiles
+          profileNames = args.profiles;
+        } else {
+          // Additive: combine default + CLI profiles
+          profileNames = [...profileNames, ...args.profiles];
+        }
+      }
+      ```
+    - _Testable Outcome:_ Profile loading logic correctly combines default and CLI profiles in the expected order
+  - **T13.3:** **[CLI OPTION]** Add `--no-default-profile` flag for explicit override behavior.
+    - _Purpose:_ Allow users to explicitly ignore default profiles when they want only specific profiles
+    - _Interface Changes:_
+      - Add `noDefaultProfile?: boolean` to `ApiCommandArgs` and `ChainCommandArgs` interfaces
+      - Add `--no-default-profile` to yargs CLI configuration
+      - Update help text to explain the flag's behavior
+    - _Use Cases:_
+      - Testing with isolated profile configurations
+      - Temporary override of default environment for specific requests
+      - Migration scenarios where default profiles conflict with new configurations
+    - _Testable Outcome:_ `httpcraft --no-default-profile --profile me myapi endpoint` loads only `me` profile, completely ignoring default profiles
+  - **T13.4:** **[TESTING]** Implement comprehensive test coverage for enhanced profile behavior.
+    - _Unit Tests:_ (`tests/unit/cli/commands/`)
+      - Test profile merging logic with various combinations of default and CLI profiles
+      - Test `--no-default-profile` flag behavior
+      - Test edge cases: missing profiles, empty profiles, conflicting variable names
+      - Test backward compatibility with existing profile configurations
+    - _Integration Tests:_ (`tests/integration/`)
+      - Test real HTTP requests with combined default + CLI profile configurations
+      - Test variable resolution with layered profile variables
+      - Test error scenarios: undefined profiles in default or CLI specifications
+      - Test verbose output showing profile merging process
+    - _Example Test Scenarios:_
+      ```typescript
+      // Test additive behavior
+      it('should combine default profiles with CLI profiles', async () => {
+        config.config.defaultProfile = ['base', 'env'];
+        args.profiles = ['user'];
+        // Expected: ['base', 'env', 'user'] merged in order
+      });
+      
+      // Test override behavior  
+      it('should ignore default profiles with --no-default-profile', async () => {
+        config.config.defaultProfile = ['base', 'env'];
+        args.profiles = ['user'];
+        args.noDefaultProfile = true;
+        // Expected: only ['user'] loaded
+      });
+      ```
+    - _Testable Outcome:_ 100% test coverage for profile merging scenarios with clear test documentation
+  - **T13.5:** **[DOCUMENTATION]** Update all documentation for enhanced profile behavior.
+    - _README.md Updates:_
+      - Update profile section to explain additive behavior
+      - Add examples showing default + CLI profile combinations
+      - Document `--no-default-profile` flag usage
+      - Update CLI options table with new flag
+    - _Examples to Add:_
+      ```yaml
+      # Example: Base configuration
+      config:
+        defaultProfile: ["development", "auth"]
+      
+      profiles:
+        development:
+          apiUrl: "https://dev-api.example.com"
+          debug: true
+        auth:
+          clientId: "dev-client-id"
+          authUrl: "https://dev-auth.example.com"
+        user_alice:
+          userId: "alice"
+          email: "alice@example.com"
+      ```
+      ```bash
+      # Enhanced behavior: gets development + auth + user_alice
+      httpcraft --profile user_alice myapi getUser
+      
+      # Override behavior: gets only user_alice  
+      httpcraft --no-default-profile --profile user_alice myapi getUser
+      ```
+    - _Migration Guide:_
+      - Explain how existing configurations will behave with new profile merging
+      - Provide guidance for users who might be affected by the behavior change
+      - Show how to achieve old behavior using `--no-default-profile` if needed
+    - _Testable Outcome:_ Clear, comprehensive documentation with working examples
+  - **T13.6:** **[DEBUGGING]** Enhance verbose output and error handling for profile operations.
+    - _Verbose Output Enhancements:_
+      - Show which profiles are being loaded (default vs CLI)
+      - Display profile merging process and final merged variables
+      - Indicate when profiles are missing or have conflicts
+    - _Error Message Improvements:_
+      - Clear error when default profiles reference non-existent profiles
+      - Clear error when CLI profiles reference non-existent profiles  
+      - Helpful suggestions when profile merging fails
+    - _Example Verbose Output:_
+      ```
+      [VERBOSE] Loading profiles:
+      [VERBOSE]   Default profiles: kaos
+      [VERBOSE]   CLI profiles: me
+      [VERBOSE]   Final profile order: kaos, me
+      [VERBOSE] Merged profile variables:
+      [VERBOSE]   cognito-auth-stage: kaos (from kaos profile)
+      [VERBOSE]   baseMpUrl: https://api-gateway.nib-cf-test.com (from kaos profile)
+      [VERBOSE]   contactNumber: 66298778 (from me profile)
+      [VERBOSE]   email: 66298778@members.nib-cf-test.com (from me profile)
+      ```
+    - _Testable Outcome:_ Enhanced debugging output helps users understand profile merging and troubleshoot issues
+
+---
+
 This more detailed breakdown provides a comprehensive OAuth2 implementation that addresses enterprise authentication needs while maintaining HttpCraft's plugin-driven architecture. The OAuth2 plugin is production-ready and supports the most common authentication scenarios required by modern API consumers.
 
 ---
 
-This more detailed breakdown should provide clearer, individually testable steps. The multiple profile loading logic is now integrated into Phase 4. Remember that some tasks might spawn sub-tasks as you get into the implementation details. Good luck!
+This comprehensive profile enhancement addresses the real-world usability issue discovered in production use and provides a much more intuitive user experience while maintaining full backward compatibility.
