@@ -3,6 +3,7 @@ import { handleApiCommand } from '../../../../src/cli/commands/api.js';
 import * as configLoaderModule from '../../../../src/core/configLoader.js';
 import * as httpClientModule from '../../../../src/core/httpClient.js';
 import * as variableResolverModule from '../../../../src/core/variableResolver.js';
+import * as urlBuilderModule from '../../../../src/core/urlBuilder.js';
 import { HttpCraftConfig } from '../../../../src/types/config.js';
 import { ApiCommandArgs } from '../../../../src/cli/commands/api.js';
 
@@ -10,10 +11,12 @@ import { ApiCommandArgs } from '../../../../src/cli/commands/api.js';
 vi.mock('../../../../src/core/configLoader.js');
 vi.mock('../../../../src/core/httpClient.js');
 vi.mock('../../../../src/core/variableResolver.js');
+vi.mock('../../../../src/core/urlBuilder.js');
 
 const mockConfigLoader = vi.mocked(configLoaderModule.configLoader);
 const mockHttpClient = vi.mocked(httpClientModule.httpClient);
 const mockVariableResolver = vi.mocked(variableResolverModule.variableResolver);
+const mockUrlBuilder = vi.mocked(urlBuilderModule.urlBuilder);
 
 describe('API Command Phase 5 Features', () => {
   let consoleLogSpy: any;
@@ -393,6 +396,469 @@ describe('API Command Phase 5 Features', () => {
 
       // Clean up
       delete process.env.ENVIRONMENT;
+    });
+  });
+});
+
+describe('API Command Query Parameters', () => {
+  let consoleLogSpy: any;
+  let consoleErrorSpy: any;
+  let stderrWriteSpy: any;
+  let processExitSpy: any;
+
+  beforeEach(() => {
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    stderrWriteSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    // Setup default mocks
+    mockVariableResolver.createContext.mockReturnValue({
+      cli: {},
+      env: {},
+      profiles: {},
+      api: {},
+      endpoint: {},
+      plugins: {}
+    });
+
+    mockVariableResolver.resolveValue.mockImplementation(async (value) => value);
+    mockVariableResolver.mergeProfiles.mockReturnValue({});
+
+    // Setup URL builder mocks
+    mockUrlBuilder.buildUrl.mockImplementation((api, endpoint) => {
+      return `${api.baseUrl}${endpoint.path}`;
+    });
+    mockUrlBuilder.mergeHeaders.mockReturnValue({});
+    mockUrlBuilder.mergeParams.mockImplementation((api, endpoint) => {
+      return { ...(api.params || {}), ...(endpoint.params || {}) };
+    });
+
+    mockHttpClient.executeRequest.mockResolvedValue({
+      status: 200,
+      statusText: 'OK',
+      headers: { 'content-type': 'application/json' },
+      body: '{"result": "success"}',
+    });
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  describe('Query Parameter Functionality', () => {
+    it('should add API-level params to the URL', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.test.com',
+            params: {
+              'api_key': 'test123',
+              'version': 'v1'
+            },
+            endpoints: {
+              getData: {
+                method: 'GET',
+                path: '/data'
+              }
+            }
+          }
+        }
+      };
+
+      mockConfigLoader.loadDefaultConfig.mockResolvedValue({
+        config,
+        path: '/test/.httpcraft.yaml'
+      });
+
+      await handleApiCommand({
+        apiName: 'testApi',
+        endpointName: 'getData'
+      });
+
+      // Verify the request was made with query parameters in the URL
+      expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: expect.stringMatching(/\?.*api_key=test123.*version=v1|version=v1.*api_key=test123/)
+        })
+      );
+    });
+
+    it('should add endpoint-level params to the URL', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.test.com',
+            endpoints: {
+              getData: {
+                method: 'GET',
+                path: '/data',
+                params: {
+                  'limit': '10',
+                  'sort': 'name'
+                }
+              }
+            }
+          }
+        }
+      };
+
+      mockConfigLoader.loadDefaultConfig.mockResolvedValue({
+        config,
+        path: '/test/.httpcraft.yaml'
+      });
+
+      await handleApiCommand({
+        apiName: 'testApi',
+        endpointName: 'getData'
+      });
+
+      // Verify the request was made with query parameters in the URL
+      expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: expect.stringMatching(/\?.*limit=10.*sort=name|sort=name.*limit=10/)
+        })
+      );
+    });
+
+    it('should merge API and endpoint params with endpoint taking precedence', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.test.com',
+            params: {
+              'api_key': 'api_value',
+              'version': 'v1'
+            },
+            endpoints: {
+              getData: {
+                method: 'GET',
+                path: '/data',
+                params: {
+                  'api_key': 'endpoint_value', // Should override API value
+                  'limit': '10'
+                }
+              }
+            }
+          }
+        }
+      };
+
+      mockConfigLoader.loadDefaultConfig.mockResolvedValue({
+        config,
+        path: '/test/.httpcraft.yaml'
+      });
+
+      await handleApiCommand({
+        apiName: 'testApi',
+        endpointName: 'getData'
+      });
+
+      // Verify endpoint param overrides API param and both API and endpoint params are included
+      expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: expect.stringContaining('api_key=endpoint_value')
+        })
+      );
+      expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: expect.stringContaining('version=v1')
+        })
+      );
+      expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: expect.stringContaining('limit=10')
+        })
+      );
+    });
+
+    it('should work with no query parameters', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.test.com',
+            endpoints: {
+              getData: {
+                method: 'GET',
+                path: '/data'
+                // No params defined
+              }
+            }
+          }
+        }
+      };
+
+      mockConfigLoader.loadDefaultConfig.mockResolvedValue({
+        config,
+        path: '/test/.httpcraft.yaml'
+      });
+
+      await handleApiCommand({
+        apiName: 'testApi',
+        endpointName: 'getData'
+      });
+
+      // Verify the request was made with clean URL (no query parameters)
+      expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: 'https://api.test.com/data'
+        })
+      );
+    });
+
+    it('should work with variable substitution in params', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.test.com',
+            params: {
+              'api_key': '{{env.API_KEY}}'
+            },
+            endpoints: {
+              getData: {
+                method: 'GET',
+                path: '/data',
+                params: {
+                  'user_id': '{{userId}}'
+                }
+              }
+            }
+          }
+        }
+      };
+
+      mockConfigLoader.loadDefaultConfig.mockResolvedValue({
+        config,
+        path: '/test/.httpcraft.yaml'
+      });
+
+      // Mock variable resolution to resolve the template variables
+      mockVariableResolver.resolveValue.mockImplementation(async (value) => {
+        if (typeof value === 'object' && value !== null) {
+          // Handle the API level params
+          if ('api_key' in value && value.api_key === '{{env.API_KEY}}') {
+            return { api_key: 'resolved_api_key' };
+          }
+          // Handle the endpoint level params
+          if ('user_id' in value && value.user_id === '{{userId}}') {
+            return { user_id: '123' };
+          }
+          // Handle baseUrl resolution
+          if (value === 'https://api.test.com') {
+            return 'https://api.test.com';
+          }
+          // Handle endpoint resolution
+          if ('method' in value && 'path' in value) {
+            return {
+              ...value,
+              params: { user_id: '123' } // Resolve the params inside endpoint
+            };
+          }
+        }
+        return value;
+      });
+
+      // Mock mergeParams to return the resolved values
+      mockUrlBuilder.mergeParams.mockReturnValue({
+        'api_key': 'resolved_api_key',
+        'user_id': '123'
+      });
+
+      await handleApiCommand({
+        apiName: 'testApi',
+        endpointName: 'getData',
+        variables: { userId: '123' }
+      });
+
+      // Verify the request was made with resolved variables in query parameters
+      expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: expect.stringContaining('api_key=resolved_api_key')
+        })
+      );
+      expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: expect.stringContaining('user_id=123')
+        })
+      );
+    });
+
+    it('should show query parameters in verbose output', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.test.com',
+            params: {
+              'api_key': 'test123'
+            },
+            endpoints: {
+              getData: {
+                method: 'GET',
+                path: '/data',
+                params: {
+                  'limit': '10'
+                }
+              }
+            }
+          }
+        }
+      };
+
+      mockConfigLoader.loadDefaultConfig.mockResolvedValue({
+        config,
+        path: '/test/.httpcraft.yaml'
+      });
+
+      // Override mergeParams for this test to return the expected values
+      mockUrlBuilder.mergeParams.mockReturnValue({
+        'api_key': 'test123',
+        'limit': '10'
+      });
+
+      await handleApiCommand({
+        apiName: 'testApi',
+        endpointName: 'getData',
+        verbose: true
+      });
+
+      // Verify that the HTTP request was made with query parameters in the URL
+      expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: expect.stringContaining('?api_key=test123&limit=10')
+        })
+      );
+      
+      // Verify that verbose output was generated (at least the query parameters section)
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[REQUEST] Query Parameters:')
+      );
+    });
+
+    it('should show query parameters in dry-run output', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.test.com',
+            params: {
+              'api_key': 'test123'
+            },
+            endpoints: {
+              getData: {
+                method: 'GET',
+                path: '/data',
+                params: {
+                  'limit': '10'
+                }
+              }
+            }
+          }
+        }
+      };
+
+      mockConfigLoader.loadDefaultConfig.mockResolvedValue({
+        config,
+        path: '/test/.httpcraft.yaml'
+      });
+
+      // Override mergeParams for this test to return the expected values
+      mockUrlBuilder.mergeParams.mockReturnValue({
+        'api_key': 'test123',
+        'limit': '10'
+      });
+
+      await handleApiCommand({
+        apiName: 'testApi',
+        endpointName: 'getData',
+        dryRun: true
+      });
+
+      // Verify no actual HTTP request was made
+      expect(mockHttpClient.executeRequest).not.toHaveBeenCalled();
+      
+      // Verify that dry-run output was generated (at least the query parameters section)
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[DRY RUN] Query Parameters:')
+      );
+    });
+
+    it('should handle special characters in query parameter values', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.test.com',
+            endpoints: {
+              getData: {
+                method: 'GET',
+                path: '/data',
+                params: {
+                  'query': 'hello world',
+                  'filter': 'name=John&age>25',
+                  'special': 'test@example.com'
+                }
+              }
+            }
+          }
+        }
+      };
+
+      mockConfigLoader.loadDefaultConfig.mockResolvedValue({
+        config,
+        path: '/test/.httpcraft.yaml'
+      });
+
+      await handleApiCommand({
+        apiName: 'testApi',
+        endpointName: 'getData'
+      });
+
+      // Verify special characters are properly URL encoded
+      // Note: URLSearchParams encodes spaces as '+' which is correct for query parameters
+      const requestCall = mockHttpClient.executeRequest.mock.calls[0][0];
+      expect(requestCall.url).toContain('query=hello+world'); // + is correct for spaces in query params
+      expect(requestCall.url).toContain('filter=name%3DJohn%26age%3E25');
+      expect(requestCall.url).toContain('special=test%40example.com');
+    });
+
+    it('should handle invalid URLs gracefully', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'not-a-valid-url',
+            endpoints: {
+              getData: {
+                method: 'GET',
+                path: '/data',
+                params: {
+                  'test': 'value'
+                }
+              }
+            }
+          }
+        }
+      };
+
+      mockConfigLoader.loadDefaultConfig.mockResolvedValue({
+        config,
+        path: '/test/.httpcraft.yaml'
+      });
+
+      await handleApiCommand({
+        apiName: 'testApi',
+        endpointName: 'getData',
+        verbose: true
+      });
+
+      // Should continue without query params and show warning in verbose mode
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[WARNING] Invalid URL format, skipping query parameters: not-a-valid-url/data')
+      );
+      expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: 'not-a-valid-url/data' // No query parameters added
+        })
+      );
     });
   });
 });

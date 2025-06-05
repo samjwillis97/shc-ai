@@ -307,10 +307,27 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     const headers = urlBuilder.mergeHeaders(resolvedApi, resolvedEndpoint);
     const params = urlBuilder.mergeParams(resolvedApi, resolvedEndpoint);
 
+    // Add query parameters to the URL if present (similar to ChainExecutor)
+    let finalUrl = url;
+    if (Object.keys(params).length > 0) {
+      try {
+        const urlObj = new URL(finalUrl);
+        Object.entries(params).forEach(([key, value]) => {
+          urlObj.searchParams.set(key, String(value));
+        });
+        finalUrl = urlObj.toString();
+      } catch (error) {
+        // If URL is invalid, just log the error but continue without query params
+        if (args.verbose) {
+          process.stderr.write(`[WARNING] Invalid URL format, skipping query parameters: ${finalUrl}\n`);
+        }
+      }
+    }
+
     // Prepare request details for verbose output / dry-run
     const requestDetails = {
       method: resolvedEndpoint.method,
-      url,
+      url: finalUrl,
       headers,
       params,
       body: resolvedEndpoint.body,
