@@ -2,13 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handleApiCommand } from '../../../../src/cli/commands/api.js';
 import * as configLoaderModule from '../../../../src/core/configLoader.js';
 import * as httpClientModule from '../../../../src/core/httpClient.js';
+import * as variableResolverModule from '../../../../src/core/variableResolver.js';
+import { HttpCraftConfig } from '../../../../src/types/config.js';
+import { ApiCommandArgs } from '../../../../src/cli/commands/api.js';
 
 // Mock modules
 vi.mock('../../../../src/core/configLoader.js');
 vi.mock('../../../../src/core/httpClient.js');
+vi.mock('../../../../src/core/variableResolver.js');
 
 const mockConfigLoader = vi.mocked(configLoaderModule.configLoader);
 const mockHttpClient = vi.mocked(httpClientModule.httpClient);
+const mockVariableResolver = vi.mocked(variableResolverModule.variableResolver);
 
 describe('API Command Phase 5 Features', () => {
   let consoleLogSpy: any;
@@ -388,6 +393,369 @@ describe('API Command Phase 5 Features', () => {
 
       // Clean up
       delete process.env.ENVIRONMENT;
+    });
+  });
+});
+
+describe('Phase 13: Enhanced Profile Merging', () => {
+  let stderrSpy: any;
+
+  beforeEach(() => {
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    // Mock httpClient methods for Phase 13 tests
+    mockHttpClient.executeRequest.mockResolvedValue({
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      body: 'test response'
+    });
+  });
+
+  afterEach(() => {
+    stderrSpy.mockRestore();
+  });
+
+  describe('additive profile merging', () => {
+    it('should combine default profiles with CLI profiles', async () => {
+      const config: HttpCraftConfig = {
+        config: {
+          defaultProfile: ['base', 'env']
+        },
+        profiles: {
+          base: { baseUrl: 'https://api.example.com' },
+          env: { environment: 'dev' },
+          user: { userId: '123' }
+        },
+        apis: {
+          testApi: {
+            baseUrl: '{{profile.baseUrl}}',
+            endpoints: {
+              test: { method: 'GET', path: '/test' }
+            }
+          }
+        }
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml'
+      });
+      vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({
+        baseUrl: 'https://api.example.com',
+        environment: 'dev',
+        userId: '123'
+      });
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        profiles: ['user']
+      };
+
+      await handleApiCommand(args);
+
+      // Should call mergeProfiles with combined profile list
+      expect(mockVariableResolver.mergeProfiles).toHaveBeenCalledWith(
+        ['base', 'env', 'user'], // Default profiles + CLI profiles
+        config.profiles,
+        false
+      );
+    });
+
+    it('should use only CLI profiles when --no-default-profile is used', async () => {
+      const config: HttpCraftConfig = {
+        config: {
+          defaultProfile: ['base', 'env']
+        },
+        profiles: {
+          base: { baseUrl: 'https://api.example.com' },
+          env: { environment: 'dev' },
+          user: { userId: '123' }
+        },
+        apis: {
+          testApi: {
+            baseUrl: '{{profile.baseUrl}}',
+            endpoints: {
+              test: { method: 'GET', path: '/test' }
+            }
+          }
+        }
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml'
+      });
+      vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({
+        userId: '123'
+      });
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        profiles: ['user'],
+        noDefaultProfile: true
+      };
+
+      await handleApiCommand(args);
+
+      // Should call mergeProfiles with only CLI profiles
+      expect(mockVariableResolver.mergeProfiles).toHaveBeenCalledWith(
+        ['user'], // Only CLI profiles
+        config.profiles,
+        false
+      );
+    });
+
+    it('should use only default profiles when no CLI profiles specified', async () => {
+      const config: HttpCraftConfig = {
+        config: {
+          defaultProfile: ['base', 'env']
+        },
+        profiles: {
+          base: { baseUrl: 'https://api.example.com' },
+          env: { environment: 'dev' }
+        },
+        apis: {
+          testApi: {
+            baseUrl: '{{profile.baseUrl}}',
+            endpoints: {
+              test: { method: 'GET', path: '/test' }
+            }
+          }
+        }
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml'
+      });
+      vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({
+        baseUrl: 'https://api.example.com',
+        environment: 'dev'
+      });
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test'
+      };
+
+      await handleApiCommand(args);
+
+      // Should call mergeProfiles with only default profiles
+      expect(mockVariableResolver.mergeProfiles).toHaveBeenCalledWith(
+        ['base', 'env'], // Only default profiles
+        config.profiles,
+        false
+      );
+    });
+
+    it('should handle single default profile (string)', async () => {
+      const config: HttpCraftConfig = {
+        config: {
+          defaultProfile: 'base' // Single profile as string
+        },
+        profiles: {
+          base: { baseUrl: 'https://api.example.com' },
+          user: { userId: '123' }
+        },
+        apis: {
+          testApi: {
+            baseUrl: '{{profile.baseUrl}}',
+            endpoints: {
+              test: { method: 'GET', path: '/test' }
+            }
+          }
+        }
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml'
+      });
+      vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({
+        baseUrl: 'https://api.example.com',
+        userId: '123'
+      });
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        profiles: ['user']
+      };
+
+      await handleApiCommand(args);
+
+      // Should call mergeProfiles with combined profile list
+      expect(mockVariableResolver.mergeProfiles).toHaveBeenCalledWith(
+        ['base', 'user'], // Single default profile + CLI profiles
+        config.profiles,
+        false
+      );
+    });
+
+    it('should handle no default profiles', async () => {
+      const config: HttpCraftConfig = {
+        profiles: {
+          user: { userId: '123' }
+        },
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            endpoints: {
+              test: { method: 'GET', path: '/test' }
+            }
+          }
+        }
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml'
+      });
+      vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({
+        userId: '123'
+      });
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        profiles: ['user']
+      };
+
+      await handleApiCommand(args);
+
+      // Should call mergeProfiles with only CLI profiles
+      expect(mockVariableResolver.mergeProfiles).toHaveBeenCalledWith(
+        ['user'], // Only CLI profiles
+        config.profiles,
+        false
+      );
+    });
+  });
+
+  describe('verbose output for profile operations', () => {
+    let stderrSpy: any;
+
+    beforeEach(() => {
+      stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    });
+
+    afterEach(() => {
+      stderrSpy.mockRestore();
+    });
+
+    it('should show profile loading information in verbose mode', async () => {
+      const config: HttpCraftConfig = {
+        config: {
+          defaultProfile: ['base', 'env']
+        },
+        profiles: {
+          base: { baseUrl: 'https://api.example.com' },
+          env: { environment: 'dev' },
+          user: { userId: '123' }
+        },
+        apis: {
+          testApi: {
+            baseUrl: '{{profile.baseUrl}}',
+            endpoints: {
+              test: { method: 'GET', path: '/test' }
+            }
+          }
+        }
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml'
+      });
+      vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({});
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        profiles: ['user'],
+        verbose: true
+      };
+
+      await handleApiCommand(args);
+
+      // Check verbose output
+      expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE] Loading profiles:\n');
+      expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   Default profiles: base, env\n');
+      expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   CLI profiles: user\n');
+      expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   Final profile order: base, env, user\n');
+    });
+
+    it('should show --no-default-profile usage in verbose mode', async () => {
+      const config: HttpCraftConfig = {
+        config: {
+          defaultProfile: ['base']
+        },
+        profiles: {
+          base: { baseUrl: 'https://api.example.com' },
+          user: { userId: '123' }
+        },
+        apis: {
+          testApi: {
+            baseUrl: '{{profile.baseUrl}}',
+            endpoints: {
+              test: { method: 'GET', path: '/test' }
+            }
+          }
+        }
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml'
+      });
+      vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({});
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        profiles: ['user'],
+        noDefaultProfile: true,
+        verbose: true
+      };
+
+      await handleApiCommand(args);
+
+      // Check verbose output shows override behavior
+      expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   --no-default-profile used: ignoring default profiles\n');
+      expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   Final profile order: user\n');
+    });
+
+    it('should show "none" when no profiles are used', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            endpoints: {
+              test: { method: 'GET', path: '/test' }
+            }
+          }
+        }
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml'
+      });
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        verbose: true
+      };
+
+      await handleApiCommand(args);
+
+      // Check verbose output shows "none"
+      expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   Default profiles: none\n');
+      expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   CLI profiles: none\n');
+      expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   Final profile order: none\n');
     });
   });
 }); 

@@ -1,0 +1,131 @@
+# examples/13_enhanced_profile_merging.yaml
+# Example demonstrating Phase 13 Enhanced Profile Merging
+
+# Global configuration with default profiles
+config:
+  # These profiles are automatically included with every request
+  # unless --no-default-profile is used
+  defaultProfile: ["base", "development"]
+
+# Profile definitions - showing layered configuration approach
+profiles:
+  # Base profile - common settings for all environments
+  base:
+    apiUrl: "https://api.example.com"
+    timeout: 30
+    userAgent: "HttpCraft/1.0"
+    retryCount: 3
+
+  # Environment profiles
+  development:
+    environment: "dev"
+    apiUrl: "https://dev-api.example.com"
+    debug: true
+    logLevel: "debug"
+  
+  staging:
+    environment: "staging"
+    apiUrl: "https://staging-api.example.com"
+    debug: true
+    logLevel: "info"
+
+  production:
+    environment: "prod"
+    apiUrl: "https://api.example.com"
+    debug: false
+    logLevel: "warn"
+
+  # User-specific profiles
+  user-alice:
+    userId: "alice123"
+    userName: "Alice Smith"
+    apiKey: "{{secret.ALICE_API_KEY}}"
+    userRole: "admin"
+
+  user-bob:
+    userId: "bob456"
+    userName: "Bob Johnson"
+    apiKey: "{{secret.BOB_API_KEY}}"
+    userRole: "user"
+
+  # Team-specific profiles
+  team-qa:
+    teamId: "qa-team"
+    automatedTesting: true
+    testSuite: "regression"
+
+  team-dev:
+    teamId: "dev-team"
+    debugMode: true
+    featureFlags: "experimental"
+
+# API definitions using profile variables
+apis:
+  userApi:
+    baseUrl: "{{profile.apiUrl}}/v1"
+    headers:
+      User-Agent: "{{profile.userAgent}}"
+      Authorization: "Bearer {{profile.apiKey}}"
+      X-Environment: "{{profile.environment}}"
+      X-User-ID: "{{profile.userId}}"
+    variables:
+      timeout: "{{profile.timeout}}"
+    endpoints:
+      getProfile:
+        description: "Get user profile information"
+        method: GET
+        path: "/users/{{profile.userId}}"
+        
+      updateProfile:
+        description: "Update user profile"
+        method: PUT
+        path: "/users/{{profile.userId}}"
+        body:
+          userName: "{{profile.userName}}"
+          role: "{{profile.userRole}}"
+          environment: "{{profile.environment}}"
+
+  teamApi:
+    baseUrl: "{{profile.apiUrl}}/v1"
+    headers:
+      Authorization: "Bearer {{profile.apiKey}}"
+      X-Team-ID: "{{profile.teamId}}"
+    endpoints:
+      getTeamInfo:
+        description: "Get team information"
+        method: GET
+        path: "/teams/{{profile.teamId}}"
+
+# Example usage:
+#
+# 1. Basic usage with default profiles:
+#    httpcraft --profile user-alice userApi getProfile
+#    Combines: base + development + user-alice
+#
+# 2. Switch environment while keeping user context:
+#    httpcraft --profile production --profile user-alice userApi getProfile
+#    Combines: base + development + production + user-alice
+#    (production overrides development settings)
+#
+# 3. Team context with user:
+#    httpcraft --profile user-alice --profile team-qa userApi getProfile
+#    Combines: base + development + user-alice + team-qa
+#
+# 4. Override default profiles:
+#    httpcraft --no-default-profile --profile production --profile user-alice userApi getProfile
+#    Uses only: production + user-alice (skips base + development)
+#
+# 5. Verbose mode to see profile merging:
+#    httpcraft --verbose --profile user-alice userApi getProfile
+#    Shows which variables come from which profiles
+#
+# 6. Environment-specific operations:
+#    httpcraft --profile staging --profile user-bob userApi updateProfile
+#    Combines: base + development + staging + user-bob
+#    (staging overrides development apiUrl)
+
+# Migration notes:
+# - Existing configurations without config.defaultProfile work unchanged
+# - Adding config.defaultProfile improves UX without breaking existing workflows
+# - Use --no-default-profile if you need the old explicit behavior
+# - Profile precedence is maintained: later profiles override earlier ones 

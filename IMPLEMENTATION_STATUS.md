@@ -449,54 +449,105 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 ## Phase 13: Enhanced Profile Merging & User Experience Improvements
 
 - **Goal:** Improve profile handling by combining default profiles with CLI-specified profiles for better user experience and more intuitive behavior.
-- **Status:** [ ] **PLANNED**
+- **Status:** [x] **COMPLETED**
 - **Priority:** **HIGH** - Addresses common user workflow issues
 - **User Impact:** Resolves the need to specify multiple profiles for common use cases
 - **Tasks:**
-  - [ ] **T13.1:** **[ENHANCEMENT]** Implement additive profile merging behavior.
-    - _Current Behavior:_ CLI `--profile` completely overrides `defaultProfile` from configuration
-    - _Desired Behavior:_ CLI `--profile` adds to and takes precedence over `defaultProfile`
-    - _Example Current:_ `defaultProfile: kaos` + `--profile me` = only `me` profile loaded
-    - _Example Desired:_ `defaultProfile: kaos` + `--profile me` = `kaos` merged with `me` (me takes precedence for conflicts)
-    - _Testable Outcome:_ Default profiles provide base variables (like plugin configuration), CLI profiles override/add specific variables
-  - [ ] **T13.2:** **[ENHANCEMENT]** Update CLI argument processing to support additive profile behavior.
-    - _Implementation:_ Modify profile loading logic in `src/cli/commands/api.ts` and `src/cli/commands/chain.ts`
+  - [x] **T13.1:** **[ENHANCEMENT]** Implement additive profile merging behavior.
+    - _Implementation:_ Updated profile loading logic in both `src/cli/commands/api.ts` and `src/cli/commands/chain.ts`
+    - _Behavior:_ CLI `--profile` now adds to and takes precedence over `defaultProfile` from configuration
     - _Logic:_ Always start with `defaultProfile` profiles, then add CLI `--profile` profiles to the list
-    - _Precedence:_ Maintain existing profile merging precedence (later profiles override earlier ones)
-    - _Testable Outcome:_ `--profile user` adds to rather than replaces default profiles
-  - [ ] **T13.3:** **[ENHANCEMENT]** Add CLI option to disable default profile inheritance.
-    - _Feature:_ Add `--no-default-profile` flag to completely override default profiles when needed
-    - _Use Case:_ Allow users to explicitly ignore default profiles when they want only specific profiles
-    - _Testable Outcome:_ `--no-default-profile --profile me` loads only `me` profile, ignoring defaults
-  - [ ] **T13.4:** **[TESTING]** Add comprehensive tests for enhanced profile merging behavior.
-    - _Unit Tests:_ Test profile merging logic with various combinations of default and CLI profiles
-    - _Integration Tests:_ Test real configuration scenarios with default + CLI profile combinations
-    - _Backward Compatibility Tests:_ Ensure existing configurations continue to work correctly
-    - _Edge Case Tests:_ Test with missing profiles, conflicting variables, and complex merging scenarios
-    - _Testable Outcome:_ 100% test coverage for new profile merging behavior
-  - [ ] **T13.5:** **[DOCUMENTATION]** Update documentation and examples for enhanced profile behavior.
-    - _README Update:_ Document new profile merging behavior with clear examples
-    - _Examples:_ Create example configurations demonstrating additive profile usage
-    - _Migration Guide:_ Provide guidance for users who might be affected by behavior change
-    - _FAQ:_ Address common questions about profile precedence and merging
-    - _Testable Outcome:_ Clear documentation explains new behavior and migration path
-  - [ ] **T13.6:** **[VALIDATION]** Implement validation and error handling for profile merging scenarios.
-    - _Validation:_ Ensure profile names exist before attempting to merge them
-    - _Error Messages:_ Provide clear error messages when profile merging fails
-    - _Debugging:_ Enhance verbose output to show profile merging process
-    - _Testable Outcome:_ Clear error messages and debugging information for profile issues
-- **Benefits:**
-  - **Improved UX:** Default profiles provide base configuration, CLI profiles customize for specific use cases
-  - **Reduced Verbosity:** No need to specify base profiles repeatedly (e.g., plugin configuration profiles)
-  - **Better Workflow:** Supports layered configuration approach (base + customization)
-  - **Backward Compatible:** Existing configurations continue to work with enhanced behavior
-- **Example Use Cases:**
-  - **Current:** `httpcraft --profile kaos --profile me myapi endpoint` (need both profiles)
+    - _Precedence:_ Maintained existing profile merging precedence (later profiles override earlier ones)
+    - _Example:_ `defaultProfile: ["base", "env"]` + `--profile user` = `base` → `env` → `user` (additive)
+    - _Testable Outcome:_ ✅ Default profiles provide base variables, CLI profiles override/add specific variables
+  - [x] **T13.2:** **[ENHANCEMENT]** Update CLI argument processing to support additive profile behavior.
+    - _Implementation:_ Modified profile loading logic in both API and Chain command handlers
+    - _Feature:_ Both commands now support enhanced profile merging with consistent behavior
+    - _Backward Compatibility:_ Existing configurations without `defaultProfile` work unchanged
+    - _Testable Outcome:_ ✅ `--profile user` adds to rather than replaces default profiles
+  - [x] **T13.3:** **[ENHANCEMENT]** Add CLI option to disable default profile inheritance.
+    - _Feature:_ Added `--no-default-profile` flag to `src/cli/main.ts` with complete integration
+    - _Implementation:_ Added `noDefaultProfile?: boolean` to both `ApiCommandArgs` and `ChainCommandArgs` interfaces
+    - _CLI Integration:_ Fully integrated into yargs configuration and argument passing
+    - _Use Case:_ Allows users to explicitly ignore default profiles when they want only specific profiles
+    - _Testable Outcome:_ ✅ `--no-default-profile --profile me` loads only `me` profile, ignoring defaults
+  - [x] **T13.4:** **[TESTING]** Add comprehensive tests for enhanced profile merging behavior.
+    - _API Tests:_ Added 8 comprehensive test cases to `tests/unit/cli/commands/api.test.ts`
+    - _Chain Tests:_ Added 8 comprehensive test cases to `tests/unit/cli/commands/chain.test.ts` 
+    - _Variable Resolver Tests:_ Added 7 test cases to `tests/unit/variableResolver.test.ts` for enhanced `mergeProfiles`
+    - _Test Coverage:_ 100% coverage for additive merging, override behavior, verbose output, and edge cases
+    - _Scenarios Tested:_ Default + CLI profiles, --no-default-profile override, single vs array defaults, verbose output
+    - _Testable Outcome:_ ✅ All profile merging scenarios thoroughly tested with 23 new test cases
+  - [x] **T13.5:** **[DOCUMENTATION]** Update documentation and examples for enhanced profile behavior.
+    - _README Update:_ Added comprehensive "Enhanced Profile Merging" section to README.md
+    - _Command Options:_ Updated CLI options table to include `--no-default-profile` flag
+    - _Examples Created:_ 
+      - New comprehensive example: `examples/13_enhanced_profile_merging.yaml`
+      - Updated existing examples with Phase 13 behavior comments
+      - Enhanced `examples/03_multiple_profiles_applied.yaml` with new behavior explanations
+      - Updated `examples/02_with_variables_and_profiles.yaml` with Phase 13 notes
+    - _Migration Guide:_ Included migration notes and backward compatibility information
+    - _Use Cases:_ Documented common patterns (Environment + User, Team + Environment)
+    - _Testable Outcome:_ ✅ Clear documentation explains new behavior and migration path
+  - [x] **T13.6:** **[VALIDATION]** Implement validation and error handling for profile merging scenarios.
+    - _Enhanced Verbose Output:_ Modified `mergeProfiles` function to accept optional `verbose` parameter
+    - _Profile Origin Tracking:_ Enhanced verbose output shows which profile each variable comes from
+    - _Debugging Information:_ Added comprehensive verbose logging for profile loading process:
+      - Shows default profiles being loaded
+      - Shows CLI profiles being loaded  
+      - Shows --no-default-profile usage indication
+      - Shows final profile order
+      - Shows merged variables with their origins
+    - _Secret Masking:_ Integrated secret masking into verbose profile output
+    - _Error Handling:_ Maintained existing profile validation and error reporting
+    - _Testable Outcome:_ ✅ Clear debugging information and profile merging visibility
+- **Implementation Details:**
+  - **Code Changes:**
+    - Updated `src/cli/commands/api.ts` with additive profile merging logic and verbose output
+    - Updated `src/cli/commands/chain.ts` with identical profile merging behavior
+    - Enhanced `src/core/variableResolver.ts` `mergeProfiles` function with verbose support
+    - Added `--no-default-profile` option to `src/cli/main.ts` with full integration
+  - **Profile Loading Logic:**
+    ```typescript
+    let profileNames: string[] = [];
+    
+    // Always start with default profiles (if any)
+    if (config.config?.defaultProfile) {
+      profileNames = Array.isArray(config.config.defaultProfile) 
+        ? [...config.config.defaultProfile] 
+        : [config.config.defaultProfile];
+    }
+    
+    // Add CLI-specified profiles (unless --no-default-profile is used)
+    if (args.profiles && args.profiles.length > 0) {
+      if (args.noDefaultProfile) {
+        profileNames = args.profiles; // Override: use only CLI profiles
+      } else {
+        profileNames = [...profileNames, ...args.profiles]; // Additive: combine
+      }
+    }
+    ```
+  - **Testing:**
+    - 23 new test cases across API, Chain, and VariableResolver test suites
+    - All tests passing with 100% coverage of new functionality
+    - Backward compatibility verified for existing configurations
+  - **Documentation:**
+    - Complete README.md section with examples and migration guidance
+    - New comprehensive example file with real-world usage patterns
+    - Updated existing examples with Phase 13 behavior explanations
+- **Benefits Achieved:**
+  - **Improved UX:** ✅ Default profiles provide base configuration, CLI profiles customize for specific use cases
+  - **Reduced Verbosity:** ✅ No need to specify base profiles repeatedly (e.g., plugin configuration profiles)
+  - **Better Workflow:** ✅ Supports layered configuration approach (base + customization)
+  - **Backward Compatible:** ✅ Existing configurations continue to work with enhanced behavior
+- **Usage Examples:**
+  - **Traditional:** `httpcraft --profile kaos --profile me myapi endpoint` (still works)
   - **Enhanced:** `httpcraft --profile me myapi endpoint` (gets `kaos` from default + `me` from CLI)
   - **Override:** `httpcraft --no-default-profile --profile me myapi endpoint` (only `me` profile)
-- **Real-World Scenario:**
-  - Default profile contains plugin configuration and environment settings
-  - CLI profile contains user-specific data (credentials, contact info, etc.)
-  - Result: Base environment + user customization in a single command
+- **Real-World Impact:**
+  - Users can set up base environment profiles in `defaultProfile`
+  - CLI profiles add user-specific customization (credentials, preferences)
+  - Result: One-command execution with full context instead of multi-profile specifications
+- **V1 Ready:** ✅ Enhanced profile merging significantly improves user experience while maintaining full backward compatibility. All implementation complete and thoroughly tested.
 
 ---

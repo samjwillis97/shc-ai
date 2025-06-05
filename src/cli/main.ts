@@ -73,6 +73,7 @@ async function main() {
           config: argv.config as string | undefined,
           variables,
           profiles,
+          noDefaultProfile: argv['no-default-profile'] as boolean,
           verbose: argv.verbose as boolean,
           dryRun: argv['dry-run'] as boolean,
           exitOnHttpError: argv['exit-on-http-error'] as string | undefined,
@@ -113,6 +114,11 @@ async function main() {
       type: 'array',
       string: true,
       alias: 'p',
+    })
+    .option('no-default-profile', {
+      describe: 'Ignore default profiles from configuration and use only profiles specified via --profile',
+      type: 'boolean',
+      default: false,
     })
     .option('verbose', {
       describe: 'Output detailed request and response information to stderr',
@@ -225,6 +231,7 @@ async function main() {
       config: argv.config as string | undefined,
       variables,
       profiles,
+      noDefaultProfile: argv['no-default-profile'] as boolean,
       verbose: argv.verbose as boolean,
       dryRun: argv['dry-run'] as boolean,
       exitOnHttpError: argv['exit-on-http-error'] as string | undefined,

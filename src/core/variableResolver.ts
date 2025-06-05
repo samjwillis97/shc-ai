@@ -635,17 +635,34 @@ export class VariableResolver {
   /**
    * Merges multiple profiles into a single variables object
    * Later profiles override earlier ones for the same key
+   * T13.6: Enhanced with verbose output for profile merging
    */
   mergeProfiles(
     profileNames: string[],
-    profiles: Record<string, Record<string, any>>
+    profiles: Record<string, Record<string, any>>,
+    verbose: boolean = false
   ): Record<string, any> {
     const merged: Record<string, any> = {};
+    const variableOrigins: Record<string, string> = {}; // Track which profile each variable comes from
 
     for (const profileName of profileNames) {
       const profile = profiles[profileName];
       if (profile) {
-        Object.assign(merged, profile);
+        for (const [key, value] of Object.entries(profile)) {
+          merged[key] = value;
+          variableOrigins[key] = profileName;
+        }
+      }
+    }
+
+    // T13.6: Show merged profile variables in verbose mode
+    if (verbose && Object.keys(merged).length > 0) {
+      process.stderr.write('[VERBOSE] Merged profile variables:\n');
+      for (const [key, value] of Object.entries(merged)) {
+        // T9.5: Mask secrets in verbose output
+        const maskedValue = this.maskSecrets(String(value));
+        const origin = variableOrigins[key];
+        process.stderr.write(`[VERBOSE]   ${key}: ${maskedValue} (from ${origin} profile)\n`);
       }
     }
 

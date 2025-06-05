@@ -11,6 +11,7 @@ export interface ChainCommandArgs {
   config?: string;
   variables?: Record<string, string>;
   profiles?: string[];
+  noDefaultProfile?: boolean;
   verbose?: boolean;
   dryRun?: boolean;
   exitOnHttpError?: string;
@@ -60,17 +61,57 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
       process.exit(1);
     }
 
-    // Determine which profiles to use
+    // Determine which profiles to use - T13.1 & T13.2: Additive profile merging
     let profileNames: string[] = [];
+    
+    // Always start with default profiles (if any)
+    if (config.config?.defaultProfile) {
+      profileNames = Array.isArray(config.config.defaultProfile) 
+        ? [...config.config.defaultProfile] 
+        : [config.config.defaultProfile];
+    }
+    
+    // Add CLI-specified profiles (unless --no-default-profile is used)
     if (args.profiles && args.profiles.length > 0) {
-      // Use profiles specified via CLI
-      profileNames = args.profiles;
-    } else if (config.config?.defaultProfile) {
-      // Use default profile(s) from config
-      if (Array.isArray(config.config.defaultProfile)) {
-        profileNames = config.config.defaultProfile;
+      if (args.noDefaultProfile) {
+        // Override: use only CLI profiles
+        profileNames = args.profiles;
       } else {
-        profileNames = [config.config.defaultProfile];
+        // Additive: combine default + CLI profiles
+        profileNames = [...profileNames, ...args.profiles];
+      }
+    }
+
+    // T13.6: Enhanced verbose output for profile operations
+    if (args.verbose) {
+      process.stderr.write('[VERBOSE] Loading profiles:\n');
+      
+      // Show default profiles
+      const defaultProfiles = config.config?.defaultProfile;
+      if (defaultProfiles) {
+        const defaultProfilesList = Array.isArray(defaultProfiles) ? defaultProfiles : [defaultProfiles];
+        process.stderr.write(`[VERBOSE]   Default profiles: ${defaultProfilesList.join(', ')}\n`);
+      } else {
+        process.stderr.write(`[VERBOSE]   Default profiles: none\n`);
+      }
+      
+      // Show CLI profiles
+      if (args.profiles && args.profiles.length > 0) {
+        process.stderr.write(`[VERBOSE]   CLI profiles: ${args.profiles.join(', ')}\n`);
+      } else {
+        process.stderr.write(`[VERBOSE]   CLI profiles: none\n`);
+      }
+      
+      // Show override behavior
+      if (args.noDefaultProfile && args.profiles && args.profiles.length > 0) {
+        process.stderr.write(`[VERBOSE]   --no-default-profile used: ignoring default profiles\n`);
+      }
+      
+      // Show final profile order
+      if (profileNames.length > 0) {
+        process.stderr.write(`[VERBOSE]   Final profile order: ${profileNames.join(', ')}\n`);
+      } else {
+        process.stderr.write(`[VERBOSE]   Final profile order: none\n`);
       }
     }
 
@@ -92,7 +133,7 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
         }
       }
 
-      mergedProfileVars = variableResolver.mergeProfiles(profileNames, config.profiles);
+      mergedProfileVars = variableResolver.mergeProfiles(profileNames, config.profiles, args.verbose);
     }
 
     // Execute the chain

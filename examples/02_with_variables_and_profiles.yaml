@@ -1,6 +1,8 @@
 # examples/02_with_variables_and_profiles.yaml
 config:
   defaultProfile: "dev" # Default profile to use if --profile is not specified
+                        # Phase 13: CLI profiles are now ADDED to this default profile
+                        # Use --no-default-profile to override this behavior
 
 profiles:
   dev:
@@ -11,6 +13,15 @@ profiles:
     apiHost: "staging.api.example.com"
     defaultUser: "tester_007"
     apiKey: "staging_api_key_from_profile"
+
+# Phase 13 Enhanced Usage:
+# httpcraft --profile staging myService getUser
+# Combines: dev (default) + staging (CLI)
+# Result: staging overrides dev for apiHost and defaultUser, but dev provides fallback
+#
+# Old explicit behavior (still available):
+# httpcraft --no-default-profile --profile staging myService getUser
+# Uses only: staging profile
 
 apis:
   myService:

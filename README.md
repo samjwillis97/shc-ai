@@ -136,6 +136,7 @@ httpcraft completion zsh
 | `--config, -c` | Path to configuration file |
 | `--var` | Set or override variables (can be used multiple times) |
 | `--profile, -p` | Select profile(s) to use (can be used multiple times) |
+| `--no-default-profile` | Skip default profiles and use only CLI-specified profiles |
 | `--verbose` | Output detailed request/response information to stderr |
 | `--dry-run` | Preview request without sending it |
 | `--exit-on-http-error` | Exit with non-zero code for specified HTTP errors |
@@ -153,6 +154,12 @@ httpcraft myapi getUser --var userId=123 --var format=json
 # With profiles
 httpcraft --profile prod myapi getUser --var userId=123
 
+# Enhanced profile merging (combines default + CLI profiles)
+httpcraft --profile user-alice myapi getUser
+
+# Override default profiles (use only CLI profiles)
+httpcraft --no-default-profile --profile user-alice myapi getUser
+
 # Verbose output
 httpcraft --verbose myapi getUser --var userId=123
 
@@ -167,6 +174,130 @@ httpcraft chain createAndGetUser --var userName="John Doe"
 
 # Chain with full output
 httpcraft chain createAndGetUser --chain-output full
+```
+
+## 🔧 Enhanced Profile Merging
+
+HttpCraft now supports **additive profile merging**, making it easier to work with layered configurations:
+
+### Default Behavior (Additive Merging)
+When you specify profiles via `--profile`, they are **combined** with your `config.defaultProfile`:
+
+```yaml
+# .httpcraft.yaml
+config:
+  defaultProfile: ["base", "dev"]  # Base environment setup
+
+profiles:
+  base:
+    apiUrl: "https://api.example.com"
+    timeout: 30
+  dev:
+    environment: "development"
+    debug: true
+  user-alice:
+    userId: "alice123"
+    apiKey: "alice-key"
+```
+
+```bash
+# This combines ALL profiles: base + dev + user-alice
+httpcraft --profile user-alice myapi getUser
+
+# Equivalent to the old behavior:
+# httpcraft --profile base --profile dev --profile user-alice myapi getUser
+```
+
+### Override Behavior
+Use `--no-default-profile` when you want **only** the CLI-specified profiles:
+
+```bash
+# Uses ONLY user-alice profile (skips base + dev)
+httpcraft --no-default-profile --profile user-alice myapi getUser
+```
+
+### Profile Precedence
+Variables from later profiles override earlier ones:
+1. Default profiles (in order specified)
+2. CLI profiles (in order specified)
+
+```bash
+# Order: base → dev → user-alice → admin
+httpcraft --profile user-alice --profile admin myapi getUser
+```
+
+### Verbose Output
+See exactly which profiles are being merged:
+
+```bash
+httpcraft --verbose --profile user-alice myapi getUser
+```
+
+Output:
+```
+[VERBOSE] Loading profiles:
+[VERBOSE]   Default profiles: base, dev
+[VERBOSE]   CLI profiles: user-alice
+[VERBOSE]   Final profile order: base, dev, user-alice
+[VERBOSE] Merged profile variables:
+[VERBOSE]   apiUrl: https://api.example.com (from base profile)
+[VERBOSE]   environment: development (from dev profile)
+[VERBOSE]   userId: alice123 (from user-alice profile)
+```
+
+### Migration from Previous Versions
+**No breaking changes** - existing configurations work unchanged:
+
+- If you don't use `config.defaultProfile`, behavior is identical
+- If you do use `config.defaultProfile`, you get the improved UX automatically
+- Use `--no-default-profile` to restore old behavior if needed
+
+### Common Patterns
+
+**Environment + User Pattern:**
+```yaml
+config:
+  defaultProfile: ["base", "production"]
+
+profiles:
+  base:
+    apiUrl: "https://api.example.com"
+    timeout: 30
+  production:
+    environment: "prod"
+    logLevel: "warn"
+  user-alice:
+    userId: "alice"
+    apiKey: "{{secret.ALICE_API_KEY}}"
+```
+
+```bash
+# Production environment with Alice's credentials
+httpcraft --profile user-alice myapi getUser
+```
+
+**Team + Environment Pattern:**
+```yaml
+config:
+  defaultProfile: "team-defaults"
+
+profiles:
+  team-defaults:
+    apiUrl: "https://api.company.com"
+    userAgent: "CompanyTool/1.0"
+  staging:
+    environment: "staging"
+    apiUrl: "https://staging-api.company.com"
+  production:
+    environment: "production"
+```
+
+```bash
+# Team defaults + staging environment
+httpcraft --profile staging myapi getUser
+
+# Only staging (no team defaults)
+httpcraft --no-default-profile --profile staging myapi getUser
 ```
 
 ## ⚙️ Configuration

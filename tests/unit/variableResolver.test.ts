@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { VariableResolver, VariableContext, VariableResolutionError } from '../../src/core/variableResolver.js';
 import type { StepExecutionResult } from '../../src/core/chainExecutor.js';
 import type { VariableSource } from '../../src/types/plugin.js';
@@ -1855,6 +1855,207 @@ describe('VariableResolver', () => {
       // Which becomes: steps.complexData.response.body.data.0.name
       const result = await resolver.resolve('{{steps.complexData.response.body.data.{{arrayIndex}}.{{objectKey}}}}', context);
       expect(result).toBe('first');
+    });
+  });
+
+  describe('Phase 13: Enhanced Profile Merging', () => {
+    describe('mergeProfiles with verbose output', () => {
+      let stderrSpy: any;
+
+      beforeEach(() => {
+        stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      });
+
+      afterEach(() => {
+        stderrSpy.mockRestore();
+      });
+
+      it('should show merged profile variables in verbose mode', () => {
+        const profiles = {
+          base: { 
+            apiUrl: 'https://api.example.com',
+            timeout: 5000
+          },
+          env: { 
+            environment: 'dev',
+            debug: true
+          },
+          user: { 
+            userId: '123',
+            timeout: 10000 // Override base timeout
+          }
+        };
+
+        const result = resolver.mergeProfiles(['base', 'env', 'user'], profiles, true);
+
+        // Check merged result
+        expect(result).toEqual({
+          apiUrl: 'https://api.example.com',
+          timeout: 10000, // user profile overrides base
+          environment: 'dev',
+          debug: true,
+          userId: '123'
+        });
+
+        // Check verbose output
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE] Merged profile variables:\n');
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   apiUrl: https://api.example.com (from base profile)\n');
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   timeout: 10000 (from user profile)\n');
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   environment: dev (from env profile)\n');
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   debug: true (from env profile)\n');
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   userId: 123 (from user profile)\n');
+      });
+
+      it('should not show verbose output when verbose is false', () => {
+        const profiles = {
+          base: { apiUrl: 'https://api.example.com' },
+          user: { userId: '123' }
+        };
+
+        const result = resolver.mergeProfiles(['base', 'user'], profiles, false);
+
+        expect(result).toEqual({
+          apiUrl: 'https://api.example.com',
+          userId: '123'
+        });
+
+        // Should not have any verbose output
+        expect(stderrSpy).not.toHaveBeenCalled();
+      });
+
+      it('should not show verbose output when no variables are merged', () => {
+        const profiles = {
+          empty1: {},
+          empty2: {}
+        };
+
+        const result = resolver.mergeProfiles(['empty1', 'empty2'], profiles, true);
+
+        expect(result).toEqual({});
+
+        // Should not show verbose output for empty result
+        expect(stderrSpy).not.toHaveBeenCalledWith('[VERBOSE] Merged profile variables:\n');
+      });
+
+      it('should mask secrets in verbose output', () => {
+        // First set up a secret value to be tracked
+        const secretValue = 'super-secret-key';
+        resolver.resetSecretTracking();
+        
+        // Simulate secret tracking by calling maskSecrets with the secret value
+        // This would normally happen during variable resolution
+        const maskedValue = resolver.maskSecrets(secretValue);
+        
+        const profiles = {
+          secrets: { 
+            apiKey: secretValue,
+            publicValue: 'not-secret'
+          }
+        };
+
+        const result = resolver.mergeProfiles(['secrets'], profiles, true);
+
+        expect(result).toEqual({
+          apiKey: secretValue,
+          publicValue: 'not-secret'
+        });
+
+        // Check that verbose output was called
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE] Merged profile variables:\n');
+        expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining('apiKey:'));
+        expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining('publicValue: not-secret (from secrets profile)'));
+      });
+
+      it('should show correct profile origin for overridden variables', () => {
+        const profiles = {
+          base: { 
+            setting: 'base-value',
+            unique: 'base-unique'
+          },
+          override: { 
+            setting: 'override-value'
+          }
+        };
+
+        const result = resolver.mergeProfiles(['base', 'override'], profiles, true);
+
+        expect(result).toEqual({
+          setting: 'override-value',
+          unique: 'base-unique'
+        });
+
+        // Check that the origin shows the overriding profile
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   setting: override-value (from override profile)\n');
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   unique: base-unique (from base profile)\n');
+      });
+
+      it('should handle complex variable values in verbose output', () => {
+        const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+        
+        const profiles = {
+          complex: {
+            stringValue: 'simple string',
+            numberValue: 42,
+            booleanValue: true,
+            objectValue: { nested: 'value' },
+            arrayValue: [1, 2, 3]
+          }
+        };
+
+        resolver.mergeProfiles(['complex'], profiles, true);
+
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE] Merged profile variables:\n');
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   stringValue: simple string (from complex profile)\n');
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   numberValue: 42 (from complex profile)\n');
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   booleanValue: true (from complex profile)\n');
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   objectValue: [object Object] (from complex profile)\n');
+        expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   arrayValue: 1,2,3 (from complex profile)\n');
+
+        stderrSpy.mockRestore();
+      });
+    });
+
+    describe('backward compatibility', () => {
+      it('should work with existing mergeProfiles calls without verbose parameter', () => {
+        const profiles = {
+          base: { apiUrl: 'https://api.example.com' },
+          user: { userId: '123' }
+        };
+
+        // Call without verbose parameter (should default to false)
+        const result = resolver.mergeProfiles(['base', 'user'], profiles);
+
+        expect(result).toEqual({
+          apiUrl: 'https://api.example.com',
+          userId: '123'
+        });
+      });
+
+      it('should maintain profile precedence order', () => {
+        const profiles = {
+          first: { 
+            shared: 'first-value',
+            unique1: 'first-unique'
+          },
+          second: { 
+            shared: 'second-value',
+            unique2: 'second-unique'
+          },
+          third: { 
+            shared: 'third-value',
+            unique3: 'third-unique'
+          }
+        };
+
+        const result = resolver.mergeProfiles(['first', 'second', 'third'], profiles);
+
+        expect(result).toEqual({
+          shared: 'third-value', // Last profile wins
+          unique1: 'first-unique',
+          unique2: 'second-unique',
+          unique3: 'third-unique'
+        });
+      });
     });
   });
 }); 
