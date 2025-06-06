@@ -863,6 +863,108 @@ apis:
 
 See `examples/oauth2_builtin_example.yaml` for a complete working example.
 
+### Interactive Browser Authentication
+
+HttpCraft supports modern browser-based OAuth2 authentication similar to Insomnia, automatically opening your browser for user authentication:
+
+#### Configuration
+
+```yaml
+plugins:
+  - name: "oauth2"
+    config:
+      # Interactive Authorization Code Grant Flow
+      grantType: "authorization_code"
+      
+      # OAuth2 Provider Configuration
+      authorizationUrl: "https://auth.example.com/oauth2/authorize"
+      tokenUrl: "https://auth.example.com/oauth2/token"
+      clientId: "{{env.OAUTH2_CLIENT_ID}}"
+      clientSecret: "{{env.OAUTH2_CLIENT_SECRET}}"
+      
+      # Scopes and Audience
+      scope: "openid profile email api:read api:write"
+      audience: "https://api.example.com"
+      
+      # Interactive Flow Options (all optional - auto-detected)
+      # interactive: true              # Auto-detected when conditions are met
+      # usePKCE: true                  # Enabled by default for security
+      # codeChallengeMethod: "S256"    # Default PKCE method
+      # tokenStorage: "keychain"       # Auto-detected: keychain → filesystem → memory
+      # callbackPort: 8080             # Auto-selected if not specified
+      # callbackPath: "/callback"      # Default callback path
+
+apis:
+  userApi:
+    baseUrl: "https://api.example.com"
+    endpoints:
+      getProfile:
+        path: "/user/profile"
+        method: GET
+        # Authorization header automatically added by OAuth2 plugin
+```
+
+#### User Experience
+
+**First-time authentication:**
+```bash
+$ httpcraft userApi getProfile
+🔐 Authentication required...                        # stderr
+🌐 Opening browser for OAuth2 authentication...      # stderr
+⏳ Waiting for authorization (timeout: 5 minutes)... # stderr
+✅ Authentication successful! Tokens stored securely. # stderr
+{"user": {"id": 123, "name": "John Doe"}}            # stdout (for piping)
+```
+
+**Subsequent requests:**
+```bash
+$ httpcraft userApi getProfile
+🔑 Using stored access token                         # stderr
+{"user": {"id": 123, "name": "John Doe"}}            # stdout (for piping)
+```
+
+**Automatic token refresh:**
+```bash
+$ httpcraft userApi getProfile
+🔄 Access token expired, refreshing...               # stderr
+✅ Token refreshed successfully                      # stderr
+{"user": {"id": 123, "name": "John Doe"}}            # stdout (for piping)
+```
+
+#### Features
+
+- **Automatic Browser Launch**: Opens system browser for authorization
+- **Secure Token Storage**: OS keychain integration with encrypted filesystem fallback
+- **PKCE Security**: Proof Key for Code Exchange enabled by default
+- **Environment Detection**: Graceful degradation in CI/automated environments
+- **Unix Piping Compatible**: Auth messages go to stderr, response to stdout
+- **Zero Configuration**: Interactive mode auto-detected when appropriate
+
+#### Provider Examples
+
+**Auth0:**
+```yaml
+authorizationUrl: "https://your-tenant.auth0.com/authorize"
+tokenUrl: "https://your-tenant.auth0.com/oauth/token"
+audience: "https://api.your-app.com"
+```
+
+**Azure AD:**
+```yaml
+authorizationUrl: "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize"
+tokenUrl: "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+scope: "https://graph.microsoft.com/.default"
+```
+
+**Google OAuth2:**
+```yaml
+authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth"
+tokenUrl: "https://oauth2.googleapis.com/token"
+scope: "https://www.googleapis.com/auth/userinfo.profile"
+```
+
+See `examples/phase15_interactive_oauth2.yaml` for complete working examples.
+
 ## 🚀 Quick Start
 
 ### 1. Create Configuration

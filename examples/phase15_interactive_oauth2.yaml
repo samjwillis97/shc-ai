@@ -1,0 +1,166 @@
+# Phase 15: Interactive OAuth2 Browser Authentication Example
+# This example demonstrates the enhanced OAuth2 plugin with interactive browser-based authentication
+# Similar to Insomnia's OAuth2 flow - automatically opens browser for user authentication
+
+plugins:
+  - name: "oauth2"
+    config:
+      # Interactive Authorization Code Grant Flow
+      grantType: "authorization_code"
+      
+      # OAuth2 Provider Configuration (Example: Auth0)
+      authorizationUrl: "https://your-tenant.auth0.com/authorize"
+      tokenUrl: "https://your-tenant.auth0.com/oauth/token"
+      
+      # Client Configuration
+      clientId: "{{env.OAUTH2_CLIENT_ID}}"
+      clientSecret: "{{env.OAUTH2_CLIENT_SECRET}}"
+      
+      # Scopes and Audience
+      scope: "openid profile email api:read api:write"
+      audience: "https://api.example.com"
+      
+      # Interactive Flow Configuration (all optional - auto-detected)
+      # interactive: true              # Auto-detected when conditions are met
+      # usePKCE: true                  # Enabled by default for security
+      # codeChallengeMethod: "S256"    # Default PKCE method
+      # tokenStorage: "keychain"       # Auto-detected: keychain → filesystem → memory
+      # callbackPort: 8080             # Auto-selected if not specified
+      # callbackPath: "/callback"      # Default callback path
+
+apis:
+  # Example API using interactive OAuth2
+  userApi:
+    baseUrl: "https://api.example.com"
+    endpoints:
+      getProfile:
+        path: "/user/profile"
+        method: GET
+        headers:
+          Accept: "application/json"
+          # Authorization header automatically added by OAuth2 plugin
+      
+      updateProfile:
+        path: "/user/profile"
+        method: PUT
+        headers:
+          Accept: "application/json"
+          Content-Type: "application/json"
+        body:
+          name: "{{var.name}}"
+          email: "{{var.email}}"
+      
+      listUsers:
+        path: "/users"
+        method: GET
+        params:
+          limit: "{{var.limit:10}}"
+          offset: "{{var.offset:0}}"
+
+  # Example with different OAuth2 provider (Google)
+  googleApi:
+    plugins:
+      - name: "oauth2"
+        config:
+          grantType: "authorization_code"
+          authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth"
+          tokenUrl: "https://oauth2.googleapis.com/token"
+          clientId: "{{env.GOOGLE_CLIENT_ID}}"
+          clientSecret: "{{env.GOOGLE_CLIENT_SECRET}}"
+          scope: "https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email"
+          usePKCE: true
+    
+    baseUrl: "https://www.googleapis.com"
+    endpoints:
+      getUserInfo:
+        path: "/oauth2/v2/userinfo"
+        method: GET
+        headers:
+          Accept: "application/json"
+
+chains:
+  # Example chain using interactive OAuth2
+  userWorkflow:
+    vars:
+      name: "John Doe"
+      email: "john.doe@example.com"
+    
+    steps:
+      - id: getProfile
+        call: userApi.getProfile
+      
+      - id: updateProfile
+        call: userApi.updateProfile
+        with:
+          body:
+            name: "{{var.name}}"
+            email: "{{var.email}}"
+            lastLogin: "{{$isoTimestamp}}"
+      
+      - id: verifyUpdate
+        call: userApi.getProfile
+
+# Environment Variables Required:
+# export OAUTH2_CLIENT_ID="your-client-id"
+# export OAUTH2_CLIENT_SECRET="your-client-secret"
+# export GOOGLE_CLIENT_ID="your-google-client-id"  
+# export GOOGLE_CLIENT_SECRET="your-google-client-secret"
+
+# Usage Examples:
+
+# First time - automatic browser authentication:
+# $ httpcraft userApi getProfile
+# 🔐 Authentication required...
+# 🌐 Opening browser for OAuth2 authentication...
+# ⏳ Waiting for authorization (timeout: 5 minutes)...
+# ✅ Authentication successful! Tokens stored securely.
+# {"user": {"id": 123, "name": "John Doe"}}
+
+# Subsequent requests - uses stored tokens:
+# $ httpcraft userApi getProfile
+# 🔑 Using stored access token
+# {"user": {"id": 123, "name": "John Doe"}}
+
+# Automatic token refresh when expired:
+# $ httpcraft userApi getProfile
+# 🔄 Access token expired, refreshing...
+# ✅ Token refreshed successfully
+# {"user": {"id": 123, "name": "John Doe"}}
+
+# Chain execution with interactive OAuth2:
+# $ httpcraft chain userWorkflow
+# 🔑 Using stored access token
+# {"user": {"id": 123, "name": "John Doe", "lastLogin": "2024-01-20T10:30:00.000Z"}}
+
+# Unix piping compatibility (auth messages go to stderr):
+# $ httpcraft userApi getProfile | jq '.user.name'
+# 🔑 Using stored access token                    # stderr (visible to user)
+# "John Doe"                                      # stdout (for jq processing)
+
+# Force re-authentication by removing stored tokens:
+# $ rm -rf ~/.config/httpcraft/tokens/  # or clear from keychain
+# $ httpcraft userApi getProfile
+# 🔐 Authentication required...
+# 🌐 Opening browser for OAuth2 authentication...
+
+# Provider-specific examples:
+
+# Auth0 Configuration:
+# authorizationUrl: "https://your-tenant.auth0.com/authorize"
+# tokenUrl: "https://your-tenant.auth0.com/oauth/token"
+# audience: "https://api.your-app.com"
+
+# Azure AD Configuration:
+# authorizationUrl: "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize"
+# tokenUrl: "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+# scope: "https://graph.microsoft.com/.default"
+
+# Google OAuth2 Configuration:
+# authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth"
+# tokenUrl: "https://oauth2.googleapis.com/token"
+# scope: "https://www.googleapis.com/auth/userinfo.profile"
+
+# Okta Configuration:
+# authorizationUrl: "https://your-org.okta.com/oauth2/default/v1/authorize"
+# tokenUrl: "https://your-org.okta.com/oauth2/default/v1/token"
+# audience: "api://default" 
