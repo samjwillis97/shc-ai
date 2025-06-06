@@ -122,6 +122,13 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
   - Default secrets provider shall be OS environment variables.
   - Secrets shall be masked in verbose logs and dry-run outputs.
   - The secrets provider mechanism should be extensible via plugins.
+- **FR3.8 (Custom Secret Resolvers):**
+  - Plugins shall be able to register custom secret resolvers that intercept `{{secret.*}}` variable resolution.
+  - Custom secret resolvers shall be tried before the default environment variable fallback.
+  - Custom secret resolvers shall support asynchronous operations for fetching secrets from external sources.
+  - Secrets resolved by custom resolvers shall automatically participate in the secret masking system.
+  - Multiple secret resolvers can be registered, with API-level plugin configurations enabling API-specific secret mappings.
+  - Custom secret resolvers shall receive only the secret name portion (e.g., for `{{secret.API_KEY}}`, the resolver receives `"API_KEY"`).
 
 ### 5.4. Chained Requests
 
@@ -157,6 +164,7 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
   - **Pre-request:** Modify the request object (URL, headers, body, etc.) before it is sent. (e.g., for custom authentication).
   - **Post-response:** Access and potentially transform the response object (status, headers, body) before it's processed for output or chaining.
 - **FR5.4 (Custom Variables/Functions):** Plugins shall be able to expose custom functions or variables accessible via the templating engine (e.g., `{{myAuthPlugin.getToken()}}`). These functions will be executed each time they are referenced.
+- **FR5.4a (Custom Secret Resolvers):** Plugins shall be able to register custom secret resolvers that intercept `{{secret.*}}` variable resolution, enabling integration with external secret management systems (e.g., HashiCorp Vault, AWS Secrets Manager, Azure Key Vault) while maintaining automatic secret masking.
 - **FR5.5 (Configuration):** Plugins can have their own configuration sections within the main tool configuration.
 - **FR5.5a (API-Level Plugin Configuration):** 
   - APIs may define plugin configurations that override global plugin settings for that specific API.

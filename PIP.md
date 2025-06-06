@@ -504,3 +504,154 @@ This more detailed breakdown provides a comprehensive OAuth2 implementation that
 ---
 
 This comprehensive profile enhancement addresses the real-world usability issue discovered in production use and provides a much more intuitive user experience while maintaining full backward compatibility.
+
+---
+
+## Phase 14: Custom Secret Resolver System
+
+- **Goal:** Implement on-demand secret resolution system to solve plugin dependency ordering issues and enable API-specific secret management.
+- **Priority:** **HIGH** - Addresses critical production workflow where Plugin A needs secrets from Plugin B's provider
+- **User Impact:** Enables API-specific secret mappings and eliminates plugin loading order dependencies
+- **Tasks:**
+  - **T14.1:** **[CORE ARCHITECTURE]** Design SecretResolver interface and integration points.
+    - _Interface Design:_ Define `SecretResolver` type as async function `(secretName: string) => Promise<string | undefined>`
+    - _Plugin Context:_ Add `registerSecretResolver(resolver: SecretResolver)` method to PluginContext interface
+    - _Integration Points:_ Identify where in VariableResolver to inject custom secret resolution
+    - _Precedence Design:_ Custom resolvers tried before environment variable fallback
+    - _Testable Outcome:_ SecretResolver interface defined and PluginContext enhanced
+  - **T14.2:** **[PLUGIN MANAGER]** Implement secret resolver registration in PluginManager.
+    - _Registration Storage:_ Add private `secretResolvers: SecretResolver[]` array to PluginManager
+    - _Registration Method:_ Implement `registerSecretResolver(resolver: SecretResolver)` in PluginContext
+    - _Resolver Access:_ Add `getSecretResolvers(): SecretResolver[]` public method to PluginManager
+    - _API-Level Support:_ Ensure API-specific plugin managers can have different secret resolvers
+    - _Testable Outcome:_ Plugins can register secret resolvers that are accessible from PluginManager
+  - **T14.3:** **[VARIABLE RESOLVER]** Integrate custom secret resolvers into variable resolution.
+    - _Core Integration:_ Modify `VariableResolver.resolveScopedVariable()` for "secret" scope
+    - _Resolution Logic:_ Try custom resolvers first, fall back to environment variables
+    - _Async Support:_ Handle async secret resolver functions properly
+    - _Secret Tracking:_ Ensure resolved secrets are added to secretVariables Set and secretValues Map for masking
+    - _Error Handling:_ Proper error handling when secret resolvers fail or timeout
+    - _Testable Outcome:_ {{secret.NAME}} syntax uses custom resolvers before environment variables
+  - **T14.4:** **[SECRET MASKING]** Ensure custom resolver secrets participate in masking system.
+    - _Automatic Tracking:_ Custom resolver results added to VariableResolver.secretValues Map
+    - _Masking Integration:_ maskSecrets() method automatically handles custom resolver secrets
+    - _Verbose Output:_ Secret values from custom resolvers masked in verbose/dry-run output
+    - _Chain Execution:_ Secret masking works in chain step data and outputs
+    - _Testable Outcome:_ Secrets from custom resolvers are automatically masked in all output
+  - **T14.5:** **[PLUGIN INTEGRATION]** Integrate secret resolvers with API-level plugin overrides.
+    - _API-Specific Resolvers:_ API-level plugin configurations can override secret mappings
+    - _Plugin Context Creation:_ API-specific plugin managers get API-specific secret resolvers
+    - _Configuration Merging:_ Secret resolver configs merged with global → API precedence
+    - _Variable Resolution:_ API-level secret mappings resolved using full variable context
+    - _Testable Outcome:_ Different APIs can have different secret mappings using same plugin
+  - **T14.6:** **[COMPREHENSIVE TESTING]** Implement comprehensive test coverage for secret resolver system.
+    - _Unit Tests:_ Test SecretResolver registration, resolution logic, and error handling
+    - _Integration Tests:_ Test real secret resolution with API-level configurations
+    - _Plugin Tests:_ Test plugin registration and resolution workflows
+    - _Masking Tests:_ Test secret masking with custom resolver secrets
+    - _API Override Tests:_ Test API-specific secret mappings and precedence
+    - _Error Scenario Tests:_ Test failure modes, timeouts, and fallback behavior
+    - _Testable Outcome:_ 95%+ test coverage for secret resolver functionality
+  - **T14.7:** **[EXAMPLE IMPLEMENTATION]** Create comprehensive secret provider plugin examples.
+    - _RQP-Secrets Plugin:_ Create examples/plugins/rqp-secrets.js demonstrating the ideal pattern
+    - _Vault Integration:_ Example with HashiCorp Vault KV v1/v2 support
+    - _AWS Integration:_ Example with AWS Secrets Manager integration
+    - _Azure Integration:_ Example with Azure Key Vault integration
+    - _Configuration Examples:_ Complete YAML examples showing global + API-specific usage
+    - _Testable Outcome:_ Working plugin examples that demonstrate real-world secret management
+  - **T14.8:** **[DOCUMENTATION]** Create comprehensive documentation for secret resolver system.
+    - _Plugin Development Guide:_ Document how to create secret provider plugins
+    - _API Configuration Guide:_ Document API-specific secret mapping patterns
+    - _Migration Guide:_ Help users migrate from environment-only secrets
+    - _Security Best Practices:_ Document security considerations and recommendations
+    - _Troubleshooting Guide:_ Common issues and debugging approaches
+    - _README Integration:_ Add secret resolver section to main README.md
+    - _Testable Outcome:_ Complete documentation covering all aspects of secret resolver system
+  - **T14.9:** **[PERFORMANCE OPTIMIZATION]** Optimize secret resolver performance and caching.
+    - _Caching Strategy:_ Plugin-level caching with configurable TTL
+    - _Request Deduplication:_ Avoid multiple requests for same secret within single execution
+    - _Async Optimization:_ Parallel secret fetching where possible
+    - _Memory Management:_ Proper cache cleanup and memory leak prevention
+    - _Testable Outcome:_ Secret resolution performance optimized with intelligent caching
+  - **T14.10:** **[ERROR HANDLING]** Implement robust error handling and fallback mechanisms.
+    - _Graceful Degradation:_ Fallback to environment variables when custom resolvers fail
+    - _Timeout Handling:_ Configurable timeouts for secret resolver operations
+    - _Retry Logic:_ Configurable retry attempts for transient failures
+    - _Error Propagation:_ Clear error messages indicating secret resolution failures
+    - _Partial Failure Handling:_ Continue execution when some secrets fail but others succeed
+    - _Testable Outcome:_ Robust error handling with graceful degradation
+- **Implementation Details:**
+  - **SecretResolver Interface:**
+    ```typescript
+    type SecretResolver = (secretName: string) => Promise<string | undefined>;
+    ```
+  - **PluginContext Enhancement:**
+    ```typescript
+    interface PluginContext {
+      // ... existing methods ...
+      registerSecretResolver(resolver: SecretResolver): void;
+    }
+    ```
+  - **Variable Resolution Integration:**
+    ```typescript
+    // In VariableResolver.resolveScopedVariable() for "secret" scope
+    if (this.pluginManager) {
+      const resolvers = this.pluginManager.getSecretResolvers();
+      for (const resolver of resolvers) {
+        const result = await resolver(variableName);
+        if (result !== undefined) {
+          this.secretVariables.add(fullVariableName);
+          this.secretValues.set(fullVariableName, result);
+          return result;
+        }
+      }
+    }
+    // Fall back to environment variable
+    const envValue = process.env[variableName];
+    if (envValue !== undefined) {
+      this.secretVariables.add(fullVariableName);
+      this.secretValues.set(fullVariableName, envValue);
+      return envValue;
+    }
+    ```
+- **Benefits:**
+  - **No Dependency Ordering:** ✅ Plugin loading order no longer matters for secret providers
+  - **API-Specific Secrets:** ✅ Different APIs can have different secret mappings
+  - **On-Demand Fetching:** ✅ Only fetches secrets for the API being used
+  - **Automatic Masking:** ✅ Maintains built-in secret masking through {{secret.*}} syntax
+  - **Multiple Providers:** ✅ Can use different secret providers for different APIs
+  - **Performance:** ✅ Plugin-level caching avoids repeated secret fetching
+- **Real-World Usage:**
+  ```yaml
+  # Global plugin definition
+  plugins:
+    - path: "./plugins/rqp-secrets.js"
+      name: "rqp-secrets"
+      config:
+        provider: "vault"
+        baseUrl: "{{env.VAULT_URL}}"
+        token: "{{env.VAULT_TOKEN}}"
+  
+  # API-specific secret mappings
+  apis:
+    userAPI:
+      plugins:
+        - name: "rqp-secrets"
+          config:
+            secretMapping:
+              USER_API_KEY: "user-service/api#key"
+              USER_DB_PASSWORD: "user-service/db#password"
+      headers:
+        Authorization: "Bearer {{secret.USER_API_KEY}}"  # Fetched on-demand
+    
+    paymentAPI:
+      plugins:
+        - name: "rqp-secrets"
+          config:
+            secretMapping:
+              PAYMENT_API_KEY: "payment-service/api#key"
+              STRIPE_SECRET: "payment-service/stripe#secret"
+      headers:
+        Authorization: "Bearer {{secret.PAYMENT_API_KEY}}"  # Different secrets
+  ```
+- **V1+ Ready:** ✅ Secret resolver system addresses critical production workflow issues while maintaining full backward compatibility and automatic secret masking.
