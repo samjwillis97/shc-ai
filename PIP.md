@@ -655,3 +655,241 @@ This comprehensive profile enhancement addresses the real-world usability issue 
         Authorization: "Bearer {{secret.PAYMENT_API_KEY}}"  # Different secrets
   ```
 - **V1+ Ready:** ✅ Secret resolver system addresses critical production workflow issues while maintaining full backward compatibility and automatic secret masking.
+
+---
+
+## Phase 15: Interactive OAuth2 Browser Authentication
+
+- **Goal:** Enhance the existing OAuth2 plugin with interactive browser-based Authorization Code flow similar to Insomnia, enabling automatic browser authentication with secure token storage.
+- **Status:** [ ] **PLANNED**
+- **Priority:** **HIGH** - Enables modern OAuth2 user authentication workflows
+- **User Impact:** Provides seamless browser-based authentication similar to modern API clients
+- **Tasks:**
+  - **T15.1:** **[CONFIGURATION ENHANCEMENT]** Enhance OAuth2Config interface for interactive flow.
+    - _New Configuration Options:_
+      - `authorizationUrl`: OAuth2 authorization endpoint URL
+      - `audience`: Optional audience parameter for token requests
+      - `usePKCE`: Boolean to enable/disable PKCE (default: true)
+      - `codeChallengeMethod`: PKCE challenge method ('S256' | 'plain', default: 'S256')
+      - `interactive`: Boolean to enable interactive browser flow (auto-detected if not specified)
+      - `tokenStorage`: Storage method ('keychain' | 'filesystem' | 'memory', default: auto-detect)
+      - `callbackPort`: Optional specific port for callback server (default: auto-select)
+      - `callbackPath`: Optional callback path (default: '/callback')
+    - _Backward Compatibility:_ All existing OAuth2 configurations continue to work unchanged
+    - _Auto-Detection Logic:_ Interactive mode automatically enabled when `grantType: 'authorization_code'`, no `authorizationCode` provided, `authorizationUrl` configured, and running in interactive terminal
+    - _Testable Outcome:_ Enhanced OAuth2Config interface supports all interactive flow parameters with proper defaults
+  - **T15.2:** **[TOKEN STORAGE SYSTEM]** Implement secure token persistence system.
+    - _Storage Implementations:_
+      - **Keychain Storage:** Use `keytar` library for secure OS keychain integration (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+      - **Filesystem Storage:** Encrypted JSON file storage with user-only permissions as fallback
+      - **Memory Storage:** Current in-memory cache as final fallback
+    - _Storage Interface:_ Create `TokenStorage` interface with `store()`, `retrieve()`, `remove()` methods
+    - _Storage Key Generation:_ Generate unique storage keys based on OAuth2 provider, client ID, and scope
+    - _Token Data Structure:_ Store access tokens, refresh tokens, expiration times, token type, and scope
+    - _Automatic Fallback:_ Gracefully fallback from keychain → filesystem → memory based on availability
+    - _Testable Outcome:_ Tokens are securely stored and retrieved across HttpCraft sessions with proper fallback handling
+  - **T15.3:** **[LOCAL CALLBACK SERVER]** Implement temporary HTTP server for OAuth2 callback handling.
+    - _Server Implementation:_ Create lightweight HTTP server using Node.js built-in `http` module
+    - _Port Management:_ Automatic port selection starting from 8080, incrementing until available port found
+    - _Callback Handling:_ Extract authorization code and state parameters from callback URL
+    - _Success/Error Pages:_ Serve user-friendly HTML pages indicating authentication success or failure
+    - _Security:_ Validate state parameter to prevent CSRF attacks
+    - _Timeout:_ Automatic server shutdown after 5 minutes or successful callback
+    - _Error Handling:_ Handle port conflicts, server start failures, and malformed callback requests
+    - _Testable Outcome:_ Local callback server successfully receives OAuth2 authorization codes with proper security validation
+  - **T15.4:** **[BROWSER INTEGRATION]** Implement automatic browser launching and URL generation.
+    - _Browser Launching:_ Use `open` npm package to launch system default browser
+    - _Authorization URL Generation:_ Build complete authorization URL with all required parameters:
+      - PKCE challenge (`code_challenge`, `code_challenge_method`)
+      - Random state parameter for security
+      - Redirect URI pointing to local callback server
+      - All user-configured parameters (scope, audience, client_id)
+    - _PKCE Implementation:_ Generate cryptographically secure code verifier and challenge using Node.js crypto
+    - _URL Validation:_ Validate authorization URL format and required parameters
+    - _Fallback Instructions:_ If browser launch fails, display authorization URL for manual copy/paste
+    - _Testable Outcome:_ Browser automatically opens with correct authorization URL containing all required OAuth2 parameters
+  - **T15.5:** **[ENHANCED AUTHORIZATION CODE FLOW]** Enhance existing authorization code flow for interactive mode.
+    - _Flow Detection:_ Automatically detect when interactive flow is needed based on configuration
+    - _Token Exchange:_ Exchange authorization code for access/refresh tokens with full PKCE support
+    - _Parameter Support:_ Support all Insomnia-compatible parameters including audience
+    - _Error Handling:_ Handle authorization denials, invalid codes, and token exchange failures
+    - _Token Caching:_ Integrate with enhanced token storage system
+    - _Refresh Integration:_ Seamlessly integrate with existing refresh token flow
+    - _Testable Outcome:_ Complete authorization code flow from browser launch to token storage works seamlessly
+  - **T15.6:** **[AUTOMATIC TOKEN MANAGEMENT]** Implement intelligent token lifecycle management.
+    - _Token Priority:_ Check stored tokens in order: valid access token → refresh token → interactive flow
+    - _Automatic Refresh:_ Use stored refresh tokens to renew access tokens before expiration
+    - _Storage Integration:_ Persist refreshed tokens to configured storage backend
+    - _Expiration Handling:_ Handle token expiration with appropriate grace periods
+    - _Cleanup:_ Remove invalid/expired tokens from storage
+    - _Cache Synchronization:_ Keep in-memory cache synchronized with persistent storage
+    - _Testable Outcome:_ Token lifecycle is fully automated with minimal user interaction required
+  - **T15.7:** **[INTERACTIVE FLOW ORCHESTRATION]** Implement complete interactive authentication workflow.
+    - _Flow Triggers:_ Automatically trigger interactive flow when needed (no valid tokens available)
+    - _User Communication:_ Clear console output indicating authentication status and next steps
+    - _Workflow Steps:_
+      1. Check for valid stored access token
+      2. Try refresh token if access token expired
+      3. Launch interactive flow if no valid tokens
+      4. Start local callback server
+      5. Generate authorization URL with PKCE
+      6. Open browser to authorization URL
+      7. Wait for callback with timeout
+      8. Exchange code for tokens
+      9. Store tokens securely
+      10. Proceed with original request
+    - _Error Recovery:_ Handle failures at each step with appropriate fallbacks
+    - _Testable Outcome:_ Complete end-to-end interactive authentication workflow functions smoothly
+  - **T15.8:** **[ENVIRONMENT DETECTION]** Implement automatic detection of interactive capabilities.
+    - _Terminal Detection:_ Detect if running in interactive terminal vs CI/automated environment
+    - _Environment Variables:_ Check common CI environment variables (CI, CONTINUOUS_INTEGRATION, etc.)
+    - _TTY Detection:_ Use Node.js `process.stdout.isTTY` to detect terminal capabilities
+    - _Browser Availability:_ Detect if browser launch is possible in current environment
+    - _Graceful Degradation:_ Fall back to traditional authorization code flow in non-interactive environments
+    - _Configuration Override:_ Allow explicit `interactive: false` to disable browser flow
+    - _Testable Outcome:_ Interactive mode is automatically enabled/disabled based on environment capabilities
+  - **T15.9:** **[COMPREHENSIVE ERROR HANDLING]** Implement robust error handling for all interactive flow scenarios.
+    - _Browser Launch Failures:_ Handle cases where browser cannot be opened (headless environments, etc.)
+    - _Callback Server Failures:_ Handle port conflicts, server start failures, and network issues
+    - _Authorization Failures:_ Handle user denial, invalid client configuration, and provider errors
+    - _Token Exchange Failures:_ Handle network errors, invalid codes, and malformed responses
+    - _Storage Failures:_ Handle keychain access denied, filesystem permissions, and storage corruption
+    - _Timeout Handling:_ Handle authorization timeout scenarios with appropriate cleanup
+    - _Error Messages:_ Provide clear, actionable error messages for each failure scenario
+    - _Fallback Instructions:_ Offer manual alternatives when automated flow fails
+    - _Testable Outcome:_ All error scenarios are handled gracefully with helpful user guidance
+  - **T15.10:** **[TESTING AND DOCUMENTATION]** Implement comprehensive testing and documentation.
+    - _Unit Tests:_ Test all new components (storage, server, browser integration, flow orchestration)
+    - _Integration Tests:_ Test complete interactive flow with mock OAuth2 provider
+    - _Mock Components:_ Create test mocks for browser launching, keychain access, and HTTP servers
+    - _Error Scenario Tests:_ Test all error handling paths and fallback mechanisms
+    - _Documentation Updates:_
+      - Update `docs/oauth2-plugin.md` with interactive flow section
+      - Add interactive flow examples to README.md
+      - Create troubleshooting guide for common interactive flow issues
+      - Update configuration schema with new parameters
+    - _Example Configurations:_ Create complete working examples for popular OAuth2 providers
+    - _Security Documentation:_ Document security considerations for token storage and callback handling
+    - _Testable Outcome:_ Comprehensive test coverage and clear documentation for interactive OAuth2 flow
+- **Implementation Details:**
+  - **Enhanced OAuth2Config Interface:**
+    ```typescript
+    interface OAuth2Config {
+      // Existing options...
+      grantType: 'client_credentials' | 'authorization_code' | 'refresh_token';
+      
+      // New interactive flow options
+      authorizationUrl?: string;           // OAuth2 authorization endpoint
+      audience?: string;                   // Optional audience parameter
+      usePKCE?: boolean;                   // Enable PKCE (default: true)
+      codeChallengeMethod?: 'S256' | 'plain'; // PKCE method (default: 'S256')
+      interactive?: boolean;               // Enable interactive browser flow (auto-detected)
+      tokenStorage?: 'keychain' | 'filesystem' | 'memory'; // Storage method (auto-detect)
+      callbackPort?: number;               // Specific callback port (optional)
+      callbackPath?: string;               // Callback path (default: '/callback')
+      
+      // Enhanced redirect URI handling
+      redirectUri?: string;                // Custom redirect URI (optional)
+    }
+    ```
+  - **Token Storage Architecture:**
+    ```typescript
+    interface StoredTokenData {
+      accessToken: string;
+      refreshToken?: string;
+      idToken?: string;
+      expiresAt: number;
+      tokenType?: string;
+      scope?: string;
+      audience?: string;
+    }
+
+    interface TokenStorage {
+      store(key: string, tokens: StoredTokenData): Promise<void>;
+      retrieve(key: string): Promise<StoredTokenData | null>;
+      remove(key: string): Promise<void>;
+      isAvailable(): Promise<boolean>;
+    }
+    ```
+  - **Interactive Flow Detection:**
+    ```typescript
+    function shouldUseInteractiveFlow(config: OAuth2Config): boolean {
+      // Explicit configuration takes precedence
+      if (config.interactive !== undefined) {
+        return config.interactive;
+      }
+      
+      // Auto-detect conditions
+      return (
+        config.grantType === 'authorization_code' &&
+        !config.authorizationCode &&              // No pre-obtained code
+        config.authorizationUrl &&                // Authorization URL provided
+        process.stdout.isTTY &&                   // Interactive terminal
+        !isCI() &&                                // Not in CI environment
+        isBrowserAvailable()                      // Browser can be launched
+      );
+    }
+    ```
+- **User Experience Examples:**
+  - **Configuration (Insomnia-Compatible):**
+    ```yaml
+    plugins:
+      - name: "oauth2"
+        config:
+          grantType: "authorization_code"
+          
+          # All your requested parameters
+          authorizationUrl: "https://auth.example.com/oauth2/authorize"
+          tokenUrl: "https://auth.example.com/oauth2/token"
+          clientId: "{{env.OAUTH2_CLIENT_ID}}"
+          clientSecret: "{{env.OAUTH2_CLIENT_SECRET}}"
+          redirectUri: "http://localhost:8080/callback"  # Optional, auto-generated if not provided
+          scope: "openid profile email api:read"
+          audience: "https://api.example.com"
+          usePKCE: true
+          codeChallengeMethod: "S256"
+          
+          # Interactive flow automatically detected
+          # tokenStorage: "keychain"  # Optional, auto-detected
+    ```
+  - **First-Time Authentication:**
+    ```bash
+    $ httpcraft myapi getUser
+    🔐 Authentication required for myapi
+    🌐 Opening browser for OAuth2 authentication...
+    ⏳ Waiting for authorization (timeout: 5 minutes)...
+    ✅ Authentication successful! Tokens stored securely.
+    📋 Response: {"user": {"id": 123, "name": "John Doe"}}
+    ```
+  - **Subsequent Requests:**
+    ```bash
+    $ httpcraft myapi getUser
+    🔑 Using stored access token
+    📋 Response: {"user": {"id": 123, "name": "John Doe"}}
+    ```
+  - **Automatic Token Refresh:**
+    ```bash
+    $ httpcraft myapi getUser
+    🔄 Access token expired, refreshing...
+    ✅ Token refreshed successfully
+    📋 Response: {"user": {"id": 123, "name": "John Doe"}}
+    ```
+- **New Dependencies:**
+  - `open`: For launching system default browser
+  - `keytar`: For secure OS keychain integration (with fallback for environments where unavailable)
+  - Enhanced crypto utilities for PKCE implementation
+- **Security Considerations:**
+  - **PKCE by Default:** Use PKCE for all authorization code flows to prevent code interception
+  - **State Parameter:** Generate and validate random state parameters to prevent CSRF attacks
+  - **Secure Storage:** Prefer OS keychain over filesystem, encrypt filesystem storage
+  - **Local Server Security:** Callback server only accepts localhost connections with proper validation
+  - **Token Masking:** All stored tokens automatically participate in existing secret masking system
+  - **Timeout Protection:** Automatic cleanup of servers and resources after timeout periods
+- **Benefits:**
+  - **Seamless UX:** ✅ Browser-based authentication identical to modern API clients like Insomnia
+  - **Automatic Token Management:** ✅ No manual token handling required after initial setup
+  - **Secure Storage:** ✅ Tokens persist securely across sessions using OS keychain
+  - **Zero Configuration:** ✅ Interactive mode automatically detected based on environment
+  - **Insomnia Compatibility:** ✅ Supports all parameters used in Insomnia OAuth2 configuration
+  - **Production Ready:** ✅ Graceful fallback in CI/automated environments
+- **V1+ Ready:** ✅ Interactive OAuth2 Browser Authentication provides modern, user-friendly OAuth2 workflows while maintaining full backward compatibility and enterprise security standards.

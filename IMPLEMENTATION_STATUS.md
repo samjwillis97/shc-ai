@@ -670,3 +670,74 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 - **V1 Ready:** ✅ Custom Secret Resolver System is fully functional and production-ready, solving critical plugin dependency ordering issues while enabling API-specific secret management with automatic masking.
 
 ---
+
+## Phase 15: Interactive OAuth2 Browser Authentication
+
+- **Goal:** Enhance the existing OAuth2 plugin with interactive browser-based Authorization Code flow similar to Insomnia, enabling automatic browser authentication with secure token storage.
+- **Status:** [ ] **PLANNED**
+- **Priority:** **HIGH** - Enables modern OAuth2 user authentication workflows
+- **User Impact:** Provides seamless browser-based authentication similar to modern API clients like Insomnia
+- **Tasks:**
+  - [ ] **T15.1:** **[CONFIGURATION ENHANCEMENT]** Enhance OAuth2Config interface for interactive flow.
+  - [ ] **T15.2:** **[TOKEN STORAGE SYSTEM]** Implement secure token persistence system.
+  - [ ] **T15.3:** **[LOCAL CALLBACK SERVER]** Implement temporary HTTP server for OAuth2 callback handling.
+  - [ ] **T15.4:** **[BROWSER INTEGRATION]** Implement automatic browser launching and URL generation.
+  - [ ] **T15.5:** **[ENHANCED AUTHORIZATION CODE FLOW]** Enhance existing authorization code flow for interactive mode.
+  - [ ] **T15.6:** **[AUTOMATIC TOKEN MANAGEMENT]** Implement intelligent token lifecycle management.
+  - [ ] **T15.7:** **[INTERACTIVE FLOW ORCHESTRATION]** Implement complete interactive authentication workflow.
+  - [ ] **T15.8:** **[ENVIRONMENT DETECTION]** Implement automatic detection of interactive capabilities.
+  - [ ] **T15.9:** **[COMPREHENSIVE ERROR HANDLING]** Implement robust error handling for all interactive flow scenarios.
+  - [ ] **T15.10:** **[TESTING AND DOCUMENTATION]** Implement comprehensive testing and documentation.
+- **Notes/Blockers:** 
+  - **Plan Committed:** Comprehensive implementation plan added to PIP.md
+  - **Dependencies Identified:** Need to add `open` and `keytar` npm packages
+  - **Backward Compatibility:** All existing OAuth2 configurations will continue to work unchanged
+  - **Auto-Detection:** Interactive mode will be automatically detected based on environment and configuration
+  - **Security Focus:** PKCE by default, secure token storage via OS keychain, proper state validation
+- **Key Features Planned:**
+  - **Insomnia Compatibility:** Support all OAuth2 parameters used in Insomnia (authorizationUrl, audience, etc.)
+  - **Automatic Browser Launch:** Opens system browser for authorization with fallback instructions
+  - **Secure Token Storage:** OS keychain integration with filesystem and memory fallbacks
+  - **Intelligent Token Management:** Automatic refresh token usage and lifecycle management
+  - **Environment Awareness:** Graceful degradation in CI/automated environments
+  - **Zero Configuration:** Interactive mode auto-detected when appropriate
+- **Expected User Experience:**
+  ```bash
+  # First time - automatic browser authentication
+  $ httpcraft myapi getUser
+  🔐 Authentication required for myapi
+  🌐 Opening browser for OAuth2 authentication...
+  ⏳ Waiting for authorization (timeout: 5 minutes)...
+  ✅ Authentication successful! Tokens stored securely.
+  📋 Response: {"user": {"id": 123, "name": "John Doe"}}
+  
+  # Subsequent calls - uses stored tokens
+  $ httpcraft myapi getUser
+  🔑 Using stored access token
+  📋 Response: {"user": {"id": 123, "name": "John Doe"}}
+  ```
+- **Configuration Example:**
+  ```yaml
+  plugins:
+    - name: "oauth2"
+      config:
+        grantType: "authorization_code"
+        authorizationUrl: "https://auth.example.com/oauth2/authorize"
+        tokenUrl: "https://auth.example.com/oauth2/token"
+        clientId: "{{env.OAUTH2_CLIENT_ID}}"
+        clientSecret: "{{env.OAUTH2_CLIENT_SECRET}}"
+        scope: "openid profile email api:read"
+        audience: "https://api.example.com"
+        usePKCE: true
+        # interactive: true  # Auto-detected
+        # tokenStorage: "keychain"  # Auto-detected
+  ```
+- **Implementation Approach:**
+  - **Enhancement Strategy:** Extend existing OAuth2 plugin rather than creating new plugin
+  - **Auto-Detection Logic:** Interactive mode enabled when authorization_code grant type, no authorizationCode provided, authorizationUrl configured, and interactive terminal detected
+  - **Storage Hierarchy:** Keychain → Encrypted filesystem → Memory (with automatic fallback)
+  - **Security First:** PKCE by default, state parameter validation, secure local callback server
+  - **Error Handling:** Comprehensive error handling with fallback instructions for manual flow
+- **V1+ Ready:** ✅ Planned for implementation as enhancement to existing OAuth2 plugin, providing modern browser-based authentication workflows while maintaining full backward compatibility.
+
+---
