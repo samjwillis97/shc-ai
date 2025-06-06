@@ -83,7 +83,7 @@ describe('API Command Phase 5 Features', () => {
       throw new Error('process.exit called');
     });
 
-    // Default mocks
+    // Default mocks - these need to return realistic values
     mockConfigLoader.loadDefaultConfig.mockResolvedValue({
       config: {
         apis: {
@@ -108,42 +108,34 @@ describe('API Command Phase 5 Features', () => {
       body: '{"result": "success"}',
     });
 
-    // Variable resolver mocks
+    // Variable resolver mocks - need to handle all the different call patterns
     mockVariableResolver.resolve.mockImplementation((config) => {
-      // Return the config with resolved endpoints
-      if (config.apis && config.apis.testapi && config.apis.testapi.endpoints) {
-        return {
-          ...config,
-          apis: {
-            ...config.apis,
-            testapi: {
-              ...config.apis.testapi,
-              endpoints: {
-                ...config.apis.testapi.endpoints,
-                getTest: {
-                  ...config.apis.testapi.endpoints.getTest,
-                  method: 'GET'
-                }
-              }
-            }
-          }
-        };
-      }
-      return config;
+      // Simple implementation that returns the config as-is
+      return Promise.resolve(config);
     });
-    mockVariableResolver.resolveValue.mockResolvedValue('resolved-value');
+    mockVariableResolver.resolveValue.mockImplementation((value) => Promise.resolve(value));
     mockVariableResolver.mergeProfiles.mockReturnValue({});
     mockVariableResolver.setPluginManager.mockReturnValue(undefined);
     mockVariableResolver.maskSecrets.mockImplementation((text) => text);
     mockVariableResolver.createContext.mockReturnValue({
       cli: {},
-      env: {}
+      env: {},
+      profiles: {},
+      api: {},
+      endpoint: {},
+      plugins: {}
     });
 
-    // URL builder mocks
-    mockUrlBuilder.buildUrl.mockReturnValue('https://api.test.com/test');
-    mockUrlBuilder.mergeHeaders.mockReturnValue({});
-    mockUrlBuilder.mergeParams.mockReturnValue({});
+    // URL builder mocks - need to return proper values
+    mockUrlBuilder.buildUrl.mockImplementation((api, endpoint) => {
+      return `${api.baseUrl}${endpoint.path}`;
+    });
+    mockUrlBuilder.mergeHeaders.mockImplementation((api, endpoint) => {
+      return { ...(api.headers || {}), ...(endpoint.headers || {}) };
+    });
+    mockUrlBuilder.mergeParams.mockImplementation((api, endpoint) => {
+      return { ...(api.params || {}), ...(endpoint.params || {}) };
+    });
   });
 
   afterEach(() => {
@@ -158,7 +150,7 @@ describe('API Command Phase 5 Features', () => {
         verbose: true,
       });
 
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[REQUEST] undefined https://api.test.com/test'));
+      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[REQUEST] GET https://api.test.com/test'));
       expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[RESPONSE] 200 OK'));
       expect(consoleLogSpy).toHaveBeenCalledWith('{"result": "success"}');
     });

@@ -24,6 +24,7 @@ vi.mock('../../src/core/variableResolver.js', () => ({
     createContext: vi.fn(),
     resolveValue: vi.fn(),
     mergeProfiles: vi.fn(),
+    setPluginManager: vi.fn(),
     maskSecrets: vi.fn((text: string) => text.replace(/secret/gi, '[SECRET]'))
   },
   VariableResolutionError: class VariableResolutionError extends Error {
