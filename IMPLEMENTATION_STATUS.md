@@ -705,16 +705,16 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   ```bash
   # First time - automatic browser authentication
   $ httpcraft myapi getUser
-  🔐 Authentication required for myapi
-  🌐 Opening browser for OAuth2 authentication...
-  ⏳ Waiting for authorization (timeout: 5 minutes)...
-  ✅ Authentication successful! Tokens stored securely.
-  📋 Response: {"user": {"id": 123, "name": "John Doe"}}
+  🔐 Authentication required for myapi                        # stderr
+  🌐 Opening browser for OAuth2 authentication...            # stderr
+  ⏳ Waiting for authorization (timeout: 5 minutes)...        # stderr
+  ✅ Authentication successful! Tokens stored securely.      # stderr
+  {"user": {"id": 123, "name": "John Doe"}}                  # stdout (for piping)
   
   # Subsequent calls - uses stored tokens
   $ httpcraft myapi getUser
-  🔑 Using stored access token
-  📋 Response: {"user": {"id": 123, "name": "John Doe"}}
+  🔑 Using stored access token                               # stderr
+  {"user": {"id": 123, "name": "John Doe"}}                  # stdout (for piping)
   ```
 - **Configuration Example:**
   ```yaml

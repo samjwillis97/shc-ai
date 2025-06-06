@@ -621,6 +621,7 @@ This comprehensive profile enhancement addresses the real-world usability issue 
   - **Automatic Masking:** ✅ Maintains built-in secret masking through {{secret.*}} syntax
   - **Multiple Providers:** ✅ Can use different secret providers for different APIs
   - **Performance:** ✅ Plugin-level caching avoids repeated secret fetching
+  - **Unix Piping Compatible:** ✅ Authentication messages to stderr, response body to stdout for seamless tool integration
 - **Real-World Usage:**
   ```yaml
   # Global plugin definition
@@ -727,6 +728,7 @@ This comprehensive profile enhancement addresses the real-world usability issue 
   - **T15.7:** **[INTERACTIVE FLOW ORCHESTRATION]** Implement complete interactive authentication workflow.
     - _Flow Triggers:_ Automatically trigger interactive flow when needed (no valid tokens available)
     - _User Communication:_ Clear console output indicating authentication status and next steps
+    - _Output Channels:_ All authentication status messages and progress indicators sent to `stderr` to maintain Unix piping compatibility (response body goes to `stdout`)
     - _Workflow Steps:_
       1. Check for valid stored access token
       2. Try refresh token if access token expired
@@ -739,7 +741,7 @@ This comprehensive profile enhancement addresses the real-world usability issue 
       9. Store tokens securely
       10. Proceed with original request
     - _Error Recovery:_ Handle failures at each step with appropriate fallbacks
-    - _Testable Outcome:_ Complete end-to-end interactive authentication workflow functions smoothly
+    - _Testable Outcome:_ Complete end-to-end interactive authentication workflow functions smoothly with proper stderr/stdout separation
   - **T15.8:** **[ENVIRONMENT DETECTION]** Implement automatic detection of interactive capabilities.
     - _Terminal Detection:_ Detect if running in interactive terminal vs CI/automated environment
     - _Environment Variables:_ Check common CI environment variables (CI, CONTINUOUS_INTEGRATION, etc.)
@@ -855,41 +857,38 @@ This comprehensive profile enhancement addresses the real-world usability issue 
   - **First-Time Authentication:**
     ```bash
     $ httpcraft myapi getUser
-    🔐 Authentication required for myapi
-    🌐 Opening browser for OAuth2 authentication...
-    ⏳ Waiting for authorization (timeout: 5 minutes)...
-    ✅ Authentication successful! Tokens stored securely.
-    📋 Response: {"user": {"id": 123, "name": "John Doe"}}
+    🔐 Authentication required for myapi                        # stderr
+    🌐 Opening browser for OAuth2 authentication...            # stderr
+    ⏳ Waiting for authorization (timeout: 5 minutes)...        # stderr
+    ✅ Authentication successful! Tokens stored securely.      # stderr
+    {"user": {"id": 123, "name": "John Doe"}}                  # stdout (for piping)
     ```
   - **Subsequent Requests:**
     ```bash
     $ httpcraft myapi getUser
-    🔑 Using stored access token
-    📋 Response: {"user": {"id": 123, "name": "John Doe"}}
+    🔑 Using stored access token                               # stderr
+    {"user": {"id": 123, "name": "John Doe"}}                  # stdout (for piping)
     ```
   - **Automatic Token Refresh:**
     ```bash
     $ httpcraft myapi getUser
-    🔄 Access token expired, refreshing...
-    ✅ Token refreshed successfully
-    📋 Response: {"user": {"id": 123, "name": "John Doe"}}
+    🔄 Access token expired, refreshing...                     # stderr
+    ✅ Token refreshed successfully                            # stderr
+    {"user": {"id": 123, "name": "John Doe"}}                  # stdout (for piping)
+    ```
+  - **Unix Piping Compatibility:**
+    ```bash
+    # Pipe response to jq for processing
+    $ httpcraft myapi getUser | jq '.user.name'
+    🔐 Authentication required for myapi                        # stderr (visible to user)
+    🌐 Opening browser for OAuth2 authentication...            # stderr (visible to user)
+    ✅ Authentication successful! Tokens stored securely.      # stderr (visible to user)
+    "John Doe"                                                 # stdout (from jq processing)
+    
+    # Pipe to other Unix tools
+    $ httpcraft myapi getUsers | grep -c '"active": true'
+    🔑 Using stored access token                               # stderr (visible to user)  
+    5                                                          # stdout (grep count result)
     ```
 - **New Dependencies:**
-  - `open`: For launching system default browser
-  - `keytar`: For secure OS keychain integration (with fallback for environments where unavailable)
-  - Enhanced crypto utilities for PKCE implementation
-- **Security Considerations:**
-  - **PKCE by Default:** Use PKCE for all authorization code flows to prevent code interception
-  - **State Parameter:** Generate and validate random state parameters to prevent CSRF attacks
-  - **Secure Storage:** Prefer OS keychain over filesystem, encrypt filesystem storage
-  - **Local Server Security:** Callback server only accepts localhost connections with proper validation
-  - **Token Masking:** All stored tokens automatically participate in existing secret masking system
-  - **Timeout Protection:** Automatic cleanup of servers and resources after timeout periods
-- **Benefits:**
-  - **Seamless UX:** ✅ Browser-based authentication identical to modern API clients like Insomnia
-  - **Automatic Token Management:** ✅ No manual token handling required after initial setup
-  - **Secure Storage:** ✅ Tokens persist securely across sessions using OS keychain
-  - **Zero Configuration:** ✅ Interactive mode automatically detected based on environment
-  - **Insomnia Compatibility:** ✅ Supports all parameters used in Insomnia OAuth2 configuration
-  - **Production Ready:** ✅ Graceful fallback in CI/automated environments
-- **V1+ Ready:** ✅ Interactive OAuth2 Browser Authentication provides modern, user-friendly OAuth2 workflows while maintaining full backward compatibility and enterprise security standards.
+  - `
