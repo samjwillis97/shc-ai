@@ -171,36 +171,24 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     // Load global plugins
     await globalPluginManager.loadPlugins(resolvedGlobalPluginConfigs || [], configDir);
 
-    // T10.4: Apply variable substitution to API-level plugin configurations
-    let resolvedApiPluginConfigs: PluginConfiguration[] | undefined;
-    if (api.plugins && api.plugins.length > 0) {
-      try {
-        resolvedApiPluginConfigs = (await variableResolver.resolveValue(
-          api.plugins,
-          initialVariableContext
-        )) as PluginConfiguration[];
-      } catch (error) {
-        if (error instanceof VariableResolutionError) {
-          console.error(
-            `Error: Failed to resolve variables in API-level plugin configuration: ${error.message}`
-          );
-          process.exit(1);
-        } else {
-          throw error;
-        }
-      }
-    }
+    // T14.3: Set global plugin manager on variable resolver for secret resolution
+    // This needs to happen BEFORE resolving API-level plugin configurations
+    // so that {{secret.*}} variables in API-level plugin configs can be resolved
+    variableResolver.setPluginManager(globalPluginManager);
 
     // T14.5: Create API-specific plugin manager with merged configurations
+    // Pass unresolved API-level plugin configurations - they will be resolved
+    // within the plugin manager where the complete merged configuration context is available
     const apiPluginManager = await globalPluginManager.loadApiPlugins(
-      resolvedApiPluginConfigs,
-      configDir
+      api.plugins,
+      configDir,
+      initialVariableContext
     );
 
     // Set the plugin manager on the HTTP client
     httpClient.setPluginManager(apiPluginManager);
 
-    // T14.3: Set plugin manager on variable resolver for secret resolution
+    // T14.3: Update variable resolver with API-specific plugin manager for secret resolution
     variableResolver.setPluginManager(apiPluginManager);
 
     const pluginVariableSources = apiPluginManager.getVariableSources();

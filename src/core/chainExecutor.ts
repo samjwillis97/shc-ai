@@ -174,7 +174,12 @@ export class ChainExecutor {
       | undefined;
 
     if (globalPluginManager && api.plugins && api.plugins.length > 0) {
-      // Create initial variable context for resolving API-level plugin configurations
+      // T14.3: Set global plugin manager on variable resolver for secret resolution
+      // This needs to happen BEFORE resolving API-level plugin configurations
+      // so that {{secret.*}} variables in API-level plugin configs can be resolved
+      variableResolver.setPluginManager(globalPluginManager);
+
+      // Create initial variable context for plugin configuration resolution
       const initialVariableContext = variableResolver.createContext(
         cliVariables,
         profiles,
@@ -188,30 +193,17 @@ export class ChainExecutor {
       initialVariableContext.chainVars = chainVars;
       initialVariableContext.steps = previousSteps;
 
-      try {
-        // Resolve variables in API-level plugin configurations
-        const resolvedApiPluginConfigs = (await variableResolver.resolveValue(
-          api.plugins,
-          initialVariableContext
-        )) as import('../types/config.js').PluginConfiguration[];
+      // T14.5: Create API-specific plugin manager with merged configurations
+      // The PluginManager will handle variable resolution internally using two-pass loading
+      stepPluginManager = await globalPluginManager.loadApiPlugins(
+        api.plugins,
+        configDir,
+        initialVariableContext
+      );
 
-        // Create API-specific plugin manager with merged configurations
-        stepPluginManager = await globalPluginManager.loadApiPlugins(
-          resolvedApiPluginConfigs,
-          configDir
-        );
-
-        // Get plugin variable sources from the API-specific plugin manager
-        pluginVariableSources = stepPluginManager.getVariableSources();
-        parameterizedPluginSources = stepPluginManager.getParameterizedVariableSources();
-      } catch (error) {
-        if (error instanceof VariableResolutionError) {
-          throw new Error(
-            `Failed to resolve variables in API-level plugin configuration for API '${apiName}': ${error.message}`
-          );
-        }
-        throw error;
-      }
+      // Get plugin variable sources from the API-specific plugin manager
+      pluginVariableSources = stepPluginManager.getVariableSources();
+      parameterizedPluginSources = stepPluginManager.getParameterizedVariableSources();
     } else if (globalPluginManager) {
       // No API-specific plugins, use global plugin manager
       pluginVariableSources = globalPluginManager.getVariableSources();
@@ -228,7 +220,7 @@ export class ChainExecutor {
       parameterizedPluginSources // T10.15: Parameterized plugin variable sources
     );
 
-    // T14.3: Set plugin manager on variable resolver for secret resolution
+    // T14.3: Update variable resolver with API-specific plugin manager for secret resolution
     if (stepPluginManager) {
       variableResolver.setPluginManager(stepPluginManager);
     }

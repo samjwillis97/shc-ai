@@ -1285,10 +1285,12 @@ export default {
         expect(result.steps[0].success).toBe(true);
 
         // Verify that variable resolution was called for API plugin configurations
-        expect(vi.mocked(variableResolver.resolveValue)).toHaveBeenCalledWith(
-          mockConfigWithApiPlugins.apis.protectedApi.plugins,
-          expect.any(Object)
-        );
+        // Note: With the new implementation, API plugin configs are resolved internally in PluginManager.loadApiPlugins
+        // So we verify that the key methods were called to indicate the flow worked correctly
+        expect(vi.mocked(variableResolver.resolveValue)).toHaveBeenCalled();
+        
+        // Verify that the plugin manager loadApiPlugins was called
+        expect(vi.mocked(mockPluginManager.loadApiPlugins)).toHaveBeenCalled();
 
         // Verify that the HTTP client setPluginManager was called (indicating API-specific plugin manager was used)
         expect(vi.mocked(httpClient.setPluginManager)).toHaveBeenCalled();
@@ -1372,9 +1374,6 @@ export default {
           resolveValueCallCount++;
           
           if (resolveValueCallCount === 1) {
-            // API plugin config resolution
-            return mockConfigWithApiPlugins.apis.apiWithAuth.plugins;
-          } else if (resolveValueCallCount === 2) {
             // API resolution with resolved Authorization header
             return {
               baseUrl: 'https://api.secure.com',
@@ -1385,7 +1384,7 @@ export default {
               variables: undefined,
               endpoints: {}
             };
-          } else if (resolveValueCallCount === 3) {
+          } else if (resolveValueCallCount === 2) {
             // Endpoint resolution
             return mockConfigWithApiPlugins.apis.apiWithAuth.endpoints.secureEndpoint;
           }
@@ -1501,24 +1500,21 @@ export default {
           body: '{"result": "success"}'
         };
 
-        // Simplified variable resolution mock
+        // Simplified variable resolution mock - now only handles API and endpoint resolution
         let resolveValueCallCount = 0;
         vi.mocked(variableResolver.resolveValue).mockImplementation(async (value: any) => {
           resolveValueCallCount++;
           
           if (resolveValueCallCount === 1) {
-            // Step 1: API1 plugin config
-            return mockConfigWithMultipleApis.apis.api1.plugins;
-          } else if (resolveValueCallCount === 2) {
             // Step 1: API1 resolution
             return mockConfigWithMultipleApis.apis.api1;
-          } else if (resolveValueCallCount === 3) {
+          } else if (resolveValueCallCount === 2) {
             // Step 1: Endpoint resolution
             return mockConfigWithMultipleApis.apis.api1.endpoints.getData;
-          } else if (resolveValueCallCount === 4) {
+          } else if (resolveValueCallCount === 3) {
             // Step 2: API2 resolution (no plugins)
             return mockConfigWithMultipleApis.apis.api2;
-          } else if (resolveValueCallCount === 5) {
+          } else if (resolveValueCallCount === 4) {
             // Step 2: Endpoint resolution
             return mockConfigWithMultipleApis.apis.api2.endpoints.postData;
           }
@@ -1646,9 +1642,6 @@ export default {
           resolveValueCallCount++;
           
           if (resolveValueCallCount === 1) {
-            // Step 1: API plugin config resolution
-            return mockConfigMixed.apis.apiWithPlugins.plugins;
-          } else if (resolveValueCallCount === 2) {
             // Step 1: API resolution
             return {
               baseUrl: 'https://api-with-plugins.com',
@@ -1657,10 +1650,10 @@ export default {
               variables: undefined,
               endpoints: {}
             };
-          } else if (resolveValueCallCount === 3) {
+          } else if (resolveValueCallCount === 2) {
             // Step 1: Endpoint resolution
             return mockConfigMixed.apis.apiWithPlugins.endpoints.getData;
-          } else if (resolveValueCallCount === 4) {
+          } else if (resolveValueCallCount === 3) {
             // Step 2: API resolution (no plugins)
             return {
               baseUrl: 'https://api-without-plugins.com',
@@ -1669,7 +1662,7 @@ export default {
               variables: undefined,
               endpoints: {}
             };
-          } else if (resolveValueCallCount === 5) {
+          } else if (resolveValueCallCount === 4) {
             // Step 2: Endpoint resolution
             return mockConfigMixed.apis.apiWithoutPlugins.endpoints.getInfo;
           }
@@ -1754,9 +1747,9 @@ export default {
 
         await mockPluginManager.loadPlugins(mockConfigWithVariableError.plugins!, tempDir);
 
-        // Mock variable resolution to throw an error for the undefined variable
-        vi.mocked(variableResolver.resolveValue).mockRejectedValueOnce(
-          new VariableResolutionError('Variable "undefinedVariable" is not defined', 'undefinedVariable')
+        // Mock loadApiPlugins to throw an error for variable resolution failure
+        vi.mocked(mockPluginManager.loadApiPlugins).mockRejectedValueOnce(
+          new Error('Failed to resolve variables in API-level plugin configuration for \'auth-plugin\': Variable "undefinedVariable" is not defined')
         );
 
         const result = await chainExecutor.executeChain(
@@ -1772,7 +1765,7 @@ export default {
         );
 
         expect(result.success).toBe(false);
-        expect(result.error).toContain('Failed to resolve variables in API-level plugin configuration for API \'problematicApi\'');
+        expect(result.error).toContain('Failed to resolve variables in API-level plugin configuration for \'auth-plugin\'');
         expect(result.steps).toHaveLength(1);
         expect(result.steps[0].success).toBe(false);
       });

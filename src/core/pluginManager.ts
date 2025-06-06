@@ -98,15 +98,15 @@ export class PluginManager {
 
   /**
    * T10.2: Load plugins for a specific API with merged configurations
+   * T14.5: Enhanced to handle variable resolution with two-pass loading
+   * to resolve circular dependencies between secret providers and secret consumers
    */
   async loadApiPlugins(
     apiPluginConfigs?: PluginConfiguration[],
-    configDir: string = process.cwd()
+    configDir: string = process.cwd(),
+    variableContext?: import('./variableResolver.js').VariableContext
   ): Promise<PluginManager> {
     const apiPluginManager = new PluginManager();
-
-    // Get merged configurations for this API
-    const mergedConfigs = this.getMergedPluginConfigurations(apiPluginConfigs);
 
     // If no API-level plugin configurations, we can reuse existing plugin instances
     if (!apiPluginConfigs || apiPluginConfigs.length === 0) {
@@ -116,22 +116,69 @@ export class PluginManager {
       return apiPluginManager;
     }
 
+    // Get merged configurations for this API (without variable resolution yet)
+    const mergedConfigs = this.getMergedPluginConfigurations(apiPluginConfigs);
+
     // Create a map of API-level plugin names for quick lookup
     const apiPluginNames = new Set(apiPluginConfigs.map((config) => config.name));
 
-    // For each merged config, either copy existing plugin or load with new config
+    // Two-pass loading to handle secret provider/consumer dependencies
+    const configsToLoad: PluginConfiguration[] = [];
+    const configsToResolve: PluginConfiguration[] = [];
+
+    // First pass: identify configs that need variable resolution vs those that don't
     for (const mergedConfig of mergedConfigs) {
       if (apiPluginNames.has(mergedConfig.name)) {
-        // This plugin has API-level configuration, so we need to reload it with merged config
-        await apiPluginManager.loadPlugin(mergedConfig, configDir);
+        // Check if this config contains secret variables that need resolution
+        const configStr = JSON.stringify(mergedConfig.config);
+        if (configStr.includes('{{secret.')) {
+          configsToResolve.push(mergedConfig);
+        } else {
+          configsToLoad.push(mergedConfig);
+        }
       } else {
-        // This plugin is global-only, copy the existing instance
+        // Global-only plugin, copy existing instance
         const existingPlugin = this.plugins.find((p) => p.name === mergedConfig.name);
         if (existingPlugin) {
           apiPluginManager.plugins.push(existingPlugin);
         } else {
-          // Fallback: load the plugin (shouldn't normally happen)
-          await apiPluginManager.loadPlugin(mergedConfig, configDir);
+          configsToLoad.push(mergedConfig);
+        }
+      }
+    }
+
+    // Load plugins that don't need variable resolution first (e.g., secret providers)
+    for (const config of configsToLoad) {
+      await apiPluginManager.loadPlugin(config, configDir);
+    }
+
+    // Now resolve variables in remaining configs and load those plugins
+    if (configsToResolve.length > 0) {
+      // Import variable resolver here to avoid circular dependency
+      const { variableResolver } = await import('./variableResolver.js');
+      
+      // Set this plugin manager on variable resolver temporarily for secret resolution
+      variableResolver.setPluginManager(apiPluginManager);
+      
+      // Use provided context or create a basic one
+      const context = variableContext || variableResolver.createContext(
+        {}, // No CLI variables during plugin loading
+        {}, // No profile variables at this stage
+        {}, // No API variables
+        {}, // No endpoint variables  
+        {}, // No plugin variables yet
+        {} // No global variables at this stage
+      );
+
+      for (const config of configsToResolve) {
+        try {
+          // Resolve variables in the plugin configuration
+          const resolvedConfig = await variableResolver.resolveValue(config, context) as PluginConfiguration;
+          await apiPluginManager.loadPlugin(resolvedConfig, configDir);
+        } catch (error) {
+          throw new Error(
+            `Failed to resolve variables in API-level plugin configuration for '${config.name}': ${error instanceof Error ? error.message : String(error)}`
+          );
         }
       }
     }
