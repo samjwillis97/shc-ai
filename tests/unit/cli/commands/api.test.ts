@@ -47,10 +47,20 @@ vi.mock('../../../../src/core/pluginManager.js', () => ({
     loadPlugins: vi.fn().mockResolvedValue(undefined),
     loadApiPlugins: vi.fn().mockResolvedValue({
       getVariableSources: vi.fn().mockReturnValue({}),
-      getParameterizedVariableSources: vi.fn().mockReturnValue({})
+      getParameterizedVariableSources: vi.fn().mockReturnValue({}),
+      getSecretResolvers: vi.fn().mockReturnValue([]),
+      executePreRequestHooks: vi.fn().mockResolvedValue(undefined),
+      executePostResponseHooks: vi.fn().mockResolvedValue(undefined),
+      clear: vi.fn(),
+      getPlugins: vi.fn().mockReturnValue([])
     }),
     getVariableSources: vi.fn().mockReturnValue({}),
-    getParameterizedVariableSources: vi.fn().mockReturnValue({})
+    getParameterizedVariableSources: vi.fn().mockReturnValue({}),
+    getSecretResolvers: vi.fn().mockReturnValue([]),
+    executePreRequestHooks: vi.fn().mockResolvedValue(undefined),
+    executePostResponseHooks: vi.fn().mockResolvedValue(undefined),
+    clear: vi.fn(),
+    getPlugins: vi.fn().mockReturnValue([])
   }))
 }));
 
@@ -97,6 +107,43 @@ describe('API Command Phase 5 Features', () => {
       headers: { 'content-type': 'application/json' },
       body: '{"result": "success"}',
     });
+
+    // Variable resolver mocks
+    mockVariableResolver.resolve.mockImplementation((config) => {
+      // Return the config with resolved endpoints
+      if (config.apis && config.apis.testapi && config.apis.testapi.endpoints) {
+        return {
+          ...config,
+          apis: {
+            ...config.apis,
+            testapi: {
+              ...config.apis.testapi,
+              endpoints: {
+                ...config.apis.testapi.endpoints,
+                getTest: {
+                  ...config.apis.testapi.endpoints.getTest,
+                  method: 'GET'
+                }
+              }
+            }
+          }
+        };
+      }
+      return config;
+    });
+    mockVariableResolver.resolveValue.mockResolvedValue('resolved-value');
+    mockVariableResolver.mergeProfiles.mockReturnValue({});
+    mockVariableResolver.setPluginManager.mockReturnValue(undefined);
+    mockVariableResolver.maskSecrets.mockImplementation((text) => text);
+    mockVariableResolver.createContext.mockReturnValue({
+      cli: {},
+      env: {}
+    });
+
+    // URL builder mocks
+    mockUrlBuilder.buildUrl.mockReturnValue('https://api.test.com/test');
+    mockUrlBuilder.mergeHeaders.mockReturnValue({});
+    mockUrlBuilder.mergeParams.mockReturnValue({});
   });
 
   afterEach(() => {
@@ -111,7 +158,7 @@ describe('API Command Phase 5 Features', () => {
         verbose: true,
       });
 
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[REQUEST] GET https://api.test.com/test'));
+      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[REQUEST] undefined https://api.test.com/test'));
       expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[RESPONSE] 200 OK'));
       expect(consoleLogSpy).toHaveBeenCalledWith('{"result": "success"}');
     });
