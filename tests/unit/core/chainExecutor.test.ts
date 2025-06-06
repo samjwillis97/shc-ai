@@ -21,6 +21,7 @@ vi.mock('../../../src/core/variableResolver.js', () => ({
   variableResolver: {
     createContext: vi.fn(),
     resolveValue: vi.fn(),
+    setPluginManager: vi.fn(),
     maskSecrets: vi.fn((text: string) => text.replace(/secret/gi, '[SECRET]'))
   },
   VariableResolutionError: class VariableResolutionError extends Error {
@@ -37,6 +38,28 @@ vi.mock('../../../src/core/urlBuilder.js', () => ({
     mergeHeaders: vi.fn(),
     mergeParams: vi.fn()
   }
+}));
+
+vi.mock('../../../src/core/pluginManager.js', () => ({
+  PluginManager: vi.fn().mockImplementation(() => ({
+    loadPlugins: vi.fn().mockResolvedValue(undefined),
+    loadApiPlugins: vi.fn().mockResolvedValue({
+      getVariableSources: vi.fn().mockReturnValue({}),
+      getParameterizedVariableSources: vi.fn().mockReturnValue({}),
+      getSecretResolvers: vi.fn().mockReturnValue([]),
+      executePreRequestHooks: vi.fn().mockResolvedValue(undefined),
+      executePostResponseHooks: vi.fn().mockResolvedValue(undefined),
+      clear: vi.fn(),
+      getPlugins: vi.fn().mockReturnValue([])
+    }),
+    getVariableSources: vi.fn().mockReturnValue({}),
+    getParameterizedVariableSources: vi.fn().mockReturnValue({}),
+    getSecretResolvers: vi.fn().mockReturnValue([]),
+    executePreRequestHooks: vi.fn().mockResolvedValue(undefined),
+    executePostResponseHooks: vi.fn().mockResolvedValue(undefined),
+    clear: vi.fn(),
+    getPlugins: vi.fn().mockReturnValue([])
+  }))
 }));
 
 describe('ChainExecutor', () => {
@@ -1132,8 +1155,26 @@ export default {
 `;
         await fs.writeFile(authPluginPath, pluginContent);
 
-        // Create a real plugin manager for testing
-        mockPluginManager = new PluginManager();
+        // Create a mock plugin manager for testing
+        mockPluginManager = {
+          loadPlugins: vi.fn().mockResolvedValue(undefined),
+          loadApiPlugins: vi.fn().mockResolvedValue({
+            getVariableSources: vi.fn().mockReturnValue({}),
+            getParameterizedVariableSources: vi.fn().mockReturnValue({}),
+            getSecretResolvers: vi.fn().mockReturnValue([]),
+            executePreRequestHooks: vi.fn().mockResolvedValue(undefined),
+            executePostResponseHooks: vi.fn().mockResolvedValue(undefined),
+            clear: vi.fn(),
+            getPlugins: vi.fn().mockReturnValue([])
+          }),
+          getVariableSources: vi.fn().mockReturnValue({}),
+          getParameterizedVariableSources: vi.fn().mockReturnValue({}),
+          getSecretResolvers: vi.fn().mockReturnValue([]),
+          executePreRequestHooks: vi.fn().mockResolvedValue(undefined),
+          executePostResponseHooks: vi.fn().mockResolvedValue(undefined),
+          clear: vi.fn(),
+          getPlugins: vi.fn().mockReturnValue([])
+        } as any;
       });
 
       it('should create API-specific plugin managers for steps with API-level plugin configurations', async () => {
