@@ -300,11 +300,11 @@ const plugin: Plugin = {
 
     // Validate required configuration
     if (!config.tokenUrl) {
-      throw new Error('OAuth2 plugin requires tokenUrl in configuration');
+      return;
     }
 
     if (!config.clientId) {
-      throw new Error('OAuth2 plugin requires clientId in configuration');
+      return;
     }
 
     // Initialize token storage
@@ -685,11 +685,13 @@ async function interactiveAuthorizationCodeFlow(config: OAuth2Config): Promise<O
       codeChallenge: pkceParams.codeChallenge,
       codeChallengeMethod: config.codeChallengeMethod || 'S256',
       state,
+      // redirectUri: callbackServer.redirectUri,
       redirectUri: callbackServer.redirectUri,
     });
     
     // Launch browser
     console.error('🌐 Opening browser for OAuth2 authentication...');
+    console.error('🌐 Authorization URL: ', authUrl);
     console.error('⏳ Waiting for authorization (timeout: 5 minutes)...');
     
     try {
@@ -761,6 +763,7 @@ async function startCallbackServer(
         srv.on('listening', () => resolve(srv));
         
         srv.listen(port, 'localhost');
+        console.error('🌐 Callback server listening on port: ', port);
       });
       break;
     } catch (error) {
