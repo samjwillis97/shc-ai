@@ -19,6 +19,37 @@ vi.mock('crypto', () => ({
   ...mockCrypto
 }));
 
+// Mock keytar module
+const mockKeytar = {
+  getPassword: vi.fn(),
+  setPassword: vi.fn(),
+  deletePassword: vi.fn()
+};
+vi.mock('keytar', () => ({
+  default: mockKeytar,
+  ...mockKeytar
+}));
+
+// Mock open module
+vi.mock('open', () => ({
+  default: vi.fn()
+}));
+
+// Mock fs/promises module
+const mockFS = {
+  mkdir: vi.fn().mockResolvedValue(undefined),
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  readFile: vi.fn(),
+  unlink: vi.fn().mockResolvedValue(undefined)
+};
+vi.mock('fs/promises', () => mockFS);
+
+// Mock os module
+vi.mock('os', () => ({
+  default: { homedir: () => '/mock/home' },
+  homedir: () => '/mock/home'
+}));
+
 describe('OAuth2 Plugin', () => {
   let plugin: any;
   let clearTokenCache: any;
@@ -51,6 +82,17 @@ describe('OAuth2 Plugin', () => {
     mockCrypto.randomBytes.mockReturnValue({
       toString: vi.fn().mockReturnValue('mocked-random-bytes')
     });
+
+    // Mock keytar to simulate unavailable keychain
+    mockKeytar.getPassword.mockResolvedValue(null);
+    mockKeytar.setPassword.mockResolvedValue(undefined);
+    mockKeytar.deletePassword.mockResolvedValue(undefined);
+
+    // Mock filesystem operations to return null (no stored tokens)
+    mockFS.mkdir.mockResolvedValue(undefined);
+    mockFS.readFile.mockRejectedValue(new Error('File not found'));
+    mockFS.writeFile.mockResolvedValue(undefined);
+    mockFS.unlink.mockResolvedValue(undefined);
 
     // Import the plugin dynamically to ensure mocks are in place
     // Use the compiled TypeScript version
@@ -400,11 +442,13 @@ describe('OAuth2 Plugin', () => {
       const preRequestHook = mockContext.registerPreRequestHook.mock.calls[0][0];
       const mockRequest = { headers: {} };
       
-      await expect(preRequestHook(mockRequest)).rejects.toThrow('OAuth2 token request failed: getaddrinfo ENOTFOUND auth.example.com');
+      await expect(preRequestHook(mockRequest)).rejects.toThrow(
+        'OAuth2 token request failed: getaddrinfo ENOTFOUND auth.example.com'
+      );
     });
 
     it('should handle HTTP error responses', async () => {
-      const errorResponse = {
+      mockAxios.post.mockRejectedValue({
         response: {
           status: 401,
           statusText: 'Unauthorized',
@@ -413,8 +457,7 @@ describe('OAuth2 Plugin', () => {
             error_description: 'Client authentication failed'
           }
         }
-      };
-      mockAxios.post.mockRejectedValue(errorResponse);
+      });
       await plugin.setup(mockContext);
       
       const preRequestHook = mockContext.registerPreRequestHook.mock.calls[0][0];
@@ -426,7 +469,7 @@ describe('OAuth2 Plugin', () => {
     });
 
     it('should throw error for unsupported grant type', async () => {
-      mockContext.config.grantType = 'unsupported_grant' as any;
+      mockContext.config.grantType = 'unsupported_grant';
       await plugin.setup(mockContext);
       
       const preRequestHook = mockContext.registerPreRequestHook.mock.calls[0][0];
@@ -458,6 +501,7 @@ describe('OAuth2 Plugin', () => {
       await plugin.setup(mockContext);
       
       const preRequestHook = mockContext.registerPreRequestHook.mock.calls[0][0];
+      
       const mockRequest1 = { headers: {} };
       const mockRequest2 = { headers: {} };
       
@@ -468,30 +512,28 @@ describe('OAuth2 Plugin', () => {
       
       // Second request should use cached token
       await preRequestHook(mockRequest2);
-      expect(mockAxios.post).toHaveBeenCalledTimes(1); // Still only one call
+      expect(mockAxios.post).toHaveBeenCalledTimes(1); // Still only 1 call
       expect(mockRequest2.headers['Authorization']).toBe('Bearer cached-token');
     });
 
     it('should generate different cache keys for different configurations', async () => {
-      // First setup with one configuration
       await plugin.setup(mockContext);
-      const preRequestHook1 = mockContext.registerPreRequestHook.mock.calls[0][0];
       
-      // Create a completely different context with different config
+      // Setup second context with different scope
       const mockContext2 = {
+        ...mockContext,
         config: {
-          tokenUrl: 'https://different-auth.example.com/oauth2/token', // Different URL
-          clientId: 'different-client-id', // Different client ID
-          clientSecret: 'different-client-secret',
-          scope: 'different-scope'
+          ...mockContext.config,
+          scope: 'admin'
         },
         registerPreRequestHook: vi.fn(),
         registerVariableSource: vi.fn(),
         registerParameterizedVariableSource: vi.fn()
       };
       
-      // Setup second plugin instance with different config
       await plugin.setup(mockContext2);
+      
+      const preRequestHook1 = mockContext.registerPreRequestHook.mock.calls[0][0];
       const preRequestHook2 = mockContext2.registerPreRequestHook.mock.calls[0][0];
       
       const mockRequest1 = { headers: {} };
@@ -516,7 +558,7 @@ describe('OAuth2 Plugin', () => {
       
       mockAxios.post.mockResolvedValue({
         data: {
-          access_token: 'test-token',
+          access_token: 'test-access-token',
           token_type: 'Bearer',
           expires_in: 3600
         }
@@ -536,7 +578,6 @@ describe('OAuth2 Plugin', () => {
     });
 
     it('should use custom timeout when configured', async () => {
-      // Modify config before setup
       mockContext.config.timeout = 60000;
       await plugin.setup(mockContext);
       
