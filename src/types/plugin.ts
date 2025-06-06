@@ -16,6 +16,9 @@ export interface HttpResponse {
   body: string;
 }
 
+// T14.1: Define SecretResolver interface for custom secret resolution
+export type SecretResolver = (secretName: string) => Promise<string | undefined>;
+
 export interface PluginContext {
   request: HttpRequest;
   response?: HttpResponse;
@@ -24,6 +27,8 @@ export interface PluginContext {
   registerPostResponseHook: (hook: PostResponseHook) => void;
   registerVariableSource: (name: string, source: VariableSource) => void;
   registerParameterizedVariableSource: (name: string, source: ParameterizedVariableSource) => void;
+  // T14.1: Add secret resolver registration method
+  registerSecretResolver: (resolver: SecretResolver) => void;
 }
 
 export interface PluginConfig {
@@ -47,4 +52,6 @@ export interface PluginInstance {
   postResponseHooks: PostResponseHook[];
   variableSources: Record<string, VariableSource>;
   parameterizedVariableSources: Record<string, ParameterizedVariableSource>;
+  // T14.2: Add secret resolvers storage
+  secretResolvers: SecretResolver[];
 }

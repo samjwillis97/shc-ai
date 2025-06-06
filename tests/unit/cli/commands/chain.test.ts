@@ -25,7 +25,8 @@ vi.mock('../../../../src/core/chainExecutor.js', () => ({
 
 vi.mock('../../../../src/core/variableResolver.js', () => ({
   variableResolver: {
-    mergeProfiles: vi.fn()
+    mergeProfiles: vi.fn(),
+    setPluginManager: vi.fn()
   }
 }));
 
@@ -333,7 +334,8 @@ describe('Chain Command', () => {
 
       await expect(handleChainCommand({
         chainName: 'simpleChain',
-        config: 'test-config.yaml'
+        config: 'test-config.yaml',
+        verbose: false
       })).rejects.toThrow('Process exited with code 1');
 
       expect(consoleErrorSpy).toHaveBeenCalledWith("Chain execution failed: Step 'createUser' failed: HTTP 400: Bad Request");
@@ -535,12 +537,14 @@ describe('Chain Command', () => {
 
       await handleChainCommand({
         chainName: 'simpleChain',
-        config: 'test-config.yaml'
+        config: 'test-config.yaml',
+        verbose: false
       });
 
       expect(variableResolver.mergeProfiles).toHaveBeenCalledWith(
         ['dev', 'user1'],
-        configWithProfiles.profiles
+        configWithProfiles.profiles,
+        false
       );
     });
 
@@ -1046,12 +1050,19 @@ describe('Chain Command', () => {
   describe('Phase 13: Enhanced Profile Merging', () => {
     beforeEach(() => {
       // Mock chainExecutor for Phase 13 tests
-      chainExecutor.executeChain.mockResolvedValue({
+      vi.mocked(chainExecutor.executeChain).mockResolvedValue({
         success: true,
-        results: [
+        chainName: 'testChain',
+        steps: [
           {
             stepId: 'step1',
             success: true,
+            request: {
+              method: 'GET',
+              url: 'https://api.test.com/test',
+              headers: {},
+              body: undefined
+            },
             response: {
               status: 200,
               statusText: 'OK',
@@ -1104,7 +1115,8 @@ describe('Chain Command', () => {
 
         const args: ChainCommandArgs = {
           chainName: 'testChain',
-          profiles: ['user']
+          profiles: ['user'],
+          verbose: false
         };
 
         await handleChainCommand(args);
@@ -1156,7 +1168,8 @@ describe('Chain Command', () => {
         const args: ChainCommandArgs = {
           chainName: 'testChain',
           profiles: ['user'],
-          noDefaultProfile: true
+          noDefaultProfile: true,
+          verbose: false
         };
 
         await handleChainCommand(args);
@@ -1206,7 +1219,8 @@ describe('Chain Command', () => {
         });
 
         const args: ChainCommandArgs = {
-          chainName: 'testChain'
+          chainName: 'testChain',
+          verbose: false
         };
 
         await handleChainCommand(args);
@@ -1257,7 +1271,8 @@ describe('Chain Command', () => {
 
         const args: ChainCommandArgs = {
           chainName: 'testChain',
-          profiles: ['user']
+          profiles: ['user'],
+          verbose: false
         };
 
         await handleChainCommand(args);
@@ -1303,7 +1318,8 @@ describe('Chain Command', () => {
 
         const args: ChainCommandArgs = {
           chainName: 'testChain',
-          profiles: ['user']
+          profiles: ['user'],
+          verbose: false
         };
 
         await handleChainCommand(args);

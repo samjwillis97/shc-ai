@@ -8,10 +8,51 @@ import { HttpCraftConfig } from '../../../../src/types/config.js';
 import { ApiCommandArgs } from '../../../../src/cli/commands/api.js';
 
 // Mock modules
-vi.mock('../../../../src/core/configLoader.js');
-vi.mock('../../../../src/core/httpClient.js');
-vi.mock('../../../../src/core/variableResolver.js');
-vi.mock('../../../../src/core/urlBuilder.js');
+vi.mock('../../../../src/core/configLoader.js', () => ({
+  configLoader: {
+    loadConfig: vi.fn(),
+    loadDefaultConfig: vi.fn()
+  }
+}));
+
+vi.mock('../../../../src/core/urlBuilder.js', () => ({
+  urlBuilder: {
+    buildUrl: vi.fn(),
+    mergeHeaders: vi.fn(),
+    mergeParams: vi.fn()
+  }
+}));
+
+vi.mock('../../../../src/core/httpClient.js', () => ({
+  httpClient: {
+    executeRequest: vi.fn(),
+    setPluginManager: vi.fn()
+  }
+}));
+
+vi.mock('../../../../src/core/variableResolver.js', () => ({
+  variableResolver: {
+    resolve: vi.fn(),
+    resolveValue: vi.fn(),
+    mergeProfiles: vi.fn(),
+    setPluginManager: vi.fn(),
+    maskSecrets: vi.fn((text: string) => text),
+    createContext: vi.fn()
+  },
+  VariableResolutionError: class extends Error {}
+}));
+
+vi.mock('../../../../src/core/pluginManager.js', () => ({
+  PluginManager: vi.fn().mockImplementation(() => ({
+    loadPlugins: vi.fn().mockResolvedValue(undefined),
+    loadApiPlugins: vi.fn().mockResolvedValue({
+      getVariableSources: vi.fn().mockReturnValue({}),
+      getParameterizedVariableSources: vi.fn().mockReturnValue({})
+    }),
+    getVariableSources: vi.fn().mockReturnValue({}),
+    getParameterizedVariableSources: vi.fn().mockReturnValue({})
+  }))
+}));
 
 const mockConfigLoader = vi.mocked(configLoaderModule.configLoader);
 const mockHttpClient = vi.mocked(httpClientModule.httpClient);

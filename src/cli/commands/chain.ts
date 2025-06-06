@@ -44,10 +44,11 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
     if (config.plugins && config.plugins.length > 0) {
       const configDir = path.dirname(configPath);
       await pluginManager.loadPlugins(config.plugins, configDir);
-
-      // Set plugin manager on HTTP client for pre-request hooks
-      httpClient.setPluginManager(pluginManager);
     }
+    httpClient.setPluginManager(pluginManager);
+
+    // T14.3: Set plugin manager on variable resolver for secret resolution
+    variableResolver.setPluginManager(pluginManager);
 
     // Find chain
     if (!config.chains) {

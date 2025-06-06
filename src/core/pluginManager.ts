@@ -16,6 +16,7 @@ import {
   HttpRequest,
   HttpResponse,
   ParameterizedVariableSource,
+  SecretResolver,
 } from '../types/plugin.js';
 import { PluginConfiguration } from '../types/config.js';
 
@@ -205,6 +206,7 @@ export class PluginManager {
         postResponseHooks: [],
         variableSources: {},
         parameterizedVariableSources: {},
+        secretResolvers: [],
       };
 
       // Create context for plugin setup
@@ -226,6 +228,9 @@ export class PluginManager {
           source: ParameterizedVariableSource
         ) => {
           pluginInstance.parameterizedVariableSources[name] = source;
+        },
+        registerSecretResolver: (resolver: SecretResolver) => {
+          pluginInstance.secretResolvers.push(resolver);
         },
       };
 
@@ -309,6 +314,19 @@ export class PluginManager {
     }
 
     return allSources;
+  }
+
+  /**
+   * T14.2: Get all secret resolvers from all plugins
+   */
+  getSecretResolvers(): SecretResolver[] {
+    const allResolvers: SecretResolver[] = [];
+
+    for (const pluginInstance of this.plugins) {
+      allResolvers.push(...pluginInstance.secretResolvers);
+    }
+
+    return allResolvers;
   }
 
   /**

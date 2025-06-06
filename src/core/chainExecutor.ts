@@ -228,6 +228,11 @@ export class ChainExecutor {
       parameterizedPluginSources // T10.15: Parameterized plugin variable sources
     );
 
+    // T14.3: Set plugin manager on variable resolver for secret resolution
+    if (stepPluginManager) {
+      variableResolver.setPluginManager(stepPluginManager);
+    }
+
     // Add chain variables to the context
     variableContext.chainVars = chainVars;
 

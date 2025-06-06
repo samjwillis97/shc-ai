@@ -168,10 +168,8 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       }
     }
 
-    // Load global plugins with resolved configurations
-    if (resolvedGlobalPluginConfigs && resolvedGlobalPluginConfigs.length > 0) {
-      await globalPluginManager.loadPlugins(resolvedGlobalPluginConfigs, configDir);
-    }
+    // Load global plugins
+    await globalPluginManager.loadPlugins(resolvedGlobalPluginConfigs || [], configDir);
 
     // T10.4: Apply variable substitution to API-level plugin configurations
     let resolvedApiPluginConfigs: PluginConfiguration[] | undefined;
@@ -193,16 +191,18 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       }
     }
 
-    // T10.2: Create API-specific plugin manager with resolved configurations
+    // T14.5: Create API-specific plugin manager with merged configurations
     const apiPluginManager = await globalPluginManager.loadApiPlugins(
       resolvedApiPluginConfigs,
       configDir
     );
 
-    // Set API-specific plugin manager on HTTP client
+    // Set the plugin manager on the HTTP client
     httpClient.setPluginManager(apiPluginManager);
 
-    // Get plugin variable sources from resolved API plugin manager (T7.4 and T7.5)
+    // T14.3: Set plugin manager on variable resolver for secret resolution
+    variableResolver.setPluginManager(apiPluginManager);
+
     const pluginVariableSources = apiPluginManager.getVariableSources();
     // T10.15: Get parameterized plugin variable sources
     const parameterizedPluginSources = apiPluginManager.getParameterizedVariableSources();

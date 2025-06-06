@@ -37,11 +37,14 @@ export interface VariableContext {
 }
 
 export class VariableResolutionError extends Error {
+  public variableName: string;
+
   constructor(
     message: string,
-    public variableName: string
+    public variableNameParam: string
   ) {
     super(message);
+    this.variableName = variableNameParam;
     this.name = 'VariableResolutionError';
   }
 }
@@ -49,6 +52,15 @@ export class VariableResolutionError extends Error {
 export class VariableResolver {
   private secretVariables: Set<string> = new Set(); // T9.5: Track secret variables for masking
   private secretValues: Map<string, string> = new Map(); // T9.5: Track secret values for masking
+  // T14.3: Add PluginManager reference for secret resolvers
+  private pluginManager?: import('./pluginManager.js').PluginManager;
+
+  /**
+   * T14.3: Set PluginManager instance for secret resolution
+   */
+  setPluginManager(pluginManager: import('./pluginManager.js').PluginManager): void {
+    this.pluginManager = pluginManager;
+  }
 
   /**
    * T9.5: Reset secret tracking (useful for testing or between requests)
@@ -341,7 +353,31 @@ export class VariableResolver {
         );
 
       case 'secret':
-        // T9.4: Secret variable resolution (default provider: OS environment)
+        // T14.3: Try custom secret resolvers first, then fall back to environment variables
+        if (this.pluginManager) {
+          const secretResolvers = this.pluginManager.getSecretResolvers();
+          
+          for (const resolver of secretResolvers) {
+            try {
+              const resolvedValue = await resolver(key);
+              if (resolvedValue !== undefined) {
+                // T14.4: Add to secret tracking for masking
+                this.secretVariables.add(variableName);
+                this.secretValues.set(variableName, resolvedValue);
+                return resolvedValue;
+              }
+            } catch (error) {
+              // Log error but continue to next resolver or fall back to environment
+              if (process.env.NODE_ENV === 'development') {
+                process.stderr.write(
+                  `[VariableResolver] Secret resolver failed for '${key}': ${error instanceof Error ? error.message : String(error)}\n`
+                );
+              }
+            }
+          }
+        }
+        
+        // T9.4: Fall back to environment variable (original behavior)
         if (context.env[key] !== undefined) {
           this.secretVariables.add(variableName);
           this.secretValues.set(variableName, context.env[key]);
