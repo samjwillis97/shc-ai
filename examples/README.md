@@ -43,9 +43,6 @@ examples/
 │   └── schema_example.yaml             # YAML schema validation example
 ├── configs/                            # Specialized configuration examples
 │   └── xml_api.yaml                    # XML API handling example
-├── docs/                               # Additional documentation
-│   ├── completion_setup.md             # ZSH completion setup
-│   └── nix_usage.md                    # Nix development environment
 └── comprehensive_example.yaml          # Complete feature showcase
 ```
 
@@ -102,8 +99,8 @@ HttpCraft supports YAML schema validation for your configuration files. See the 
 
 ## 🛠 Development Setup
 
-- **[ZSH Completion Setup](docs/completion_setup.md)** - Tab completion installation
-- **[Nix Usage Guide](docs/nix_usage.md)** - Nix development environment
+- **[ZSH Completion Setup](../docs/completion_setup.md)** - Tab completion installation
+- **[Nix Usage Guide](../docs/nix_usage.md)** - Nix development environment
 
 ## 📖 Complete Reference
 

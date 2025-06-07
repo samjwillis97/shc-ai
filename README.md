@@ -706,6 +706,8 @@ echo "use flake" > .envrc
 direnv allow
 ```
 
+For detailed Nix setup and usage instructions, see the [Nix Usage Guide](docs/nix_usage.md).
+
 ## 🐛 Troubleshooting
 
 ### Common Issues
@@ -762,7 +764,6 @@ The OAuth2 plugin is included with HttpCraft - no need to install or reference e
 
 ```yaml
 plugins:
-  # OAuth2 as built-in plugin - no path required!
   - name: "oauth2"
     config:
       grantType: "client_credentials"
@@ -1344,6 +1345,8 @@ npm run test:integration
 ```bash
 nix develop
 ```
+
+For detailed Nix setup and usage instructions, see the [Nix Usage Guide](docs/nix_usage.md).
 
 ## 📚 Advanced Examples
 
