@@ -495,7 +495,7 @@ async function storeTokens(
  * OAuth2 Client Credentials Grant Flow
  */
 async function clientCredentialsFlow(config: OAuth2Config): Promise<OAuth2TokenResponse> {
-  const params = new URLSearchParams();
+  const params = new globalThis.URLSearchParams();
   params.append('grant_type', 'client_credentials');
   params.append('client_id', config.clientId);
 
@@ -535,10 +535,11 @@ async function clientCredentialsFlow(config: OAuth2Config): Promise<OAuth2TokenR
     });
 
     return response.data as OAuth2TokenResponse;
-  } catch (error: any) {
-    if (error.response) {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response: { status: number; statusText: string; data: unknown } };
       throw new Error(
-        `OAuth2 token request failed: ${error.response.status} ${error.response.statusText} - ${JSON.stringify(error.response.data)}`
+        `OAuth2 token request failed: ${axiosError.response.status} ${axiosError.response.statusText} - ${JSON.stringify(axiosError.response.data)}`
       );
     }
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -559,7 +560,7 @@ async function authorizationCodeFlow(config: OAuth2Config): Promise<OAuth2TokenR
     throw new Error('Redirect URI is required for authorization_code grant type');
   }
 
-  const params = new URLSearchParams();
+  const params = new globalThis.URLSearchParams();
   params.append('grant_type', 'authorization_code');
   params.append('client_id', config.clientId);
   params.append('code', config.authorizationCode);
@@ -592,10 +593,11 @@ async function authorizationCodeFlow(config: OAuth2Config): Promise<OAuth2TokenR
     });
 
     return response.data as OAuth2TokenResponse;
-  } catch (error: any) {
-    if (error.response) {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response: { status: number; statusText: string; data: unknown } };
       throw new Error(
-        `OAuth2 authorization code exchange failed: ${error.response.status} ${error.response.statusText} - ${JSON.stringify(error.response.data)}`
+        `OAuth2 authorization code exchange failed: ${axiosError.response.status} ${axiosError.response.statusText} - ${JSON.stringify(axiosError.response.data)}`
       );
     }
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -611,7 +613,7 @@ async function refreshTokenFlow(config: OAuth2Config): Promise<OAuth2TokenRespon
     throw new Error('Refresh token is required for refresh_token grant type');
   }
 
-  const params = new URLSearchParams();
+  const params = new globalThis.URLSearchParams();
   params.append('grant_type', 'refresh_token');
   params.append('refresh_token', config.refreshToken);
   params.append('client_id', config.clientId);
@@ -643,10 +645,11 @@ async function refreshTokenFlow(config: OAuth2Config): Promise<OAuth2TokenRespon
     });
 
     return response.data as OAuth2TokenResponse;
-  } catch (error: any) {
-    if (error.response) {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response: { status: number; statusText: string; data: unknown } };
       throw new Error(
-        `OAuth2 refresh token failed: ${error.response.status} ${error.response.statusText} - ${JSON.stringify(error.response.data)}`
+        `OAuth2 refresh token failed: ${axiosError.response.status} ${axiosError.response.statusText} - ${JSON.stringify(axiosError.response.data)}`
       );
     }
     const errorMessage = error instanceof Error ? error.message : String(error);
