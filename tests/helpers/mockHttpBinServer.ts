@@ -6,13 +6,20 @@ export interface MockServerRequest {
   method: string;
   url: string;
   headers: Record<string, string | string[]>;
-  body?: any;
+  body?: unknown;
   args: Record<string, string>;
-  form?: Record<string, any>;
-  files?: Record<string, any>;
-  json?: any;
+  form?: Record<string, unknown>;
+  files?: Record<string, unknown>;
+  json?: unknown;
   data?: string;
   origin?: string;
+}
+
+export interface MockResponseData {
+  status?: number;
+  headers?: Record<string, string>;
+  body?: unknown;
+  delay?: number;
 }
 
 export class MockHttpBinServer {
@@ -108,7 +115,7 @@ export class MockHttpBinServer {
 
     const requestData: MockServerRequest = {
       method,
-      url: `http://localhost:${this.port}${path}${Object.keys(args).length ? '?' + new URLSearchParams(args).toString() : ''}`,
+      url: `http://localhost:${this.port}${path}${Object.keys(args).length ? '?' + new globalThis.URLSearchParams(args).toString() : ''}`,
       headers,
       args,
       origin: req.socket.remoteAddress || '127.0.0.1'
@@ -125,8 +132,8 @@ export class MockHttpBinServer {
       } catch {
         // Not JSON, check if form data
         try {
-          const formData = new URLSearchParams(body);
-          const form: Record<string, any> = {};
+          const formData = new globalThis.URLSearchParams(body);
+          const form: Record<string, unknown> = {};
           formData.forEach((value, key) => {
             form[key] = value;
           });
@@ -246,7 +253,7 @@ export class MockHttpBinServer {
     this.sendJsonResponse(res, 200, requestData);
   }
 
-  private sendJsonResponse(res: ServerResponse, statusCode: number, data: any): void {
+  private sendJsonResponse(res: ServerResponse, statusCode: number, data: unknown): void {
     const json = JSON.stringify(data, null, 2);
     res.writeHead(statusCode, {
       'Content-Type': 'application/json',
@@ -260,6 +267,12 @@ export class MockHttpBinServer {
   private sendErrorResponse(res: ServerResponse, statusCode: number, message: string): void {
     res.writeHead(statusCode, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: message }));
+  }
+
+  private handleFormDataRequest(_parsedUrl: URL, body: string): Record<string, unknown> {
+    // Implementation of handleFormDataRequest method
+    // This method should return a Record<string, unknown> based on the parsed body
+    throw new Error('Method not implemented');
   }
 }
 

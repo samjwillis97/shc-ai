@@ -49,9 +49,9 @@ describe('MockHttpBinServer', () => {
     });
 
     it('should handle form data', async () => {
-      const formData = new URLSearchParams();
-      formData.append('name', 'John');
-      formData.append('age', '30');
+      const formData = new globalThis.URLSearchParams();
+      formData.append('key1', 'value1');
+      formData.append('key2', 'value2');
 
       const response = await axios.post(`${baseUrl}/post`, formData, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -60,7 +60,7 @@ describe('MockHttpBinServer', () => {
       expect(response.status).toBe(200);
       const data = response.data as any;
       expect(data).toHaveProperty('form');
-      expect(data.form).toEqual({ name: 'John', age: '30' });
+      expect(data.form).toEqual({ key1: 'value1', key2: 'value2' });
     });
   });
 
@@ -164,8 +164,11 @@ describe('MockHttpBinServer', () => {
       try {
         await axios.get(`${baseUrl}/unknown`);
         expect.fail('Should have thrown an error');
-      } catch (error: any) {
-        expect(error.response?.status).toBe(404);
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'response' in error) {
+          const axiosError = error as { response: { status: number } };
+          expect(axiosError.response?.status).toBe(404);
+        }
       }
     });
 
@@ -173,8 +176,11 @@ describe('MockHttpBinServer', () => {
       try {
         await axios.get(`${baseUrl}/status/abc`);
         expect.fail('Should have thrown an error');
-      } catch (error: any) {
-        expect(error.response?.status).toBe(400);
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'response' in error) {
+          const axiosError = error as { response: { status: number } };
+          expect(axiosError.response?.status).toBe(400);
+        }
       }
     });
   });
