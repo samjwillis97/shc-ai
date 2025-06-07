@@ -472,39 +472,39 @@ export default {
 };
 ```
 
-## 🔧 ZSH Completion Setup
+## 🏗️ ZSH Tab Completion
 
-### Quick Setup
+Enable intelligent tab completion for faster workflows:
 
-Add to your `~/.zshrc`:
+### Setup
 
 ```bash
+# Quick setup - add to your ~/.zshrc
 eval "$(httpcraft completion zsh)"
-```
 
-Then reload your shell:
+# Or generate completion script manually
+httpcraft completion zsh > ~/.zsh/completions/_httpcraft
 
-```bash
+# Add to .zshrc
+echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+
+# Reload shell
 source ~/.zshrc
 ```
 
-### Manual Installation
+### Troubleshooting
+
+If you encounter `_arguments:comparguments:327: can only be called from completion function`, ensure you're using the latest version - this was fixed to properly use `compdef` for completion setup.
+
+### Usage
 
 ```bash
-# Generate and save completion script
-httpcraft completion zsh > ~/.local/share/zsh/site-functions/_httpcraft
-
-# Reload completions
-compinit
+httpcraft <TAB>              # Complete API names
+httpcraft myApi <TAB>        # Complete endpoint names
+httpcraft --profile <TAB>    # Complete profile names
+httpcraft chain <TAB>        # Complete chain names
 ```
-
-### Features
-
-- Complete API names: `httpcraft <TAB>`
-- Complete endpoint names: `httpcraft myapi <TAB>`
-- Complete chain names: `httpcraft chain <TAB>`
-- Complete CLI options: `httpcraft --<TAB>`
-- Complete config files: `httpcraft --config <TAB>`
 
 ## 🧪 Examples
 
@@ -1229,7 +1229,10 @@ Enable intelligent tab completion for faster workflows:
 ### Setup
 
 ```bash
-# Generate completion script
+# Quick setup - add to your ~/.zshrc
+eval "$(httpcraft completion zsh)"
+
+# Or generate completion script manually
 httpcraft completion zsh > ~/.zsh/completions/_httpcraft
 
 # Add to .zshrc
@@ -1239,6 +1242,10 @@ echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
 # Reload shell
 source ~/.zshrc
 ```
+
+### Troubleshooting
+
+If you encounter `_arguments:comparguments:327: can only be called from completion function`, ensure you're using the latest version - this was fixed to properly use `compdef` for completion setup.
 
 ### Usage
 

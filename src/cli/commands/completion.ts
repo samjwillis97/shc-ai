@@ -131,7 +131,11 @@ _httpcraft() {
   esac
 }
 
-_httpcraft "$@"`;
+# Only set up completion when script is sourced
+if [[ $ZSH_EVAL_CONTEXT == 'toplevel' ]] || [[ -n $BASH_VERSION ]]; then
+  # Script is being sourced, set up completion
+  compdef _httpcraft httpcraft
+fi`;
 }
 
 /**
