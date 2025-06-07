@@ -35,7 +35,7 @@ describe('VariableResolver - Phase 7 Plugin Support', () => {
         asyncPlugin: {
           asyncVar: async () => {
             // Simulate async operation
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise(resolve => globalThis.setTimeout(resolve, 10));
             return 'async-result';
           }
         }
@@ -297,11 +297,11 @@ describe('VariableResolver - Phase 7 Plugin Support', () => {
       const pluginSources: Record<string, Record<string, VariableSource>> = {
         asyncPlugin: {
           var1: async () => {
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise(resolve => globalThis.setTimeout(resolve, 10));
             return 'async1';
           },
           var2: async () => {
-            await new Promise(resolve => setTimeout(resolve, 5));
+            await new Promise(resolve => globalThis.setTimeout(resolve, 5));
             return 'async2';
           }
         }
@@ -322,7 +322,11 @@ describe('VariableResolver - Phase 7 Plugin Support', () => {
     it('should handle async variables in arrays', async () => {
       const pluginSources: Record<string, Record<string, VariableSource>> = {
         asyncPlugin: {
-          asyncVar: async () => 'async-value'
+          asyncVar: async () => {
+            await new Promise(resolve => globalThis.setTimeout(resolve, 10));
+            return 'async-value';
+          },
+          staticVar: () => 'static-value'
         }
       };
 
@@ -342,6 +346,20 @@ describe('VariableResolver - Phase 7 Plugin Support', () => {
 
       const result = await resolver.resolveValue(array, context);
       expect(result).toEqual(['async-value', 'static-value', 'async-value']);
+    });
+
+    // Test timeout behavior
+    const timeoutPromise = new Promise((_, reject) => {
+      globalThis.setTimeout(() => {
+        reject(new Error('Timeout'));
+      }, 100);
+    });
+
+    // Test timeout behavior  
+    const timeoutPromise2 = new Promise((_, reject) => {
+      globalThis.setTimeout(() => {
+        reject(new Error('Timeout'));
+      }, 100);
     });
   });
 }); 

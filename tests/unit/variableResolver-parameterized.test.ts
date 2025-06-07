@@ -166,8 +166,12 @@ describe('VariableResolver - T10.15 Parameterized Plugin Functions', () => {
       const parameterizedSources: Record<string, Record<string, ParameterizedVariableSource>> = {
         async: {
           fetchData: async (id: string, timeout = '1000') => {
-            await new Promise(resolve => setTimeout(resolve, 10)); // Simulate async operation
+            await new Promise(resolve => globalThis.setTimeout(resolve, 10)); // Simulate async operation
             return `data-${id}-timeout-${timeout}`;
+          },
+          asyncFunction: async (input: unknown) => {
+            await new Promise(resolve => globalThis.setTimeout(resolve, 10)); // Simulate async operation
+            return `async-${input}`;
           }
         }
       };
