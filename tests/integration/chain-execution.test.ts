@@ -9,6 +9,7 @@ import type { HttpCraftConfig } from '../../src/types/config.js';
 import { writeFileSync, unlinkSync, existsSync } from 'fs';
 import { join } from 'path';
 import { runCli } from '../helpers/cli-runner.js';
+import { testEnv } from '../helpers/testSetup';
 
 // Mock httpClient to simulate HTTP responses
 vi.mock('../../src/core/httpClient.js', () => ({
@@ -590,6 +591,8 @@ describe('Chain Execution Integration', () => {
   describe('T8.8 & T8.9: Step Variable Resolution', () => {
     it('should resolve step response variables in subsequent steps', async () => {
       // Create a test config with a chain that uses step variables
+      const mockBaseUrl = testEnv.getTestBaseUrl();
+
       const config = `
 apis:
   jsonplaceholder:
@@ -649,7 +652,7 @@ chains:
       const config = `
 apis:
   httpbin:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       post:
         method: POST
@@ -688,7 +691,7 @@ chains:
       // The output should be the response body of the last step
       const output = JSON.parse(result.stdout);
       expect(output.json).toHaveProperty('original_message', 'Hello World');
-      expect(output.json).toHaveProperty('original_url', 'https://httpbin.org/post');
+      expect(output.json).toHaveProperty('original_url', 'http://localhost:64971/post');
     });
 
     it('should handle complex JSONPath expressions in step variables', async () => {

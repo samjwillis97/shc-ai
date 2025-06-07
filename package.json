@@ -26,7 +26,8 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "prepare": "npm run build",
-    "prepublishOnly": "npm test && npm run lint"
+    "prepublishOnly": "npm test && npm run lint",
+    "migrate-tests": "node --loader ts-node/esm scripts/migrate-tests.ts"
   },
   "repository": {
     "type": "git",
@@ -51,6 +52,7 @@
   "homepage": "https://github.com/samjwillis97/httpcraft#readme",
   "devDependencies": {
     "@eslint/js": "^9.28.0",
+    "@types/glob": "^8.1.0",
     "@types/jsonpath-plus": "^5.0.5",
     "@types/keytar": "^4.4.0",
     "@types/node": "^22.15.29",
@@ -60,6 +62,7 @@
     "eslint": "^9.28.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-prettier": "^5.4.1",
+    "glob": "^11.0.0",
     "prettier": "^3.5.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",

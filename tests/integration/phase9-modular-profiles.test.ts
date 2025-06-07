@@ -4,6 +4,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import { tmpdir } from 'os';
+import { testEnv } from '../helpers/testSetup';
 
 const execFileAsync = promisify(execFile);
 
@@ -273,7 +274,7 @@ profiles:
 
 apis:
   testApi:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       test:
         method: GET
@@ -305,7 +306,7 @@ profiles:
 
 apis:
   testApi:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       test:
         method: GET

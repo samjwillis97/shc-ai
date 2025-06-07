@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawn } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
@@ -7,8 +6,8 @@ import { testEnv } from '../helpers/testSetup';
 
 const execFile = promisify(require('child_process').execFile);
 
-describe('Phase 3: Variable Substitution Integration Tests', () => {
-  const testConfigPath = path.join(process.cwd(), 'test-config-phase3.yaml');
+describe('Phase 3: Variable Substitution Integration Tests (Mock Server)', () => {
+  const testConfigPath = path.join(process.cwd(), 'test-config-phase3-mock.yaml');
   const cliPath = path.join(process.cwd(), 'dist/index.js');
 
   beforeEach(async () => {
@@ -224,7 +223,7 @@ apis:
         headers:
           X-Missing-Env: "{{env.UNDEFINED_ENV_VAR}}"
 `;
-      const envTestConfigPath = path.join(process.cwd(), 'test-env-error.yaml');
+      const envTestConfigPath = path.join(process.cwd(), 'test-env-error-mock.yaml');
       await fs.writeFile(envTestConfigPath, testConfigWithEnvVar);
 
       try {

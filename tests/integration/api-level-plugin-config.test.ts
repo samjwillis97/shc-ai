@@ -3,32 +3,38 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
+import { testEnv } from '../helpers/testSetup';
 
 const execFileAsync = promisify(execFile);
 
 describe('T10.4: Variable substitution in API-level plugin configurations', () => {
-  const testDir = path.join(process.cwd(), 'temp-api-plugin-test');
-  const configPath = path.join(testDir, 'test-config.yaml');
-  const pluginPath = path.join(testDir, 'testPlugin.js');
+  let testDir: string;
+  let configPath: string;
+  const pluginPath = path.join(process.cwd(), 'dist', 'cli', 'main.js');
   const cliPath = path.join(process.cwd(), 'dist', 'cli', 'main.js');
 
   beforeEach(async () => {
+    // Create temporary directory for test files
+    testDir = path.join(__dirname, 'temp-api-plugin-test');
     await fs.mkdir(testDir, { recursive: true });
 
-    // Create a test plugin that exposes its configuration
+    // Create test plugin
     const pluginContent = `
-export default {
-  async setup(context) {
-    // Store config for inspection via pre-request hook
-    context.registerPreRequestHook(async (request) => {
-      request.headers['X-Plugin-Config'] = JSON.stringify(context.config);
+module.exports = {
+  setup: (context) => {
+    context.registerPreRequestHook(async (request, config) => {
+      // Add plugin configuration to headers for verification
+      request.headers['X-Plugin-Config'] = JSON.stringify(config);
+      return request;
     });
   }
 };
 `;
-    await fs.writeFile(pluginPath, pluginContent);
+    await fs.writeFile(path.join(testDir, 'testPlugin.js'), pluginContent);
 
-    // Create test configuration with API-level plugin configurations containing variables
+    // Create configuration file
+    configPath = path.join(testDir, 'test-config.yaml');
+    const mockBaseUrl = testEnv.getTestBaseUrl();
     const configContent = `
 profiles:
   test:
@@ -45,7 +51,7 @@ plugins:
 
 apis:
   test-api:
-    baseUrl: https://httpbin.org
+    baseUrl: ${mockBaseUrl}
     plugins:
       - name: testPlugin
         config:
@@ -150,7 +156,7 @@ plugins:
 
 apis:
   test-api:
-    baseUrl: https://httpbin.org
+    baseUrl: ${testEnv.getTestBaseUrl()}
     plugins:
       - name: testPlugin
         config:
@@ -197,7 +203,7 @@ plugins:
 
 apis:
   test-api:
-    baseUrl: https://httpbin.org
+    baseUrl: ${testEnv.getTestBaseUrl()}
     plugins:
       - name: testPlugin
         config:

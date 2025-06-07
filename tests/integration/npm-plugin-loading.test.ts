@@ -56,7 +56,7 @@ describe.skip('npm Plugin Loading Integration Tests (T10.7)', () => {
       async setup(context: any) {
         context.registerPreRequestHook(async (request: any) => {
           const apiKey = context.config.apiKey || 'default-api-key';
-          request.headers['Authorization'] = `Bearer ${apiKey}`;
+          request.headers['authorization'] = `Bearer ${apiKey}`;
           request.headers['X-Plugin-Source'] = 'npm-package';
         });
         
@@ -101,7 +101,7 @@ describe.skip('npm Plugin Loading Integration Tests (T10.7)', () => {
 
       await pluginManager.executePreRequestHooks(request);
 
-      expect(request.headers['Authorization']).toBe('Bearer test-npm-api-key-123');
+      expect(request.headers['authorization']).toBe('Bearer test-npm-api-key-123');
       expect(request.headers['X-Plugin-Source']).toBe('npm-package');
 
       // Test variable source registration

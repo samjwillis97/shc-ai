@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
+import { testEnv } from '../helpers/testSetup';
 
 const execFile = promisify(require('child_process').execFile);
 
@@ -34,7 +35,7 @@ describe('Phase 9 Integration - Modular API Imports (T9.1)', () => {
       // Create API definition file
       await fs.writeFile(path.join(apisDir, 'httpbin.yaml'), `
 httpbin:
-  baseUrl: "https://httpbin.org"
+  baseUrl: "${mockBaseUrl}"
   endpoints:
     testGet:
       method: GET
@@ -70,7 +71,7 @@ apis:
       // Create first API file
       await fs.writeFile(path.join(apisDir, 'service1.yaml'), `
 service1:
-  baseUrl: "https://httpbin.org"
+  baseUrl: "${mockBaseUrl}"
   endpoints:
     test1:
       method: GET
@@ -82,7 +83,7 @@ service1:
       // Create second API file
       await fs.writeFile(path.join(apisDir, 'service2.yaml'), `
 service2:
-  baseUrl: "https://httpbin.org"
+  baseUrl: "${mockBaseUrl}"
   endpoints:
     test2:
       method: GET
@@ -131,7 +132,7 @@ apis:
 
       await fs.writeFile(path.join(apisDir, 'dir-service.yaml'), `
 dirService:
-  baseUrl: "https://httpbin.org"
+  baseUrl: "${mockBaseUrl}"
   endpoints:
     test:
       method: GET
@@ -144,7 +145,7 @@ dirService:
       const individualFile = path.join(tempDir, 'individual-service.yaml');
       await fs.writeFile(individualFile, `
 individualService:
-  baseUrl: "https://httpbin.org"
+  baseUrl: "${mockBaseUrl}"
   endpoints:
     test:
       method: GET
@@ -192,7 +193,7 @@ apis:
       await fs.writeFile(configFile, `
 apis:
   httpbin:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       testDirect:
         method: GET
@@ -265,7 +266,7 @@ apis:
 
       await fs.writeFile(path.join(apisDir, 'completion-test.yaml'), `
 completionTest:
-  baseUrl: "https://httpbin.org"
+  baseUrl: "${mockBaseUrl}"
   endpoints:
     testEndpoint:
       method: GET

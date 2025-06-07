@@ -4,6 +4,7 @@ import { promisify } from 'util';
 import path from 'path';
 import * as fs from 'fs/promises';
 import { existsSync } from 'fs';
+import { testEnv } from '../helpers/testSetup';
 
 /**
  * T10.12: Comprehensive End-to-End Integration Tests
@@ -29,6 +30,8 @@ describe('T10.12: End-to-End Integration Tests', () => {
 
   async function runHttpCraft(args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     const cliPath = path.resolve('./dist/index.js');
+    const mockBaseUrl = testEnv.getTestBaseUrl();
+
     const command = `node "${cliPath}" ${args.map(arg => `"${arg}"`).join(' ')}`;
     
     try {
@@ -82,7 +85,7 @@ describe('T10.12: End-to-End Integration Tests', () => {
     it('should handle complete workflow: config loading, variables, profiles, and HTTP requests', async () => {
       // Set up environment variables
       process.env.E2E_SECRET_TOKEN = 'secret-env-token-123';
-      process.env.E2E_BASE_URL = 'https://httpbin.org';
+      process.env.E2E_BASE_URL = testEnv.getTestBaseUrl();
       
       // Create comprehensive configuration
       const config = `
@@ -197,7 +200,7 @@ profiles:
 
 apis:
   httpbin:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     variables:
       message: "api-message"
     endpoints:
@@ -239,6 +242,8 @@ apis:
   describe('Plugin System Integration', () => {
     it('should work with local plugins providing variables and hooks', async () => {
       // Create a test plugin
+      const mockBaseUrl = testEnv.getTestBaseUrl();
+
       const pluginCode = `
 export default {
   async setup(context) {
@@ -288,7 +293,7 @@ plugins:
 
 apis:
   httpbin:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     headers:
       Authorization: "Bearer {{plugins.testPlugin.authToken}}"
       X-Timestamp: "{{plugins.testPlugin.timestamp}}"
@@ -323,6 +328,8 @@ apis:
 
     it('should support parameterized plugin functions (T10.15)', async () => {
       // Create a plugin with parameterized functions
+      const mockBaseUrl = testEnv.getTestBaseUrl();
+
       const pluginCode = `
 const cache = new Map();
 cache.set('dev-key', 'dev-api-key-12345');
@@ -358,7 +365,7 @@ plugins:
 
 apis:
   httpbin:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       test-parameterized:
         method: GET
@@ -397,10 +404,12 @@ apis:
 
   describe('Chain Execution Integration', () => {
     it('should execute complex chains with step data passing and all features', async () => {
+      const mockBaseUrl = testEnv.getTestBaseUrl();
+
       const config = `
 profiles:
   test:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     userId: "chain-test-user"
 
 apis:
@@ -505,10 +514,12 @@ chains:
     });
 
     it('should handle chain failure correctly with proper error reporting', async () => {
+      const mockBaseUrl = testEnv.getTestBaseUrl();
+
       const config = `
 apis:
   httpbin:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       success:
         method: GET
@@ -549,10 +560,12 @@ chains:
 
   describe('CLI Options and Error Handling', () => {
     it('should handle dry-run mode correctly', async () => {
+      const mockBaseUrl = testEnv.getTestBaseUrl();
+
       const config = `
 apis:
   httpbin:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       test:
         method: POST
@@ -587,10 +600,12 @@ apis:
     });
 
     it('should handle exit-on-http-error correctly', async () => {
+      const mockBaseUrl = testEnv.getTestBaseUrl();
+
       const config = `
 apis:
   httpbin:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       not-found:
         method: GET
@@ -660,7 +675,7 @@ apis:
       await fs.writeFile(configFile, `
 apis:
   existing-api:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       test:
         method: GET
@@ -697,7 +712,7 @@ apis:
       // Create API files
       await fs.writeFile(path.join(apisDir, 'service1.yaml'), `
 service1:
-  baseUrl: "https://httpbin.org"
+  baseUrl: "${mockBaseUrl}"
   endpoints:
     test1:
       method: GET
@@ -706,7 +721,7 @@ service1:
 
       await fs.writeFile(path.join(apisDir, 'service2.yaml'), `
 service2:
-  baseUrl: "https://httpbin.org"
+  baseUrl: "${mockBaseUrl}"
   endpoints:
     test2:
       method: GET
@@ -725,6 +740,8 @@ test-workflow:
 `);
 
       // Create main config
+      const mockBaseUrl = testEnv.getTestBaseUrl();
+
       const config = `
 apis:
   - "directory:./apis/"
@@ -762,7 +779,7 @@ chains:
       const config = `
 apis:
   httpbin:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       test-dynamic:
         method: POST

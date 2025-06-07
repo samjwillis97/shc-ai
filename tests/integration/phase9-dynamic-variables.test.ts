@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { testEnv } from '../helpers/testSetup';
 
 const execFileAsync = promisify(execFile);
 
@@ -12,12 +13,14 @@ describe('Phase 9 T9.6: Built-in Dynamic Variables Integration Tests', () => {
 
   beforeAll(async () => {
     // Create test configuration file
+    const mockBaseUrl = testEnv.getTestBaseUrl();
+
     const testConfig = `# Test configuration for T9.6: Built-in Dynamic Variables
 # This config demonstrates using built-in dynamic variables
 
 apis:
   httpbin:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       testDynamicVariables:
         method: GET
@@ -155,7 +158,7 @@ apis:
       ]);
 
       // Verbose output should show the request details with resolved dynamic variables
-      expect(stderr).toContain('[DRY RUN] GET https://httpbin.org/get');
+      expect(stderr).toContain('[DRY RUN] GET ${testEnv.getTestBaseUrl()}/get');
       expect(stderr).toMatch(/X-Timestamp: \d+/);
       expect(stderr).toMatch(/X-Request-ID: [0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/);
     });

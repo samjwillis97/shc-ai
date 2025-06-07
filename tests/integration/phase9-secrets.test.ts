@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { testEnv } from '../helpers/testSetup';
 
 const execFileAsync = promisify(execFile);
 
@@ -12,12 +13,14 @@ describe('Phase 9 T9.4: Secret Variable Resolution Integration Tests', () => {
 
   beforeAll(async () => {
     // Create test configuration file
+    const mockBaseUrl = testEnv.getTestBaseUrl();
+
     const testConfig = `# Test configuration for T9.4: Secret Variable Resolution
 # This config demonstrates using {{secret.VAR_NAME}} syntax
 
 apis:
   httpbin:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       testSecrets:
         method: GET
@@ -36,7 +39,7 @@ apis:
           X-Missing-Secret: "{{secret.UNDEFINED_SECRET}}"
   
   httpbin-body:
-    baseUrl: "https://httpbin.org"
+    baseUrl: "${mockBaseUrl}"
     endpoints:
       testSecretInBody:
         method: POST
@@ -149,6 +152,7 @@ apis:
     });
 
     it('should work with verbose output', async () => {
+      const mockBaseUrl = testEnv.getTestBaseUrl();
       const { stderr } = await execFileAsync('node', [
         cliPath,
         'httpbin',
@@ -167,7 +171,7 @@ apis:
       });
 
       // Verbose output should show the request details with masked secrets
-      expect(stderr).toContain('[DRY RUN] GET https://httpbin.org/get');
+      expect(stderr).toContain(`[DRY RUN] GET ${mockBaseUrl}/get`);
       expect(stderr).toContain('X-API-Key: [SECRET]');
       expect(stderr).not.toContain('verbose-api-key');
     });
