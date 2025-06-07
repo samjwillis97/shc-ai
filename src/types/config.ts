@@ -54,17 +54,30 @@ export interface EndpointDefinition {
 }
 
 export interface ChainDefinition {
+  description?: string;
+  vars?: Record<string, unknown>;
   steps: ChainStep[];
+  // Legacy alias for backward compatibility
   variables?: Record<string, unknown>;
 }
 
 export interface ChainStep {
   id: string;
+  description?: string;
   call: string;
-  variables?: Record<string, unknown>;
+  with?: StepOverrides;
   condition?: string;
   onSuccess?: ChainStepAction[];
   onFailure?: ChainStepAction[];
+  // Legacy alias for backward compatibility
+  variables?: Record<string, unknown>;
+}
+
+export interface StepOverrides {
+  headers?: Record<string, unknown>;
+  params?: Record<string, unknown>;
+  pathParams?: Record<string, unknown>;
+  body?: unknown;
 }
 
 export interface ChainStepAction {

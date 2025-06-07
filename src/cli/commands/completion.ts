@@ -31,7 +31,7 @@ export async function handleCompletionCommand(args: CompletionCommandArgs): Prom
   if (args.shell === 'zsh') {
     console.log(generateZshCompletion());
   } else {
-    console.error(`Error: Shell '${args.shell}' is not supported`);
+    console.error('Error: Only ZSH completion is currently supported');
     process.exit(1);
   }
 }
@@ -76,8 +76,8 @@ _httpcraft() {
     '1: :->command' \\
     '*: :->args' \\
     '(--config)--config[Configuration file]:config file:_files -g "*.yaml" -g "*.yml"' \\
-    '(--var)--var[Variable assignment]:variable assignment:' \\
-    '(--profile)--profile[Profile to use]:profile:_httpcraft_profiles' \\
+    '*--var[Set or override a variable]:variable:' \\
+    '*--profile[Select profile(s) to use]:profile:_httpcraft_profiles' \\
     '(--verbose)--verbose[Verbose output]' \\
     '(--dry-run)--dry-run[Dry run mode]' \\
     '(--exit-on-http-error)--exit-on-http-error[Exit on HTTP error]:error pattern:' \\
@@ -92,7 +92,7 @@ _httpcraft() {
       commands=(
         'completion:Generate shell completion script'
         'request:Make a direct HTTP request'
-        'chain:Execute a chain of requests'
+        'chain:Execute a chain of HTTP requests'
       )
       
       # Add API commands dynamically
@@ -153,7 +153,15 @@ export async function handleGetApiNamesCommand(args: GetApiNamesArgs): Promise<v
     }
 
     const apiNames = Object.keys(config.apis || {});
-    console.log(apiNames.join('\n'));
+    if (apiNames.length === 0) {
+      // Don't log anything if there are no APIs
+      return;
+    }
+    
+    // Log each API name separately
+    for (const apiName of apiNames) {
+      console.log(apiName);
+    }
   } catch {
     // Silently ignore errors in completion to avoid breaking tab completion
     return;
@@ -185,7 +193,15 @@ export async function handleGetEndpointNamesCommand(args: GetEndpointNamesArgs):
     }
 
     const endpointNames = Object.keys(api.endpoints || {});
-    console.log(endpointNames.join('\n'));
+    if (endpointNames.length === 0) {
+      // Don't log anything if there are no endpoints
+      return;
+    }
+    
+    // Log each endpoint name separately
+    for (const endpointName of endpointNames) {
+      console.log(endpointName);
+    }
   } catch {
     // Silently ignore errors in completion to avoid breaking tab completion
     return;
@@ -211,7 +227,15 @@ export async function handleGetChainNamesCommand(args: GetChainNamesArgs): Promi
     }
 
     const chainNames = Object.keys(config.chains || {});
-    console.log(chainNames.join('\n'));
+    if (chainNames.length === 0) {
+      // Don't log anything if there are no chains
+      return;
+    }
+    
+    // Log each chain name separately
+    for (const chainName of chainNames) {
+      console.log(chainName);
+    }
   } catch {
     // Silently ignore errors in completion to avoid breaking tab completion
     return;
@@ -237,7 +261,15 @@ export async function handleGetProfileNamesCommand(args: GetProfileNamesArgs): P
     }
 
     const profileNames = Object.keys(config.profiles || {});
-    console.log(profileNames.join('\n'));
+    if (profileNames.length === 0) {
+      // Don't log anything if there are no profiles
+      return;
+    }
+    
+    // Log each profile name separately
+    for (const profileName of profileNames) {
+      console.log(profileName);
+    }
   } catch {
     // Silently ignore errors in completion to avoid breaking tab completion
     return;

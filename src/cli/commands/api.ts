@@ -364,7 +364,18 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     }
   } catch (error: unknown) {
     if (error instanceof Error) {
-      process.stderr.write(`Configuration Error: ${error.message}\n`);
+      // Check for variable resolution errors by message content
+      const errorMessage = error.message;
+      
+      // Check for variable-related errors
+      if (errorMessage.includes('could not be resolved') || 
+          errorMessage.includes('Variable ') ||
+          errorMessage.includes('not defined') ||
+          errorMessage.includes('resolution failed')) {
+        process.stderr.write(`Variable Error: ${errorMessage}\n`);
+      } else {
+        process.stderr.write(`Configuration Error: ${errorMessage}\n`);
+      }
     } else {
       process.stderr.write(`Configuration Error: ${String(error)}\n`);
     }

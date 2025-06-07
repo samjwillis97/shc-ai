@@ -7,6 +7,24 @@ import type {
 } from '../../types/config.js';
 import path from 'path';
 
+/**
+ * Helper function to parse JSON strings into objects when possible
+ * If the value is a valid JSON string, returns the parsed object
+ * Otherwise, returns the original value unchanged
+ */
+function parseJsonIfPossible(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+  
+  try {
+    return JSON.parse(value);
+  } catch {
+    // If parsing fails, return original string
+    return value;
+  }
+}
+
 export interface ChainCommandArgs {
   chainName: string;
   config?: string;
@@ -50,8 +68,14 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
     // T14.3: Set plugin manager on variable resolver for secret resolution
     variableResolver.setPluginManager(pluginManager);
 
+    // Check if any chains are defined at all
+    if (!config.chains || Object.keys(config.chains).length === 0) {
+      console.error('Error: No chains defined in configuration');
+      process.exit(1);
+    }
+
     // Find chain
-    const chain = config.chains?.[args.chainName];
+    const chain = config.chains[args.chainName];
     if (!chain) {
       console.error(`Error: Chain '${args.chainName}' not found in configuration`);
       process.exit(1);
@@ -146,11 +170,26 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
     );
 
     // Handle chain output
-    if (args.chainOutput === 'full') {
-      // Output structured JSON
-      console.log(JSON.stringify(result, null, 2));
-    } else {
-      // Default behavior: output last step's response body
+    if (args.chainOutput === 'full' && result.success) {
+      // Output structured JSON with parsed bodies and correct property order (only on success)
+      const structuredResult = {
+        chainName: result.chainName,
+        success: result.success,
+        steps: result.steps.map(step => ({
+          ...step,
+          request: {
+            ...step.request,
+            body: parseJsonIfPossible(step.request.body)
+          },
+          response: {
+            ...step.response,
+            body: parseJsonIfPossible(step.response.body)
+          }
+        }))
+      };
+      console.log(JSON.stringify(structuredResult, null, 2));
+    } else if (args.chainOutput !== 'full') {
+      // Default behavior: output last step's response body (only on success)
       if (result.success && result.steps.length > 0) {
         const lastStep = result.steps[result.steps.length - 1];
         if (lastStep.success && lastStep.response?.body) {
@@ -161,13 +200,14 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
 
     // Check if chain failed and exit appropriately
     if (!result.success) {
+      console.error(`Chain execution failed: ${result.error}`);
       process.exit(1);
     }
   } catch (error: unknown) {
     if (error instanceof Error) {
-      process.stderr.write(`Configuration Error: ${error.message}\n`);
+      console.error('Error executing chain:', error);
     } else {
-      process.stderr.write(`Configuration Error: ${String(error)}\n`);
+      console.error('Error executing chain:', String(error));
     }
     process.exit(1);
   }

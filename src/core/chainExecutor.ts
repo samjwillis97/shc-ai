@@ -55,6 +55,10 @@ export class ChainExecutor {
     try {
       if (verbose) {
         console.error(`[CHAIN] Starting execution of chain: ${chainName}`);
+        // Add chain description output if available
+        if (chain.description) {
+          console.error(`[CHAIN] Description: ${chain.description}`);
+        }
         console.error(`[CHAIN] Steps to execute: ${chain.steps.length}`);
       }
 
@@ -73,7 +77,7 @@ export class ChainExecutor {
             config,
             cliVariables,
             profiles,
-            chain.variables || {},
+            chain.vars || chain.variables || {},
             result.steps, // Pass completed steps for variable resolution
             verbose,
             dryRun,
@@ -231,8 +235,9 @@ export class ChainExecutor {
     try {
       // T8.5: First resolve step.with overrides using the full variable context (including steps)
       let resolvedStepWith: Record<string, unknown> | null = null;
-      if (step.variables) {
-        resolvedStepWith = await variableResolver.resolveValue(step.variables, variableContext) as Record<string, unknown>;
+      const stepOverrides = step.with || step.variables; // Support both new and legacy property names
+      if (stepOverrides) {
+        resolvedStepWith = await variableResolver.resolveValue(stepOverrides, variableContext) as Record<string, unknown>;
       }
 
       // If step.with provides pathParams, add them to the variable context

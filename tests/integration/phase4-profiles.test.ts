@@ -386,12 +386,16 @@ apis:
 
       await fs.writeFile(configFile, config);
       
-      const originalError = console.error;
+      const originalStderrWrite = process.stderr.write;
       const originalExit = process.exit;
       let capturedError = '';
       let exitCode = 0;
       
-      console.error = (msg: string) => { capturedError = msg; };
+      // Capture process.stderr.write calls instead of console.error
+      process.stderr.write = ((chunk: any) => { 
+        capturedError += chunk;
+        return true;
+      }) as any;
       process.exit = ((code: number) => { exitCode = code; }) as any;
       
       try {
@@ -406,7 +410,7 @@ apis:
         expect(capturedError).toContain("missing");
         expect(exitCode).toBe(1);
       } finally {
-        console.error = originalError;
+        process.stderr.write = originalStderrWrite;
         process.exit = originalExit;
       }
     });

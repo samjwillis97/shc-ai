@@ -551,33 +551,36 @@ export class VariableResolver {
    * 8. {{secret.*}} variables (scoped access only)
    * 9. {{env.*}} OS environment variables (scoped access only)
    * 10. {{$dynamic}} built-in dynamic variables (scoped access only)
-   * Note: Plugin variables require the plugins.name.variable syntax and are not available as unscoped
    * Note: Secret, env, and dynamic variables are only accessible via their scoped syntax
    */
   private resolveUnscopedVariable(variableName: string, context: VariableContext): any {
-    // 1. CLI variables (highest precedence)
-    if (context.cliVariables[variableName] !== undefined) {
-      return context.cliVariables[variableName];
+    // 1. CLI variables (highest precedence) - support both old and new names
+    const cliVars = context.cliVariables || (context as any).cli || {};
+    if (cliVars && cliVars[variableName] !== undefined) {
+      return cliVars[variableName];
     }
 
-    // 2. Step with overrides (for future chains)
-    if (context.stepWith && context.stepWith[variableName] !== undefined) {
-      return context.stepWith[variableName];
+    // 2. Step with overrides (for chains) - support both old and new names  
+    const stepWith = context.stepWith || (context as any).stepWith || {};
+    if (stepWith && stepWith[variableName] !== undefined) {
+      return stepWith[variableName];
     }
 
-    // 3. Chain variables (for future chains)
+    // 3. Chain variables (for chains)
     if (context.chainVars && context.chainVars[variableName] !== undefined) {
       return context.chainVars[variableName];
     }
 
-    // 4. Endpoint-specific variables
-    if (context.endpointVariables && context.endpointVariables[variableName] !== undefined) {
-      return context.endpointVariables[variableName];
+    // 4. Endpoint-specific variables - support both old and new names
+    const endpointVars = context.endpointVariables || context.endpoint || {};
+    if (endpointVars && endpointVars[variableName] !== undefined) {
+      return endpointVars[variableName];
     }
 
-    // 5. API-specific variables
-    if (context.apiVariables && context.apiVariables[variableName] !== undefined) {
-      return context.apiVariables[variableName];
+    // 5. API-specific variables - support both old and new names
+    const apiVars = context.apiVariables || context.api || {};
+    if (apiVars && apiVars[variableName] !== undefined) {
+      return apiVars[variableName];
     }
 
     // 6. Profile variables (merged)
@@ -657,7 +660,7 @@ export class VariableResolver {
     > // T10.15: Parameterized plugins
   ): VariableContext {
     return {
-      cliVariables: { ...cliVars },
+      cliVariables: cliVars ? { ...cliVars } : {},
       profiles: profiles ? { ...profiles } : {},
       apiVariables: api ? { ...api } : undefined,
       endpointVariables: endpoint ? { ...endpoint } : undefined,
