@@ -2,21 +2,24 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://httpcraft.dev/schemas/config.json",
   "title": "HttpCraft Configuration",
-  "description": "Configuration schema for HttpCraft - a command-line HTTP API client",
+  "description": "Configuration schema for HttpCraft - a command-line HTTP API client with advanced features including OAuth2 authentication, variable resolution, request chaining, and plugin system",
   "type": "object",
   "properties": {
     "config": {
       "type": "object",
-      "description": "Global tool settings",
+      "description": "Global tool settings and configuration options",
       "properties": {
         "defaultProfile": {
-          "description": "Default profile to use when no --profile flag is specified",
+          "description": "Default profile(s) to use when no --profile flag is specified. CLI profiles are added to (not replace) default profiles unless --no-default-profile is used",
           "oneOf": [
-            { "type": "string" },
+            { 
+              "type": "string",
+              "description": "Single default profile name"
+            },
             { 
               "type": "array",
               "items": { "type": "string" },
-              "description": "List of profiles to apply by default"
+              "description": "List of profiles to apply by default (in order)"
             }
           ]
         }
@@ -24,7 +27,7 @@
       "additionalProperties": false
     },
     "profiles": {
-      "description": "Named sets of variables for different environments or configurations",
+      "description": "Named sets of variables for different environments or configurations. Support enhanced merging with default profiles",
       "oneOf": [
         {
           "type": "object",
@@ -44,30 +47,30 @@
     },
     "secrets": {
       "type": "object",
-      "description": "Configuration for secret management",
+      "description": "Configuration for secret management and custom secret resolvers",
       "properties": {
         "provider": {
           "type": "string",
           "default": "env",
-          "description": "Secret provider type (default: environment variables)"
+          "description": "Default secret provider type (default: environment variables). Plugins can register custom secret resolvers"
         }
       },
       "additionalProperties": true
     },
     "plugins": {
       "type": "array",
-      "description": "Plugin configurations",
+      "description": "Plugin configurations. Supports local files, npm packages, and built-in plugins",
       "items": {
         "$ref": "#/definitions/PluginConfiguration"
       }
     },
     "variables": {
       "type": "array",
-      "description": "Paths to global variable files",
+      "description": "Paths to global variable files for modular variable management",
       "items": { "type": "string" }
     },
     "apis": {
-      "description": "API definitions",
+      "description": "API definitions with support for modular imports",
       "oneOf": [
         {
           "type": "object",
@@ -86,7 +89,7 @@
       ]
     },
     "chains": {
-      "description": "Chain definitions for multi-step request sequences",
+      "description": "Chain definitions for multi-step request sequences with advanced data passing",
       "oneOf": [
         {
           "type": "object",
@@ -110,10 +113,10 @@
   "definitions": {
     "ProfileDefinition": {
       "type": "object",
-      "description": "A profile containing variables and settings",
+      "description": "A profile containing variables and settings. Supports enhanced merging with CLI profiles",
       "patternProperties": {
         "^[a-zA-Z_][a-zA-Z0-9_]*$": {
-          "description": "Variable name and value",
+          "description": "Variable name and value with {{variable}} substitution support",
           "oneOf": [
             { "type": "string" },
             { "type": "number" },
@@ -126,11 +129,11 @@
     },
     "PluginConfiguration": {
       "type": "object",
-      "description": "Plugin configuration",
+      "description": "Plugin configuration supporting local files, npm packages, and built-in plugins (e.g., oauth2)",
       "properties": {
         "path": {
           "type": "string",
-          "description": "Path to local plugin file"
+          "description": "Path to local plugin file (JavaScript/TypeScript)"
         },
         "npmPackage": {
           "type": "string",
@@ -138,24 +141,136 @@
         },
         "name": {
           "type": "string",
-          "description": "Plugin name/identifier"
+          "description": "Plugin name/identifier (required). For built-in plugins like OAuth2, use 'oauth2'"
         },
         "config": {
           "type": "object",
-          "description": "Plugin-specific configuration",
+          "description": "Plugin-specific configuration. For OAuth2, includes grantType, tokenUrl, clientId, etc.",
           "additionalProperties": true
         }
       },
       "required": ["name"],
       "oneOf": [
         { "required": ["path"] },
-        { "required": ["npmPackage"] }
+        { "required": ["npmPackage"] },
+        {
+          "properties": {
+            "name": {
+              "enum": ["oauth2"],
+              "description": "Built-in OAuth2 plugin - no path or npmPackage required"
+            }
+          }
+        }
       ],
+      "additionalProperties": false
+    },
+    "OAuth2PluginConfig": {
+      "type": "object",
+      "description": "OAuth2 plugin configuration schema for the built-in OAuth2 authentication plugin",
+      "properties": {
+        "grantType": {
+          "type": "string",
+          "enum": ["client_credentials", "authorization_code", "refresh_token"],
+          "default": "client_credentials",
+          "description": "OAuth2 grant type flow"
+        },
+        "tokenUrl": {
+          "type": "string",
+          "description": "OAuth2 token endpoint URL (required)"
+        },
+        "clientId": {
+          "type": "string",
+          "description": "OAuth2 client ID (required, supports {{variable}} substitution)"
+        },
+        "clientSecret": {
+          "type": "string",
+          "description": "OAuth2 client secret (supports {{variable}} and {{secret.*}} substitution)"
+        },
+        "scope": {
+          "type": "string",
+          "description": "Requested OAuth2 scopes (space-separated)"
+        },
+        "authMethod": {
+          "type": "string",
+          "enum": ["basic", "post"],
+          "default": "post",
+          "description": "Client authentication method"
+        },
+        "tokenType": {
+          "type": "string",
+          "default": "Bearer",
+          "description": "Token type for Authorization header"
+        },
+        "timeout": {
+          "type": "number",
+          "default": 30000,
+          "description": "Request timeout in milliseconds"
+        },
+        "authorizationCode": {
+          "type": "string",
+          "description": "Authorization code for authorization_code grant (supports {{variable}} substitution)"
+        },
+        "redirectUri": {
+          "type": "string",
+          "description": "Redirect URI for authorization_code grant"
+        },
+        "codeVerifier": {
+          "type": "string",
+          "description": "PKCE code verifier for enhanced security"
+        },
+        "refreshToken": {
+          "type": "string",
+          "description": "Refresh token for refresh_token grant (supports {{secret.*}} substitution)"
+        },
+        "additionalParams": {
+          "type": "object",
+          "description": "Additional parameters for token requests",
+          "additionalProperties": { "type": "string" }
+        },
+        "authorizationUrl": {
+          "type": "string",
+          "description": "OAuth2 authorization endpoint URL (for interactive browser flows)"
+        },
+        "audience": {
+          "type": "string",
+          "description": "Optional audience parameter for token requests"
+        },
+        "usePKCE": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable PKCE (Proof Key for Code Exchange) for enhanced security"
+        },
+        "codeChallengeMethod": {
+          "type": "string",
+          "enum": ["S256", "plain"],
+          "default": "S256",
+          "description": "PKCE code challenge method"
+        },
+        "interactive": {
+          "type": "boolean",
+          "description": "Enable interactive browser flow (auto-detected if not specified)"
+        },
+        "tokenStorage": {
+          "type": "string",
+          "enum": ["keychain", "filesystem", "memory"],
+          "description": "Token storage method (auto-detected if not specified)"
+        },
+        "callbackPort": {
+          "type": "number",
+          "description": "Specific port for OAuth2 callback server (auto-selected if not specified)"
+        },
+        "callbackPath": {
+          "type": "string",
+          "default": "/callback",
+          "description": "Callback path for OAuth2 flow"
+        }
+      },
+      "required": ["tokenUrl", "clientId"],
       "additionalProperties": false
     },
     "ApiPluginConfiguration": {
       "type": "object",
-      "description": "API-level plugin configuration override",
+      "description": "API-level plugin configuration override with variable substitution support",
       "properties": {
         "name": {
           "type": "string",
@@ -163,7 +278,7 @@
         },
         "config": {
           "type": "object",
-          "description": "Plugin-specific configuration overrides (merged with global plugin config)",
+          "description": "Plugin-specific configuration overrides (merged with global plugin config, supports {{variable}} substitution)",
           "additionalProperties": true
         }
       },
@@ -172,7 +287,7 @@
     },
     "ApiDefinition": {
       "type": "object",
-      "description": "API definition containing base URL and endpoints",
+      "description": "API definition containing base URL, endpoints, and plugin configurations",
       "properties": {
         "description": {
           "type": "string",
@@ -180,7 +295,7 @@
         },
         "baseUrl": {
           "type": "string",
-          "description": "Base URL for the API (can contain {{variable}} substitutions)",
+          "description": "Base URL for the API (supports {{variable}} substitutions including {{profile.*}}, {{secret.*}}, {{env.*}})",
           "pattern": "^(https?://|\\{\\{[^}]+\\}\\})"
         },
         "headers": {
@@ -193,11 +308,11 @@
         },
         "variables": {
           "$ref": "#/definitions/VariablesMap",
-          "description": "API-level variables"
+          "description": "API-level variables with precedence over global and profile variables"
         },
         "plugins": {
           "type": "array",
-          "description": "API-level plugin configuration overrides",
+          "description": "API-level plugin configuration overrides for API-specific behavior",
           "items": {
             "$ref": "#/definitions/ApiPluginConfiguration"
           }
@@ -218,7 +333,7 @@
     },
     "EndpointDefinition": {
       "type": "object",
-      "description": "HTTP endpoint definition",
+      "description": "HTTP endpoint definition with comprehensive variable support",
       "properties": {
         "description": {
           "type": "string",
@@ -231,7 +346,7 @@
         },
         "path": {
           "type": "string",
-          "description": "URL path (can contain {{variable}} substitutions)",
+          "description": "URL path (supports {{variable}} substitutions including path parameters like {{userId}})",
           "pattern": "^(/|\\{\\{[^}]+\\}\\})"
         },
         "headers": {
@@ -243,7 +358,7 @@
           "description": "Endpoint-specific query parameters (override API defaults)"
         },
         "body": {
-          "description": "Request body (can be object for JSON or string for other types)",
+          "description": "Request body (can be object for JSON or string for other types, supports {{variable}} substitution)",
           "oneOf": [
             { "type": "string" },
             { "type": "object" },
@@ -255,7 +370,7 @@
         },
         "variables": {
           "$ref": "#/definitions/VariablesMap",
-          "description": "Endpoint-level variables"
+          "description": "Endpoint-level variables with highest precedence"
         }
       },
       "required": ["method", "path"],
@@ -263,7 +378,7 @@
     },
     "ChainDefinition": {
       "type": "object",
-      "description": "Chain definition for multi-step request sequences",
+      "description": "Chain definition for multi-step request sequences with data passing between steps",
       "properties": {
         "description": {
           "type": "string",
@@ -271,11 +386,11 @@
         },
         "vars": {
           "$ref": "#/definitions/VariablesMap",
-          "description": "Chain-level variables"
+          "description": "Chain-level variables available to all steps"
         },
         "steps": {
           "type": "array",
-          "description": "Ordered list of request steps",
+          "description": "Ordered list of request steps with data flow support",
           "items": {
             "$ref": "#/definitions/ChainStep"
           },
@@ -287,12 +402,12 @@
     },
     "ChainStep": {
       "type": "object",
-      "description": "A single step in a chain",
+      "description": "A single step in a chain with advanced override capabilities",
       "properties": {
         "id": {
           "type": "string",
           "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
-          "description": "Unique identifier for this step within the chain"
+          "description": "Unique identifier for this step within the chain (used for {{steps.stepId.*}} references)"
         },
         "description": {
           "type": "string",
@@ -305,7 +420,7 @@
         },
         "with": {
           "$ref": "#/definitions/StepOverrides",
-          "description": "Step-specific overrides for headers, params, pathParams, or body"
+          "description": "Step-specific overrides for headers, params, pathParams, or body with full variable support"
         }
       },
       "required": ["id", "call"],
@@ -313,22 +428,22 @@
     },
     "StepOverrides": {
       "type": "object",
-      "description": "Step-specific overrides",
+      "description": "Step-specific overrides with comprehensive variable support including step data references",
       "properties": {
         "headers": {
           "$ref": "#/definitions/HeadersMap",
-          "description": "Override headers for this step"
+          "description": "Override headers for this step (supports {{steps.*}} variables from previous steps)"
         },
         "params": {
           "$ref": "#/definitions/ParamsMap",
-          "description": "Override query parameters for this step"
+          "description": "Override query parameters for this step (supports {{steps.*}} variables)"
         },
         "pathParams": {
           "$ref": "#/definitions/ParamsMap",
-          "description": "Path parameters for URL substitution"
+          "description": "Path parameters for URL substitution (e.g., {{userId}} in /users/{{userId}})"
         },
         "body": {
-          "description": "Override request body for this step",
+          "description": "Override request body for this step (supports {{steps.*}} variables for data passing)",
           "oneOf": [
             { "type": "string" },
             { "type": "object" },
@@ -343,21 +458,21 @@
     },
     "HeadersMap": {
       "type": "object",
-      "description": "HTTP headers map",
+      "description": "HTTP headers map with comprehensive variable substitution support",
       "patternProperties": {
         "^[a-zA-Z][a-zA-Z0-9-]*$": {
           "type": "string",
-          "description": "Header value (can contain {{variable}} substitutions)"
+          "description": "Header value (supports {{variable}} substitutions including {{secret.*}}, {{plugins.*}}, {{steps.*}})"
         }
       },
       "additionalProperties": false
     },
     "ParamsMap": {
       "type": "object",
-      "description": "Parameters map (query params or path params)",
+      "description": "Parameters map (query params or path params) with variable substitution",
       "patternProperties": {
         "^[a-zA-Z_][a-zA-Z0-9_]*$": {
-          "description": "Parameter value (can contain {{variable}} substitutions)",
+          "description": "Parameter value (supports {{variable}} substitutions including dynamic variables like {{$timestamp}})",
           "oneOf": [
             { "type": "string" },
             { "type": "number" },
@@ -369,10 +484,10 @@
     },
     "VariablesMap": {
       "type": "object",
-      "description": "Variables map",
+      "description": "Variables map with full variable system support and precedence rules",
       "patternProperties": {
         "^[a-zA-Z_][a-zA-Z0-9_]*$": {
-          "description": "Variable value",
+          "description": "Variable value (can reference other variables with {{variable}} syntax)",
           "oneOf": [
             { "type": "string" },
             { "type": "number" },
@@ -383,5 +498,81 @@
       },
       "additionalProperties": false
     }
-  }
+  },
+  "examples": [
+    {
+      "description": "Complete HttpCraft configuration with OAuth2, profiles, and chains",
+      "config": {
+        "defaultProfile": ["development", "auth"]
+      },
+      "profiles": {
+        "development": {
+          "apiUrl": "https://dev-api.example.com",
+          "debug": true
+        },
+        "auth": {
+          "clientId": "dev-client-id"
+        }
+      },
+      "plugins": [
+        {
+          "name": "oauth2",
+          "config": {
+            "grantType": "client_credentials",
+            "tokenUrl": "https://auth.example.com/oauth2/token",
+            "clientId": "{{env.OAUTH2_CLIENT_ID}}",
+            "clientSecret": "{{secret.OAUTH2_CLIENT_SECRET}}",
+            "scope": "api:read api:write"
+          }
+        }
+      ],
+      "apis": {
+        "userApi": {
+          "baseUrl": "{{profile.apiUrl}}/v1",
+          "endpoints": {
+            "getUser": {
+              "method": "GET",
+              "path": "/users/{{userId}}"
+            },
+            "createUser": {
+              "method": "POST",
+              "path": "/users",
+              "body": {
+                "name": "{{userName}}",
+                "email": "{{userEmail}}"
+              }
+            }
+          }
+        }
+      },
+      "chains": {
+        "userWorkflow": {
+          "vars": {
+            "userName": "Test User"
+          },
+          "steps": [
+            {
+              "id": "createUser",
+              "call": "userApi.createUser",
+              "with": {
+                "body": {
+                  "name": "{{chain.vars.userName}}",
+                  "email": "{{$timestamp}}@test.com"
+                }
+              }
+            },
+            {
+              "id": "getCreatedUser",
+              "call": "userApi.getUser",
+              "with": {
+                "pathParams": {
+                  "userId": "{{steps.createUser.response.body.id}}"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
 } 
