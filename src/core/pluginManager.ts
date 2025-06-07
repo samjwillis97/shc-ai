@@ -129,9 +129,9 @@ export class PluginManager {
     // First pass: identify configs that need variable resolution vs those that don't
     for (const mergedConfig of mergedConfigs) {
       if (apiPluginNames.has(mergedConfig.name)) {
-        // Check if this config contains secret variables that need resolution
+        // Check if this config contains any variables that need resolution
         const configStr = JSON.stringify(mergedConfig.config);
-        if (configStr.includes('{{secret.')) {
+        if (configStr.includes('{{')) {
           configsToResolve.push(mergedConfig);
         } else {
           configsToLoad.push(mergedConfig);

@@ -96,9 +96,6 @@ async function main() {
         await handleCompletionCommand({ shell: argv.shell as string });
       }
     )
-    .command('test', 'Test command', {}, () => {
-      console.log('Test command executed!');
-    })
     .option('config', {
       describe: 'Path to configuration file',
       type: 'string',
@@ -246,7 +243,6 @@ async function main() {
     );
     console.log('       httpcraft request <url>');
     console.log('       httpcraft completion <shell>');
-    console.log('       httpcraft test');
     console.log('');
     console.log('Use --help for more information.');
   }

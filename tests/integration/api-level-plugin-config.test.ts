@@ -10,8 +10,7 @@ const execFileAsync = promisify(execFile);
 describe('T10.4: Variable substitution in API-level plugin configurations', () => {
   let testDir: string;
   let configPath: string;
-  const pluginPath = path.join(process.cwd(), 'dist', 'cli', 'main.js');
-  const cliPath = path.join(process.cwd(), 'dist', 'cli', 'main.js');
+  const cliPath = path.join(process.cwd(), 'dist', 'index.js');
 
   beforeEach(async () => {
     // Create temporary directory for test files
@@ -20,11 +19,11 @@ describe('T10.4: Variable substitution in API-level plugin configurations', () =
 
     // Create test plugin
     const pluginContent = `
-module.exports = {
+export default {
   setup: (context) => {
-    context.registerPreRequestHook(async (request, config) => {
+    context.registerPreRequestHook(async (request) => {
       // Add plugin configuration to headers for verification
-      request.headers['X-Plugin-Config'] = JSON.stringify(config);
+      request.headers['X-Plugin-Config'] = JSON.stringify(context.config);
       return request;
     });
   }
@@ -78,7 +77,7 @@ apis:
   });
 
   it('should resolve variables in API-level plugin configurations from CLI variables', async () => {
-    const { stdout } = await execFileAsync('node', [
+    const { stdout, stderr } = await execFileAsync('node', [
       cliPath,
       'test-api',
       'test-endpoint',
@@ -94,8 +93,14 @@ apis:
       env: { ...process.env, TEST_ENV_VAR: 'envTestValue' }
     });
 
+    // Debug output if stdout is undefined
+    if (!stdout) {
+      console.error('CLI stdout is undefined. stderr:', stderr);
+      throw new Error(`CLI command failed. stderr: ${stderr}`);
+    }
+
     const response = JSON.parse(stdout);
-    const pluginConfig = JSON.parse(response.headers['X-Plugin-Config']);
+    const pluginConfig = JSON.parse(response.headers['x-plugin-config'] || response.headers['X-Plugin-Config']);
 
     // Verify that CLI variables overrode profile variables
     expect(pluginConfig.apiKey).toBe('cliTestValue');
@@ -126,7 +131,7 @@ apis:
     });
 
     const response = JSON.parse(stdout);
-    const pluginConfig = JSON.parse(response.headers['X-Plugin-Config']);
+    const pluginConfig = JSON.parse(response.headers['x-plugin-config'] || response.headers['X-Plugin-Config']);
 
     // Verify that profile variables were resolved
     expect(pluginConfig.apiKey).toBe('resolvedTestValue');
@@ -237,7 +242,7 @@ apis:
     ]);
 
     const response = JSON.parse(stdout);
-    const pluginConfig = JSON.parse(response.headers['X-Plugin-Config']);
+    const pluginConfig = JSON.parse(response.headers['x-plugin-config'] || response.headers['X-Plugin-Config']);
 
     // Verify complex nested object resolution
     expect(pluginConfig.connection.host).toBe('example.com');

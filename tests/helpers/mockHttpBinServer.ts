@@ -221,8 +221,24 @@ export class MockHttpBinServer {
       return;
     }
 
+    // Get appropriate status text for the status code
+    const statusTexts: Record<number, string> = {
+      200: 'OK',
+      201: 'Created',
+      204: 'No Content',
+      400: 'Bad Request',
+      401: 'Unauthorized',
+      403: 'Forbidden',
+      404: 'Not Found',
+      500: 'Internal Server Error',
+      502: 'Bad Gateway',
+      503: 'Service Unavailable'
+    };
+    
+    const statusText = statusTexts[statusCode] || 'Unknown';
+
     // For status endpoints, return empty body with the requested status
-    res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+    res.writeHead(statusCode, statusText, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({}));
   }
 

@@ -298,21 +298,25 @@ const plugin: Plugin = {
   async setup(context: PluginContext): Promise<void> {
     const config = context.config as OAuth2Config;
 
-    // Validate required configuration
-    if (!config.tokenUrl) {
-      return;
-    }
+    // Don't validate required configuration here since plugins can be loaded
+    // globally (without complete config) and then at API level (with complete config)
+    // Validation will happen when the plugin is actually used
 
-    if (!config.clientId) {
-      return;
-    }
-
-    // Initialize token storage
+    // Initialize token storage (this is safe to do multiple times)
     await initializeTokenStorage(config);
 
     // Register pre-request hook for automatic token injection
     context.registerPreRequestHook(async (request: HttpRequest) => {
       try {
+        // Validate required configuration when actually using the plugin
+        if (!config.tokenUrl) {
+          throw new Error('OAuth2 plugin requires tokenUrl in configuration');
+        }
+
+        if (!config.clientId) {
+          throw new Error('OAuth2 plugin requires clientId in configuration');
+        }
+
         const token = await getAccessToken(config);
         if (token) {
           const authHeader = `${config.tokenType || 'Bearer'} ${token}`;
@@ -327,6 +331,15 @@ const plugin: Plugin = {
 
     // Register variable sources for manual token access
     context.registerVariableSource('accessToken', async () => {
+      // Validate required configuration when accessing variables
+      if (!config.tokenUrl) {
+        throw new Error('OAuth2 plugin requires tokenUrl in configuration');
+      }
+
+      if (!config.clientId) {
+        throw new Error('OAuth2 plugin requires clientId in configuration');
+      }
+
       return await getAccessToken(config);
     });
 
@@ -336,6 +349,15 @@ const plugin: Plugin = {
 
     // Register parameterized function for custom scopes
     context.registerParameterizedVariableSource('getTokenWithScope', async (scope: string) => {
+      // Validate required configuration when accessing parameterized variables
+      if (!config.tokenUrl) {
+        throw new Error('OAuth2 plugin requires tokenUrl in configuration');
+      }
+
+      if (!config.clientId) {
+        throw new Error('OAuth2 plugin requires clientId in configuration');
+      }
+
       const scopedConfig = { ...config, scope };
       return await getAccessToken(scopedConfig);
     });

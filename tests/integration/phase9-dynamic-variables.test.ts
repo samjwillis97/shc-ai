@@ -9,7 +9,7 @@ const execFileAsync = promisify(execFile);
 
 describe('Phase 9 T9.6: Built-in Dynamic Variables Integration Tests', () => {
   const testConfigPath = join(process.cwd(), 'test-config-t9.6-dynamic.yaml');
-  const cliPath = join(process.cwd(), 'dist', 'cli', 'main.js');
+  const cliPath = join(process.cwd(), 'dist', 'index.js');
 
   beforeAll(async () => {
     // Create test configuration file
@@ -158,7 +158,8 @@ apis:
       ]);
 
       // Verbose output should show the request details with resolved dynamic variables
-      expect(stderr).toContain('[DRY RUN] GET ${testEnv.getTestBaseUrl()}/get');
+      const mockBaseUrl = testEnv.getTestBaseUrl();
+      expect(stderr).toContain(`[DRY RUN] GET ${mockBaseUrl}/get`);
       expect(stderr).toMatch(/X-Timestamp: \d+/);
       expect(stderr).toMatch(/X-Request-ID: [0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/);
     });

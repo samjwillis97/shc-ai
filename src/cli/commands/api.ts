@@ -349,13 +349,16 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       if (shouldExit) {
         process.stderr.write(`HTTP ${response.status} ${response.statusText}\n`);
         process.exit(1);
+      } else {
+        // If exit pattern doesn't match but we have an error status, still write to stderr
+        process.stderr.write(`HTTP ${response.status} ${response.statusText}\n`);
       }
     }
 
     // Output response body to stdout (as per PRD requirement)
     console.log(response.body);
 
-    // If HTTP error status, print error info to stderr but exit 0 (as per T1.6) unless --exit-on-http-error
+    // If HTTP error status, print error info to stderr but exit 0 (as per T1.6) only when no exitOnHttpError is set
     if (response.status >= 400 && !args.exitOnHttpError) {
       process.stderr.write(`HTTP ${response.status} ${response.statusText}\n`);
     }

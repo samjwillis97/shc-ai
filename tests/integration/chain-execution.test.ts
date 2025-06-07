@@ -652,7 +652,7 @@ chains:
       const config = `
 apis:
   httpbin:
-    baseUrl: "${mockBaseUrl}"
+    baseUrl: "${testEnv.getTestBaseUrl()}"
     endpoints:
       post:
         method: POST
@@ -691,7 +691,7 @@ chains:
       // The output should be the response body of the last step
       const output = JSON.parse(result.stdout);
       expect(output.json).toHaveProperty('original_message', 'Hello World');
-      expect(output.json).toHaveProperty('original_url', 'http://localhost:64971/post');
+      expect(output.json).toHaveProperty('original_url', `${testEnv.getTestBaseUrl()}/post`);
     });
 
     it('should handle complex JSONPath expressions in step variables', async () => {

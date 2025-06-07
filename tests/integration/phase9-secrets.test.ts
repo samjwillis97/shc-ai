@@ -9,7 +9,7 @@ const execFileAsync = promisify(execFile);
 
 describe('Phase 9 T9.4: Secret Variable Resolution Integration Tests', () => {
   const testConfigPath = join(process.cwd(), 'test-config-t9.4-secrets.yaml');
-  const cliPath = join(process.cwd(), 'dist', 'cli', 'main.js');
+  const cliPath = join(process.cwd(), 'dist', 'index.js');
 
   beforeAll(async () => {
     // Create test configuration file

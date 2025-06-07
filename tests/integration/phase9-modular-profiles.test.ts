@@ -9,7 +9,7 @@ import { testEnv } from '../helpers/testSetup';
 const execFileAsync = promisify(execFile);
 
 // Get the CLI path for testing
-const cliPath = path.resolve(process.cwd(), 'dist', 'cli', 'main.js');
+const cliPath = path.resolve(process.cwd(), 'dist', 'index.js');
 
 describe('Phase 9 Integration - Modular Profile Imports', () => {
   let tempDir: string;
@@ -274,7 +274,7 @@ profiles:
 
 apis:
   testApi:
-    baseUrl: "${mockBaseUrl}"
+    baseUrl: "${testEnv.getTestBaseUrl()}"
     endpoints:
       test:
         method: GET
@@ -306,7 +306,7 @@ profiles:
 
 apis:
   testApi:
-    baseUrl: "${mockBaseUrl}"
+    baseUrl: "${testEnv.getTestBaseUrl()}"
     endpoints:
       test:
         method: GET

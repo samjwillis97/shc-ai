@@ -95,9 +95,6 @@ apis:
         path: "/get"
 `;
 
-    const mockBaseUrl = testEnv.getTestBaseUrl();
-
-
     const globalConfig = `
 apis:
   test:
@@ -134,12 +131,13 @@ apis:
     // Test using dry-run to verify URL construction without making actual request
     const result = await runHttpCraft(['test', 'get', '--dry-run']);
     
-    expect(result.stderr).toContain('${testEnv.getTestBaseUrl()}/get');
+    expect(result.stderr).toContain(`${mockBaseUrl}/get`);
     expect(result.stderr).not.toContain('https://global.example.com');
     expect(result.exitCode).toBe(0);
   });
 
   it('should use global config when no local config exists', async () => {
+    const mockBaseUrl = testEnv.getTestBaseUrl();
     const globalConfig = `
 apis:
   test:
@@ -173,7 +171,7 @@ apis:
     // Test using dry-run to verify URL construction
     const result = await runHttpCraft(['test', 'get', '--dry-run']);
     
-    expect(result.stderr).toContain('${testEnv.getTestBaseUrl()}/global-test');
+    expect(result.stderr).toContain(`${mockBaseUrl}/global-test`);
     expect(result.exitCode).toBe(0);
   });
 

@@ -28,6 +28,7 @@ describe('Phase 9 Integration - Modular API Imports (T9.1)', () => {
 
   describe('Directory-based API Loading', () => {
     it('should execute requests using APIs loaded from directory', async () => {
+      const mockBaseUrl = testEnv.getTestBaseUrl();
       // Create APIs directory
       const apisDir = path.join(tempDir, 'apis');
       await fs.mkdir(apisDir, { recursive: true });
@@ -61,10 +62,11 @@ apis:
       ]);
 
       const response = JSON.parse(stdout);
-      expect(response.headers['X-Test-Source']).toBe('modular-api');
+      expect(response.headers['x-test-source'] || response.headers['X-Test-Source']).toBe('modular-api');
     });
 
     it('should handle multiple API files in directory', async () => {
+      const mockBaseUrl = testEnv.getTestBaseUrl();
       const apisDir = path.join(tempDir, 'apis');
       await fs.mkdir(apisDir, { recursive: true });
 
@@ -108,7 +110,7 @@ apis:
       ]);
 
       const response1 = JSON.parse(stdout1);
-      expect(response1.headers['X-Service']).toBe('service1');
+      expect(response1.headers['x-service'] || response1.headers['X-Service']).toBe('service1');
 
       // Test second service
       const { stdout: stdout2 } = await execFile('node', [
@@ -120,12 +122,13 @@ apis:
       ]);
 
       const response2 = JSON.parse(stdout2);
-      expect(response2.headers['X-Service']).toBe('service2');
+      expect(response2.headers['x-service'] || response2.headers['X-Service']).toBe('service2');
     });
   });
 
   describe('Mixed Import Methods', () => {
     it('should handle both directory and individual file imports', async () => {
+      const mockBaseUrl = testEnv.getTestBaseUrl();
       // Create APIs directory
       const apisDir = path.join(tempDir, 'apis');
       await fs.mkdir(apisDir, { recursive: true });
@@ -171,7 +174,7 @@ apis:
       ]);
 
       const response1 = JSON.parse(stdout1);
-      expect(response1.headers['X-Source']).toBe('directory');
+      expect(response1.headers['x-source'] || response1.headers['X-Source']).toBe('directory');
 
       // Test individually-loaded service
       const { stdout: stdout2 } = await execFile('node', [
@@ -183,12 +186,13 @@ apis:
       ]);
 
       const response2 = JSON.parse(stdout2);
-      expect(response2.headers['X-Source']).toBe('individual');
+      expect(response2.headers['x-source'] || response2.headers['X-Source']).toBe('individual');
     });
   });
 
   describe('Backward Compatibility', () => {
     it('should still work with direct API definitions', async () => {
+      const mockBaseUrl = testEnv.getTestBaseUrl();
       const configFile = path.join(tempDir, 'config.yaml');
       await fs.writeFile(configFile, `
 apis:
@@ -211,7 +215,7 @@ apis:
       ]);
 
       const response = JSON.parse(stdout);
-      expect(response.headers['X-Type']).toBe('direct');
+      expect(response.headers['x-type'] || response.headers['X-Type']).toBe('direct');
     });
   });
 
@@ -261,6 +265,7 @@ apis:
 
   describe('Tab Completion Integration', () => {
     it('should include modular APIs in completion', async () => {
+      const mockBaseUrl = testEnv.getTestBaseUrl();
       const apisDir = path.join(tempDir, 'apis');
       await fs.mkdir(apisDir, { recursive: true });
 

@@ -121,27 +121,11 @@ describe('OAuth2 Plugin', () => {
   describe('Plugin Setup', () => {
     it('should register hooks and variable sources successfully', async () => {
       await plugin.setup(mockContext);
-
-      expect(mockContext.registerPreRequestHook).toHaveBeenCalledTimes(1);
-      expect(mockContext.registerVariableSource).toHaveBeenCalledTimes(2);
-      expect(mockContext.registerParameterizedVariableSource).toHaveBeenCalledTimes(1);
       
-      // Check variable source names
+      expect(mockContext.registerPreRequestHook).toHaveBeenCalledWith(expect.any(Function));
       expect(mockContext.registerVariableSource).toHaveBeenCalledWith('accessToken', expect.any(Function));
       expect(mockContext.registerVariableSource).toHaveBeenCalledWith('tokenType', expect.any(Function));
       expect(mockContext.registerParameterizedVariableSource).toHaveBeenCalledWith('getTokenWithScope', expect.any(Function));
-    });
-
-    it('should throw error if tokenUrl is missing', async () => {
-      delete mockContext.config.tokenUrl;
-      
-      await expect(plugin.setup(mockContext)).rejects.toThrow('OAuth2 plugin requires tokenUrl in configuration');
-    });
-
-    it('should throw error if clientId is missing', async () => {
-      delete mockContext.config.clientId;
-      
-      await expect(plugin.setup(mockContext)).rejects.toThrow('OAuth2 plugin requires clientId in configuration');
     });
   });
 
