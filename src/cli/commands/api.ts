@@ -1,4 +1,4 @@
-import { configLoader, ConfigWithPath } from '../../core/configLoader.js';
+import { configLoader } from '../../core/configLoader.js';
 import { urlBuilder } from '../../core/urlBuilder.js';
 import { httpClient } from '../../core/httpClient.js';
 import { variableResolver, VariableResolutionError } from '../../core/variableResolver.js';
@@ -118,7 +118,7 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     }
 
     // Load and merge profile variables
-    let mergedProfileVars: Record<string, any> = {};
+    let mergedProfileVars: Record<string, unknown> = {};
     if (profileNames.length > 0) {
       if (!config.profiles) {
         console.error(
@@ -215,7 +215,7 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       // Only resolve the specific API properties we need, not all endpoints
       // This prevents variable resolution errors from other endpoints affecting the current request
       const resolvedApiBase: Pick<ApiDefinition, 'baseUrl' | 'headers' | 'params' | 'variables'> & {
-        endpoints?: any;
+        endpoints?: Record<string, EndpointDefinition>;
       } = {
         baseUrl: await variableResolver.resolveValue(api.baseUrl, variableContext),
         headers: api.headers
@@ -299,12 +299,12 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     let finalUrl = url;
     if (Object.keys(params).length > 0) {
       try {
-        const urlObj = new URL(finalUrl);
+        const urlObj = new globalThis.URL(finalUrl);
         Object.entries(params).forEach(([key, value]) => {
           urlObj.searchParams.set(key, String(value));
         });
         finalUrl = urlObj.toString();
-      } catch (error) {
+      } catch {
         // If URL is invalid, just log the error but continue without query params
         if (args.verbose) {
           process.stderr.write(`[WARNING] Invalid URL format, skipping query parameters: ${finalUrl}\n`);
@@ -362,17 +362,22 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     if (response.status >= 400 && !args.exitOnHttpError) {
       process.stderr.write(`HTTP ${response.status} ${response.statusText}\n`);
     }
-  } catch (error) {
-    if (error instanceof VariableResolutionError) {
-      console.error(`Variable Error: ${error.message}`);
-      process.exit(1);
-    } else if (error instanceof Error) {
-      console.error(`Error: ${error.message}`);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      process.stderr.write(`Configuration Error: ${error.message}\n`);
     } else {
-      console.error('Error: Unknown error occurred');
+      process.stderr.write(`Configuration Error: ${String(error)}\n`);
     }
     process.exit(1);
   }
+}
+
+interface RequestDetails {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  params: Record<string, unknown>;
+  body?: unknown;
 }
 
 /**
@@ -380,7 +385,7 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
  * T9.5: Added secret masking support
  */
 function printRequestDetails(
-  request: any,
+  request: RequestDetails,
   isDryRun: boolean,
   variableResolver?: VariableResolver
 ): void {
@@ -420,10 +425,16 @@ function printRequestDetails(
   process.stderr.write('\n');
 }
 
+interface ResponseDetails {
+  status: number;
+  statusText: string;
+  headers?: Record<string, unknown>;
+}
+
 /**
  * Print response details to stderr
  */
-function printResponseDetails(response: any, duration: number): void {
+function printResponseDetails(response: ResponseDetails, duration: number): void {
   process.stderr.write(`[RESPONSE] ${response.status} ${response.statusText} (${duration}ms)\n`);
 
   if (response.headers && Object.keys(response.headers).length > 0) {

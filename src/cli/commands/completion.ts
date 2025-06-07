@@ -1,5 +1,7 @@
-import { configLoader, ConfigWithPath } from '../../core/configLoader.js';
-import type { HttpCraftConfig } from '../../types/config.js';
+import { configLoader } from '../../core/configLoader.js';
+import type {
+  HttpCraftConfig,
+} from '../../types/config.js';
 
 export interface CompletionCommandArgs {
   shell: string;
@@ -26,96 +28,110 @@ export interface GetProfileNamesArgs {
  * Handle the completion zsh command that outputs the ZSH completion script
  */
 export async function handleCompletionCommand(args: CompletionCommandArgs): Promise<void> {
-  if (args.shell !== 'zsh') {
-    console.error('Error: Only ZSH completion is currently supported');
+  if (args.shell === 'zsh') {
+    console.log(generateZshCompletion());
+  } else {
+    console.error(`Error: Shell '${args.shell}' is not supported`);
     process.exit(1);
   }
-
-  const completionScript = generateZshCompletionScript();
-  console.log(completionScript);
 }
 
 /**
  * Generate the ZSH completion script
  */
-function generateZshCompletionScript(): string {
+function generateZshCompletion(): string {
   return `#compdef httpcraft
 
+_httpcraft_apis() {
+  local apis
+  apis=($(httpcraft --get-api-names 2>/dev/null))
+  _describe 'API' apis
+}
+
+_httpcraft_endpoints() {
+  local endpoints
+  if [[ -n $words[3] ]]; then
+    endpoints=($(httpcraft --get-endpoint-names $words[3] 2>/dev/null))
+    _describe 'endpoint' endpoints
+  fi
+}
+
+_httpcraft_chains() {
+  local chains
+  chains=($(httpcraft --get-chain-names 2>/dev/null))
+  _describe 'chain' chains
+}
+
 _httpcraft_profiles() {
-    local -a profile_names
-    profile_names=($(httpcraft --get-profile-names 2>/dev/null))
-    _describe 'profile' profile_names
+  local profiles
+  profiles=($(httpcraft --get-profile-names 2>/dev/null))
+  _describe 'profile' profiles
 }
 
 _httpcraft() {
-    local state line
-    typeset -A opt_args
+  local context state line
+  typeset -A opt_args
 
-    _arguments -C \\
-        '1: :->command' \\
-        '2: :->subcommand' \\
-        '--config[Path to configuration file]:config file:_files -g "*.yaml"' \\
-        '*--var[Set or override a variable]:variable:' \\
-        '*--profile[Select profile(s) to use]:profile:_httpcraft_profiles' \\
-        '--verbose[Output detailed request and response information]' \\
-        '--dry-run[Display the request without sending it]' \\
-        '--exit-on-http-error[Exit with non-zero code for HTTP errors]:error pattern:' \\
-        '--chain-output[Output format for chains]:output format:(default full)' \\
-        '--help[Show help]' \\
-        '--version[Show version]' \\
-        '*: :->args' && return 0
+  _arguments -C \\
+    '1: :->command' \\
+    '*: :->args' \\
+    '(--config)--config[Configuration file]:config file:_files -g "*.yaml" -g "*.yml"' \\
+    '(--var)--var[Variable assignment]:variable assignment:' \\
+    '(--profile)--profile[Profile to use]:profile:_httpcraft_profiles' \\
+    '(--verbose)--verbose[Verbose output]' \\
+    '(--dry-run)--dry-run[Dry run mode]' \\
+    '(--exit-on-http-error)--exit-on-http-error[Exit on HTTP error]:error pattern:' \\
+    '(--no-default-profile)--no-default-profile[Do not use default profiles]' \\
+    '(--chain-output)--chain-output[Chain output format]:format:(default full)' \\
+    '(--version)--version[Show version]' \\
+    '(--help)--help[Show help]'
 
-    case $state in
-        command)
-            local -a commands
-            commands=(
-                'request:Make an HTTP GET request to the specified URL'
-                'chain:Execute a chain of HTTP requests'
-                'completion:Generate shell completion script'
-            )
-            
-            # Get API names dynamically
-            local -a api_names
-            api_names=($(httpcraft --get-api-names 2>/dev/null))
-            
-            # Add API names to commands
-            for api_name in $api_names; do
-                commands+=("$api_name")
-            done
-            
-            _describe 'command' commands
-            ;;
-        subcommand)
-            local cmd=$line[1]
-            
-            case $cmd in
-                chain)
-                    # Complete chain names after 'httpcraft chain'
-                    local -a chain_names
-                    chain_names=($(httpcraft --get-chain-names 2>/dev/null))
-                    _describe 'chain name' chain_names
-                    ;;
-                completion)
-                    # Complete shell types for completion command
-                    _describe 'shell' '(zsh)'
-                    ;;
-                request)
-                    # Complete URLs - just show a placeholder message
-                    _message 'URL to request'
-                    ;;
-                *)
-                    # For API names, complete endpoint names
-                    local -a endpoint_names
-                    endpoint_names=($(httpcraft --get-endpoint-names "$cmd" 2>/dev/null))
-                    _describe 'endpoint' endpoint_names
-                    ;;
-            esac
-            ;;
-    esac
+  case $state in
+    (command)
+      local commands
+      commands=(
+        'completion:Generate shell completion script'
+        'request:Make a direct HTTP request'
+        'chain:Execute a chain of requests'
+      )
+      
+      # Add API commands dynamically
+      local apis
+      apis=($(httpcraft --get-api-names 2>/dev/null))
+      for api in $apis; do
+        commands+=("$api:Execute API endpoints")
+      done
+      
+      _describe 'command' commands
+      ;;
+    (args)
+      case $words[2] in
+        (completion)
+          _arguments \\
+            '1: :_values "shell" zsh'
+          ;;
+        (request)
+          _arguments \\
+            '1: :_urls'
+          ;;
+        (chain)
+          _arguments \\
+            '1: :_httpcraft_chains'
+          ;;
+        (*)
+          # Handle API endpoints
+          local apis
+          apis=($(httpcraft --get-api-names 2>/dev/null))
+          if [[ " $apis " =~ " $words[2] " ]]; then
+            _httpcraft_endpoints
+          fi
+          ;;
+      esac
+      ;;
+  esac
 }
 
-# Register the completion function with compdef
-compdef _httpcraft httpcraft`;
+_httpcraft "$@"`;
 }
 
 /**
@@ -123,28 +139,24 @@ compdef _httpcraft httpcraft`;
  */
 export async function handleGetApiNamesCommand(args: GetApiNamesArgs): Promise<void> {
   try {
-    // Load configuration
     let config: HttpCraftConfig;
 
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
     } else {
-      const defaultConfigResult = await configLoader.loadDefaultConfig();
-      if (!defaultConfigResult) {
-        // Silently exit if no config found - completion should not error
+      const defaultConfig = await configLoader.loadDefaultConfig();
+      if (!defaultConfig) {
+        // Silently exit if no config found - completion should be graceful
         return;
       }
-      config = defaultConfigResult.config;
+      config = defaultConfig.config;
     }
 
-    // Output API names, one per line
     const apiNames = Object.keys(config.apis || {});
-    for (const apiName of apiNames) {
-      console.log(apiName);
-    }
-  } catch (error) {
-    // Silently fail for completion - errors would break tab completion
-    // User can use regular commands to see actual errors
+    console.log(apiNames.join('\n'));
+  } catch {
+    // Silently ignore errors in completion to avoid breaking tab completion
+    return;
   }
 }
 
@@ -153,31 +165,30 @@ export async function handleGetApiNamesCommand(args: GetApiNamesArgs): Promise<v
  */
 export async function handleGetEndpointNamesCommand(args: GetEndpointNamesArgs): Promise<void> {
   try {
-    // Load configuration
     let config: HttpCraftConfig;
 
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
     } else {
-      const defaultConfigResult = await configLoader.loadDefaultConfig();
-      if (!defaultConfigResult) {
-        // Silently exit if no config found - completion should not error
+      const defaultConfig = await configLoader.loadDefaultConfig();
+      if (!defaultConfig) {
+        // Silently exit if no config found - completion should be graceful
         return;
       }
-      config = defaultConfigResult.config;
+      config = defaultConfig.config;
     }
 
-    // Find the API and output its endpoint names
     const api = config.apis?.[args.apiName];
-    if (api && api.endpoints) {
-      const endpointNames = Object.keys(api.endpoints);
-      for (const endpointName of endpointNames) {
-        console.log(endpointName);
-      }
+    if (!api) {
+      // Silently exit if API not found - completion should be graceful
+      return;
     }
-  } catch (error) {
-    // Silently fail for completion - errors would break tab completion
-    // User can use regular commands to see actual errors
+
+    const endpointNames = Object.keys(api.endpoints || {});
+    console.log(endpointNames.join('\n'));
+  } catch {
+    // Silently ignore errors in completion to avoid breaking tab completion
+    return;
   }
 }
 
@@ -186,28 +197,24 @@ export async function handleGetEndpointNamesCommand(args: GetEndpointNamesArgs):
  */
 export async function handleGetChainNamesCommand(args: GetChainNamesArgs): Promise<void> {
   try {
-    // Load configuration
     let config: HttpCraftConfig;
 
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
     } else {
-      const defaultConfigResult = await configLoader.loadDefaultConfig();
-      if (!defaultConfigResult) {
-        // Silently exit if no config found - completion should not error
+      const defaultConfig = await configLoader.loadDefaultConfig();
+      if (!defaultConfig) {
+        // Silently exit if no config found - completion should be graceful
         return;
       }
-      config = defaultConfigResult.config;
+      config = defaultConfig.config;
     }
 
-    // Output chain names, one per line
     const chainNames = Object.keys(config.chains || {});
-    for (const chainName of chainNames) {
-      console.log(chainName);
-    }
-  } catch (error) {
-    // Silently fail for completion - errors would break tab completion
-    // User can use regular commands to see actual errors
+    console.log(chainNames.join('\n'));
+  } catch {
+    // Silently ignore errors in completion to avoid breaking tab completion
+    return;
   }
 }
 
@@ -216,27 +223,23 @@ export async function handleGetChainNamesCommand(args: GetChainNamesArgs): Promi
  */
 export async function handleGetProfileNamesCommand(args: GetProfileNamesArgs): Promise<void> {
   try {
-    // Load configuration
     let config: HttpCraftConfig;
 
     if (args.config) {
       config = await configLoader.loadConfig(args.config);
     } else {
-      const defaultConfigResult = await configLoader.loadDefaultConfig();
-      if (!defaultConfigResult) {
-        // Silently exit if no config found - completion should not error
+      const defaultConfig = await configLoader.loadDefaultConfig();
+      if (!defaultConfig) {
+        // Silently exit if no config found - completion should be graceful
         return;
       }
-      config = defaultConfigResult.config;
+      config = defaultConfig.config;
     }
 
-    // Output profile names, one per line
     const profileNames = Object.keys(config.profiles || {});
-    for (const profileName of profileNames) {
-      console.log(profileName);
-    }
-  } catch (error) {
-    // Silently fail for completion - errors would break tab completion
-    // User can use regular commands to see actual errors
+    console.log(profileNames.join('\n'));
+  } catch {
+    // Silently ignore errors in completion to avoid breaking tab completion
+    return;
   }
 }
