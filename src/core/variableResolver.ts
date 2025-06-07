@@ -3,7 +3,7 @@
  * Supports {{variable}} syntax with precedence rules
  */
 
-import { VariableSource } from '../types/plugin.js';
+import { VariableSource, ParameterizedVariableSource, HttpResponse } from '../types/plugin.js';
 import { JSONPath } from 'jsonpath-plus';
 import type { StepExecutionResult } from './chainExecutor.js';
 
@@ -30,6 +30,10 @@ export interface VariableContext {
   chainVars?: Record<string, unknown>;
   steps?: import('./chainExecutor.js').StepExecutionResult[];
   stepWith?: Record<string, unknown>;
+  env?: Record<string, string>;
+  api?: Record<string, unknown>;
+  endpoint?: Record<string, unknown>;
+  plugins?: Record<string, Record<string, VariableSource>>;
 }
 
 export class VariableResolutionError extends Error {
@@ -340,7 +344,7 @@ export class VariableResolver {
 
     switch (scope) {
       case 'env':
-        if (context.env[key] !== undefined) {
+        if (context.env && context.env[key] !== undefined) {
           return context.env[key];
         }
         throw new VariableResolutionError(
@@ -374,7 +378,7 @@ export class VariableResolver {
         }
         
         // T9.4: Fall back to environment variable (original behavior)
-        if (context.env[key] !== undefined) {
+        if (context.env && context.env[key] !== undefined) {
           this.secretVariables.add(variableName);
           this.secretValues.set(variableName, context.env[key]);
           return context.env[key];
@@ -654,13 +658,17 @@ export class VariableResolver {
   ): VariableContext {
     return {
       cliVariables: { ...cliVars },
-      profiles: profiles ? { ...profiles } : undefined,
+      profiles: profiles ? { ...profiles } : {},
       apiVariables: api ? { ...api } : undefined,
       endpointVariables: endpoint ? { ...endpoint } : undefined,
       pluginVariables: plugins ? { ...plugins } : undefined,
       parameterizedPluginSources: parameterizedPlugins ? { ...parameterizedPlugins } : undefined, // T10.15
       globalVariables: globalVariables ? { ...globalVariables } : undefined, // T9.3
       env: { ...process.env } as Record<string, string>,
+      // Also set the direct api/endpoint properties for scoped resolution
+      api: api ? { ...api } : undefined,
+      endpoint: endpoint ? { ...endpoint } : undefined,
+      plugins: plugins ? { ...plugins } : undefined,
     };
   }
 
@@ -1037,7 +1045,7 @@ export class VariableResolver {
   async resolveStepsVariable(stepPath: string, steps: import('./chainExecutor.js').StepExecutionResult[]): Promise<unknown> {
     const parts = stepPath.split('.');
     if (parts.length < 2) {
-      throw new VariableResolutionError(`Invalid steps path: ${stepPath}. Expected format: stepId.property[.subproperty...]`);
+      throw new VariableResolutionError(`Invalid steps path: ${stepPath}. Expected format: stepId.property[.subproperty...]`, stepPath);
     }
 
     const [stepId, property, ...subPath] = parts;
@@ -1045,7 +1053,7 @@ export class VariableResolver {
     // Find the step by ID
     const step = steps.find(s => s.stepId === stepId);
     if (!step) {
-      throw new VariableResolutionError(`Step '${stepId}' not found in executed steps`);
+      throw new VariableResolutionError(`Step '${stepId}' not found in executed steps`, stepPath);
     }
 
     let value: unknown;
@@ -1063,7 +1071,7 @@ export class VariableResolver {
         value = step.error;
         break;
       default:
-        throw new VariableResolutionError(`Invalid step property '${property}'. Available: request, response, success, error`);
+        throw new VariableResolutionError(`Invalid step property '${property}'. Available: request, response, success, error`, stepPath);
     }
 
     // If there's a subpath, navigate into the object

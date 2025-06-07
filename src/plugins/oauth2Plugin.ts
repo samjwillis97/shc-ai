@@ -296,7 +296,7 @@ async function initializeTokenStorage(config: OAuth2Config): Promise<TokenStorag
 
 const plugin: Plugin = {
   async setup(context: PluginContext): Promise<void> {
-    const config = context.config as OAuth2Config;
+    const config = context.config as unknown as OAuth2Config;
 
     // Don't validate required configuration here since plugins can be loaded
     // globally (without complete config) and then at API level (with complete config)
@@ -348,7 +348,9 @@ const plugin: Plugin = {
     });
 
     // Register parameterized function for custom scopes
-    context.registerParameterizedVariableSource('getTokenWithScope', async (scope: string) => {
+    context.registerParameterizedVariableSource('getTokenWithScope', async (...args: unknown[]) => {
+      const scope = args[0] as string;
+      
       // Validate required configuration when accessing parameterized variables
       if (!config.tokenUrl) {
         throw new Error('OAuth2 plugin requires tokenUrl in configuration');

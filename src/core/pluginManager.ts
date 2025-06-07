@@ -15,6 +15,7 @@ import type {
 import type {
   Plugin,
   PluginContext,
+  PluginInstance,
   VariableSource,
   ParameterizedVariableSource,
   SecretResolver,
@@ -27,17 +28,6 @@ import type { VariableContext } from './variableResolver.js';
 
 const require = createRequire(import.meta.url);
 
-export interface PluginInstance {
-  name: string;
-  config?: Record<string, unknown>;
-  instance?: Plugin;
-  variableSources?: Record<string, VariableSource>;
-  parameterizedVariableSources?: Record<string, ParameterizedVariableSource>;
-  secretResolvers?: SecretResolver[];
-  preRequestHooks?: PreRequestHook[];
-  postResponseHooks?: PostResponseHook[];
-}
-
 // Built-in plugins registry
 const BUILTIN_PLUGINS: Record<string, string> = {
   oauth2: 'oauth2Plugin.js',
@@ -48,11 +38,7 @@ export class PluginManager {
   private globalPluginConfigs: PluginConfiguration[] = [];
 
   constructor() {
-    // Clear module cache for testing environments
-    const originalRequire = module.require;
-    if (originalRequire) {
-      module.require = originalRequire;
-    }
+    // Constructor is now empty - no module cache manipulation needed
   }
 
   /**

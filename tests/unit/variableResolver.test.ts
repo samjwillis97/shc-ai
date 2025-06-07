@@ -10,11 +10,12 @@ describe('VariableResolver', () => {
   beforeEach(() => {
     resolver = new VariableResolver();
     mockContext = {
-      cli: {
+      cliVariables: {
         userId: '123',
         apiKey: 'cli-api-key',
         name: 'John'
       },
+      profiles: {},
       env: {
         USER: 'testuser',
         NODE_ENV: 'test',
@@ -177,9 +178,9 @@ describe('VariableResolver', () => {
         const cliVars = { apiKey: 'cli-key', userId: '456' };
         const context = resolver.createContext(cliVars);
         
-        expect(context.cli).toEqual(cliVars);
-        expect(context.env.TEST_VAR).toBe('test_value');
-        expect(context.env.USER).toBe('testuser');
+        expect(context.cliVariables).toEqual(cliVars);
+        expect(context.env?.TEST_VAR).toBe('test_value');
+        expect(context.env?.USER).toBe('testuser');
       } finally {
         process.env = originalEnv;
       }
@@ -189,7 +190,7 @@ describe('VariableResolver', () => {
       const cliVars: Record<string, string> = { apiKey: 'test' };
       const context = resolver.createContext(cliVars);
       
-      context.cli.newVar = 'added';
+      context.cliVariables.newVar = 'added';
       expect(cliVars.newVar).toBeUndefined();
     });
   });
@@ -203,7 +204,9 @@ describe('VariableResolver', () => {
 
     it('should resolve environment variables with env. prefix', async () => {
       const context = resolver.createContext({}, undefined, undefined, undefined);
-      context.env.TEST_VAR = 'test_value';
+      if (context.env) {
+        context.env.TEST_VAR = 'test_value';
+      }
       
       const result = await resolver.resolve('Value: {{env.TEST_VAR}}', context);
       expect(result).toBe('Value: test_value');
@@ -211,7 +214,9 @@ describe('VariableResolver', () => {
 
     it('should handle CLI variables taking precedence over environment', async () => {
       const context = resolver.createContext({ test: 'cli_value' });
-      context.env.test = 'env_value';
+      if (context.env) {
+        context.env.test = 'env_value';
+      }
       
       const result = await resolver.resolve('{{test}}', context);
       expect(result).toBe('cli_value');
@@ -302,7 +307,9 @@ describe('VariableResolver', () => {
         { test: 'api_value' },                    // API
         { test: 'endpoint_value' }                // Endpoint
       );
-      context.env.test = 'env_value';            // Environment (lowest)
+      if (context.env) {
+        context.env.test = 'env_value';            // Environment (lowest)
+      }
       
       const result = await resolver.resolve('{{test}}', context);
       expect(result).toBe('cli_value');
@@ -315,7 +322,9 @@ describe('VariableResolver', () => {
         { test: 'api_value' },                    // API
         { test: 'endpoint_value' }                // Endpoint
       );
-      context.env.test = 'env_value';            // Environment
+      if (context.env) {
+        context.env.test = 'env_value';            // Environment
+      }
       
       const result = await resolver.resolve('{{test}}', context);
       expect(result).toBe('endpoint_value');
@@ -328,7 +337,9 @@ describe('VariableResolver', () => {
         { test: 'api_value' },                    // API
         {}                                        // No endpoint
       );
-      context.env.test = 'env_value';            // Environment
+      if (context.env) {
+        context.env.test = 'env_value';            // Environment
+      }
       
       const result = await resolver.resolve('{{test}}', context);
       expect(result).toBe('api_value');
@@ -341,7 +352,9 @@ describe('VariableResolver', () => {
         {},                                       // No API
         {}                                        // No endpoint
       );
-      context.env.test = 'env_value';            // Environment
+      if (context.env) {
+        context.env.test = 'env_value';            // Environment
+      }
       
       const result = await resolver.resolve('{{test}}', context);
       expect(result).toBe('profile_value');
@@ -354,7 +367,9 @@ describe('VariableResolver', () => {
         {},                                       // No API
         {}                                        // No endpoint
       );
-      context.env.test = 'env_value';            // Environment
+      if (context.env) {
+        context.env.test = 'env_value';            // Environment
+      }
       
       // Environment variables should only be accessible via env. prefix according to PRD
       const result = await resolver.resolve('{{env.test}}', context);
@@ -370,7 +385,9 @@ describe('VariableResolver', () => {
         { apiVar: 'api_val' },
         { endpointVar: 'endpoint_val' }
       );
-      context.env.ENV_VAR = 'env_val';
+      if (context.env) {
+        context.env.ENV_VAR = 'env_val';
+      }
       
       const template = 'CLI: {{cliVar}}, Profile: {{profile.profileVar}}, API: {{api.apiVar}}, Endpoint: {{endpoint.endpointVar}}, Env: {{env.ENV_VAR}}';
       const result = await resolver.resolve(template, context);
@@ -506,7 +523,9 @@ describe('VariableResolver', () => {
 
     it('should handle variables in complex paths', async () => {
       const context = resolver.createContext({}, undefined, undefined, undefined);
-      context.env['COMPLEX_PATH'] = '/path/to/resource';
+      if (context.env) {
+        context.env['COMPLEX_PATH'] = '/path/to/resource';
+      }
       
       const result = await resolver.resolve('{{env.COMPLEX_PATH}}', context);
       expect(result).toBe('/path/to/resource');
@@ -767,7 +786,8 @@ describe('VariableResolver', () => {
         globalVariables: {
           testVar: 'global-value'
         },
-        cli: {
+        cliVariables: {
+          ...mockContext.cliVariables,
           testVar: 'cli-value'
         }
       };
@@ -797,7 +817,7 @@ describe('VariableResolver', () => {
         globalVariables: {
           testVar: 'global-value'
         },
-        api: {
+        apiVariables: {
           testVar: 'api-value'
         }
       };
@@ -812,7 +832,7 @@ describe('VariableResolver', () => {
         globalVariables: {
           testVar: 'global-value'
         },
-        endpoint: {
+        endpointVariables: {
           testVar: 'endpoint-value'
         }
       };
@@ -1512,7 +1532,7 @@ describe('VariableResolver', () => {
       const resolvedNested = await resolver.resolve(nestedTemplate, context);
       
       // Add the resolved nested variable to CLI context
-      context.cli.nestedVar = resolvedNested;
+      context.cliVariables.nestedVar = resolvedNested;
 
       // The nestedVar should use CLI baseVar due to precedence
       const result = await resolver.resolve('{{nestedVar}}', context);

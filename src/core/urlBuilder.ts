@@ -25,7 +25,18 @@ export class UrlBuilder {
     const apiParams = api.params || {};
     const endpointParams = endpoint.params || {};
 
-    return { ...apiParams, ...endpointParams };
+    // Convert unknown values to strings
+    const convertedApiParams: Record<string, string> = {};
+    for (const [key, value] of Object.entries(apiParams)) {
+      convertedApiParams[key] = String(value);
+    }
+
+    const convertedEndpointParams: Record<string, string> = {};
+    for (const [key, value] of Object.entries(endpointParams)) {
+      convertedEndpointParams[key] = String(value);
+    }
+
+    return { ...convertedApiParams, ...convertedEndpointParams };
   }
 
   /**
@@ -39,7 +50,18 @@ export class UrlBuilder {
     const apiHeaders = api.headers || {};
     const endpointHeaders = endpoint.headers || {};
 
-    return { ...apiHeaders, ...endpointHeaders };
+    // Convert unknown values to strings
+    const convertedApiHeaders: Record<string, string> = {};
+    for (const [key, value] of Object.entries(apiHeaders)) {
+      convertedApiHeaders[key] = String(value);
+    }
+
+    const convertedEndpointHeaders: Record<string, string> = {};
+    for (const [key, value] of Object.entries(endpointHeaders)) {
+      convertedEndpointHeaders[key] = String(value);
+    }
+
+    return { ...convertedApiHeaders, ...convertedEndpointHeaders };
   }
 }
 
