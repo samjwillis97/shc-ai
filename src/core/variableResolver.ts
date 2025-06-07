@@ -20,20 +20,16 @@ export interface FunctionArgument {
 }
 
 export interface VariableContext {
-  cli: Record<string, string>;
-  stepWith?: Record<string, any>; // For future chain steps
-  chainVars?: Record<string, any>; // For future chains
-  endpoint?: Record<string, any>;
-  api?: Record<string, any>;
-  profiles?: Record<string, any>; // Merged profile variables
-  globalVariables?: Record<string, any>; // T9.3: Global variable files
-  plugins?: Record<string, Record<string, VariableSource>>; // Plugin variable sources
-  parameterizedPlugins?: Record<
-    string,
-    Record<string, import('../types/plugin.js').ParameterizedVariableSource>
-  >; // T10.15: Parameterized plugin variable sources
-  env: Record<string, string>;
-  steps?: StepExecutionResult[]; // T8.8 & T8.9: Step execution results for chains
+  cliVariables: Record<string, string>;
+  profiles: Record<string, unknown>;
+  apiVariables?: Record<string, unknown>;
+  endpointVariables?: Record<string, unknown>;
+  pluginVariables?: Record<string, Record<string, VariableSource>>;
+  globalVariables?: Record<string, unknown>;
+  parameterizedPluginSources?: Record<string, Record<string, ParameterizedVariableSource>>;
+  chainVars?: Record<string, unknown>;
+  steps?: import('./chainExecutor.js').StepExecutionResult[];
+  stepWith?: Record<string, unknown>;
 }
 
 export class VariableResolutionError extends Error {
@@ -556,8 +552,8 @@ export class VariableResolver {
    */
   private resolveUnscopedVariable(variableName: string, context: VariableContext): any {
     // 1. CLI variables (highest precedence)
-    if (context.cli[variableName] !== undefined) {
-      return context.cli[variableName];
+    if (context.cliVariables[variableName] !== undefined) {
+      return context.cliVariables[variableName];
     }
 
     // 2. Step with overrides (for future chains)
@@ -571,13 +567,13 @@ export class VariableResolver {
     }
 
     // 4. Endpoint-specific variables
-    if (context.endpoint && context.endpoint[variableName] !== undefined) {
-      return context.endpoint[variableName];
+    if (context.endpointVariables && context.endpointVariables[variableName] !== undefined) {
+      return context.endpointVariables[variableName];
     }
 
     // 5. API-specific variables
-    if (context.api && context.api[variableName] !== undefined) {
-      return context.api[variableName];
+    if (context.apiVariables && context.apiVariables[variableName] !== undefined) {
+      return context.apiVariables[variableName];
     }
 
     // 6. Profile variables (merged)
@@ -657,12 +653,12 @@ export class VariableResolver {
     > // T10.15: Parameterized plugins
   ): VariableContext {
     return {
-      cli: { ...cliVars },
+      cliVariables: { ...cliVars },
       profiles: profiles ? { ...profiles } : undefined,
-      api: api ? { ...api } : undefined,
-      endpoint: endpoint ? { ...endpoint } : undefined,
-      plugins: plugins ? { ...plugins } : undefined,
-      parameterizedPlugins: parameterizedPlugins ? { ...parameterizedPlugins } : undefined, // T10.15
+      apiVariables: api ? { ...api } : undefined,
+      endpointVariables: endpoint ? { ...endpoint } : undefined,
+      pluginVariables: plugins ? { ...plugins } : undefined,
+      parameterizedPluginSources: parameterizedPlugins ? { ...parameterizedPlugins } : undefined, // T10.15
       globalVariables: globalVariables ? { ...globalVariables } : undefined, // T9.3
       env: { ...process.env } as Record<string, string>,
     };
@@ -822,14 +818,14 @@ export class VariableResolver {
   ): Promise<string> {
     const functionCall = this.parseFunctionCall(variableName);
 
-    if (!context.parameterizedPlugins || !context.parameterizedPlugins[functionCall.pluginName]) {
+    if (!context.parameterizedPluginSources || !context.parameterizedPluginSources[functionCall.pluginName]) {
       throw new VariableResolutionError(
         `Plugin '${functionCall.pluginName}' not found or has no parameterized functions`,
         variableName
       );
     }
 
-    const pluginFunctions = context.parameterizedPlugins[functionCall.pluginName];
+    const pluginFunctions = context.parameterizedPluginSources[functionCall.pluginName];
     if (!pluginFunctions[functionCall.functionName]) {
       throw new VariableResolutionError(
         `Parameterized function '${functionCall.functionName}' not found in plugin '${functionCall.pluginName}'`,
@@ -985,6 +981,119 @@ export class VariableResolver {
     }
 
     return args;
+  }
+
+  /**
+   * T8.7: Enhanced to handle both numeric and non-numeric array indices
+   */
+  resolveArrayAccess(value: unknown, accessPath: string[]): unknown {
+    if (!value || typeof value !== 'object') {
+      return undefined;
+    }
+
+    let current: unknown = value;
+    for (const segment of accessPath) {
+      if (current === null || current === undefined) {
+        return undefined;
+      }
+
+      if (Array.isArray(current)) {
+        const index = parseInt(segment, 10);
+        if (!isNaN(index)) {
+          current = current[index];
+        } else {
+          return undefined; // Non-numeric index on array
+        }
+      } else if (typeof current === 'object') {
+        current = (current as Record<string, unknown>)[segment];
+      } else {
+        return undefined;
+      }
+    }
+
+    return current;
+  }
+
+  private getProfiles(context: VariableContext): Record<string, unknown> {
+    // Remove unused variable assignment
+    const resolvedProfiles: Record<string, unknown> = {};
+
+    // Merge all profiles
+    Object.assign(resolvedProfiles, context.profiles);
+
+    return resolvedProfiles;
+  }
+
+  private extractVariableValue(response: HttpResponse, path: string): unknown {
+    try {
+      const parsedBody = JSON.parse(response.body);
+      return this.resolveArrayAccess(parsedBody, path.split('.'));
+    } catch {
+      // If parsing fails, return the raw body
+      return response.body;
+    }
+  }
+
+  async resolveStepsVariable(stepPath: string, steps: import('./chainExecutor.js').StepExecutionResult[]): Promise<unknown> {
+    const parts = stepPath.split('.');
+    if (parts.length < 2) {
+      throw new VariableResolutionError(`Invalid steps path: ${stepPath}. Expected format: stepId.property[.subproperty...]`);
+    }
+
+    const [stepId, property, ...subPath] = parts;
+
+    // Find the step by ID
+    const step = steps.find(s => s.stepId === stepId);
+    if (!step) {
+      throw new VariableResolutionError(`Step '${stepId}' not found in executed steps`);
+    }
+
+    let value: unknown;
+    switch (property) {
+      case 'request':
+        value = step.request;
+        break;
+      case 'response':
+        value = step.response;
+        break;
+      case 'success':
+        value = step.success;
+        break;
+      case 'error':
+        value = step.error;
+        break;
+      default:
+        throw new VariableResolutionError(`Invalid step property '${property}'. Available: request, response, success, error`);
+    }
+
+    // If there's a subpath, navigate into the object
+    if (subPath.length > 0) {
+      value = this.resolveArrayAccess(value, subPath);
+    }
+
+    return value;
+  }
+
+  private maskSecretInObject(obj: unknown, secretPattern: RegExp): unknown {
+    if (typeof obj === 'string') {
+      return obj.replace(secretPattern, (match, secretName) => {
+        return `[MASKED:${secretName}]`;
+      });
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.maskSecretInObject(item, secretPattern));
+    }
+
+    if (obj && typeof obj === 'object') {
+      const result: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = this.maskSecretInObject(value, secretPattern);
+      }
+      return result;
+    }
+
+    return obj;
   }
 }
 

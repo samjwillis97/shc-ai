@@ -55,9 +55,6 @@ export class ChainExecutor {
     try {
       if (verbose) {
         console.error(`[CHAIN] Starting execution of chain: ${chainName}`);
-        if (chain.description) {
-          console.error(`[CHAIN] Description: ${chain.description}`);
-        }
         console.error(`[CHAIN] Steps to execute: ${chain.steps.length}`);
       }
 
@@ -76,7 +73,7 @@ export class ChainExecutor {
             config,
             cliVariables,
             profiles,
-            chain.vars || {},
+            chain.variables || {},
             result.steps, // Pass completed steps for variable resolution
             verbose,
             dryRun,
@@ -142,7 +139,7 @@ export class ChainExecutor {
     config: HttpCraftConfig,
     cliVariables: Record<string, string>,
     profiles: Record<string, unknown>,
-    chainVars: Record<string, any>,
+    chainVars: Record<string, unknown>,
     previousSteps: StepExecutionResult[], // T8.8 & T8.9: Previous step results for variable resolution
     verbose: boolean,
     dryRun: boolean,
@@ -233,15 +230,15 @@ export class ChainExecutor {
 
     try {
       // T8.5: First resolve step.with overrides using the full variable context (including steps)
-      let resolvedStepWith: any = null;
-      if (step.with) {
-        resolvedStepWith = await variableResolver.resolveValue(step.with, variableContext);
+      let resolvedStepWith: Record<string, unknown> | null = null;
+      if (step.variables) {
+        resolvedStepWith = await variableResolver.resolveValue(step.variables, variableContext) as Record<string, unknown>;
       }
 
       // If step.with provides pathParams, add them to the variable context
       // so they can be used during endpoint variable resolution
       if (resolvedStepWith?.pathParams) {
-        variableContext.stepWith = resolvedStepWith.pathParams;
+        variableContext.stepWith = resolvedStepWith.pathParams as Record<string, string>;
       }
 
       // Resolve only the API-level properties (not all endpoints) and the specific endpoint we need
@@ -269,7 +266,7 @@ export class ChainExecutor {
 
       // T8.5: Apply pathParams substitution if provided in step.with
       if (resolvedStepWith?.pathParams) {
-        url = this.applyPathParams(url, resolvedStepWith.pathParams);
+        url = this.applyPathParams(url, resolvedStepWith.pathParams as Record<string, string>);
       }
 
       // T8.5: Merge headers with step.with overrides (step.with has highest precedence)

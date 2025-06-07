@@ -771,7 +771,7 @@ async function startCallbackServer(
     rejectPromise = reject;
     
     // Set timeout
-    setTimeout(() => {
+    globalThis.setTimeout(() => {
       reject(new Error('OAuth2 authorization timeout (5 minutes)'));
     }, 5 * 60 * 1000);
   });
@@ -791,7 +791,7 @@ async function startCallbackServer(
         console.error('🌐 Callback server listening on port: ', port);
       });
       break;
-    } catch (error) {
+    } catch {
       // Port not available, try next one
       continue;
     }

@@ -23,6 +23,7 @@ import type {
   PreRequestHook,
   PostResponseHook,
 } from '../types/plugin.js';
+import type { VariableContext } from './variableResolver.js';
 
 const require = createRequire(import.meta.url);
 
@@ -45,6 +46,14 @@ const BUILTIN_PLUGINS: Record<string, string> = {
 export class PluginManager {
   private plugins: PluginInstance[] = [];
   private globalPluginConfigs: PluginConfiguration[] = [];
+
+  constructor() {
+    // Clear module cache for testing environments
+    const originalRequire = module.require;
+    if (originalRequire) {
+      module.require = originalRequire;
+    }
+  }
 
   /**
    * Load and setup plugins from configuration
