@@ -1,4 +1,4 @@
-# examples/09_modular_setup/chains/UserOnboarding.yaml
+# examples/features/advanced/modular_setup/chains/UserOnboarding.yaml
 # Defines a user onboarding chain
 userOnboarding:
   description: "User onboarding workflow"

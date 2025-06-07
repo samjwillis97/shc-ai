@@ -1,4 +1,4 @@
-# examples/09_modular_setup/httpcraft.yaml
+# examples/features/advanced/modular_setup/httpcraft.yaml
 config:
   defaultProfiles:
     - "development"

@@ -1,4 +1,4 @@
-# examples/09_modular_setup/profiles/development.yaml
+# examples/features/advanced/modular_setup/profiles/development.yaml
 # Defines the 'development' profile
 development:
   ssoBaseUrl: "https://sso.dev.example.com"

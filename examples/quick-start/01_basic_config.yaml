@@ -1,4 +1,4 @@
-# examples/01_basic_config.yaml
+# examples/quick-start/01_basic_config.yaml
 apis:
   jsonplaceholder:
     baseUrl: "https://jsonplaceholder.typicode.com"

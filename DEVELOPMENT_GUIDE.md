@@ -79,9 +79,7 @@ There are several ways to run the CLI while developing:
   `ts-node` allows you to run TypeScript files directly.
 
   ```bash
-  npx ts-node ./src/index.ts <your_httpcraft_commands_and_args>
-  # Example:
-  npx ts-node ./src/index.ts --config examples/01_basic_config.yaml jsonplaceholder getTodo --verbose
+  npx ts-node ./src/index.ts --config examples/quick-start/01_basic_config.yaml jsonplaceholder getTodo --verbose
   ```
 
 - **Running the built version:**
@@ -105,7 +103,7 @@ There are several ways to run the CLI while developing:
       This creates a global symbolic link pointing to your local project.
   3.  Now you can run `httpcraft` from anywhere:
       ```bash
-      httpcraft --config examples/01_basic_config.yaml jsonplaceholder getTodo
+      httpcraft --config examples/quick-start/01_basic_config.yaml jsonplaceholder getTodo
       ```
   4.  To remove the global link when you're done or want to switch projects:
       ```bash
@@ -208,7 +206,7 @@ Key components of the HttpCraft architecture will likely include:
           "args": [
             "${workspaceFolder}/src/index.ts" // Path to your main CLI entry point
             // Add your HttpCraft arguments here for testing a specific command
-            // e.g., "--config", "examples/01_basic_config.yaml", "jsonplaceholder", "getTodo"
+            // e.g., "--config", "examples/quick-start/01_basic_config.yaml", "jsonplaceholder", "getTodo"
           ],
           "cwd": "${workspaceFolder}", // Set current working directory to project root
           "internalConsoleOptions": "openOnSessionStart",

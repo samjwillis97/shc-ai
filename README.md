@@ -861,7 +861,7 @@ apis:
 - **Flexibility**: API-level configuration overrides
 - **Integration**: Seamless integration with profiles, variables, and chains
 
-See `examples/oauth2_builtin_example.yaml` for a complete working example.
+See `examples/features/oauth2/builtin_oauth2.yaml` for a complete working example.
 
 ### Interactive Browser Authentication
 
@@ -963,7 +963,7 @@ tokenUrl: "https://oauth2.googleapis.com/token"
 scope: "https://www.googleapis.com/auth/userinfo.profile"
 ```
 
-See `examples/phase15_interactive_oauth2.yaml` for complete working examples.
+See `examples/features/oauth2/interactive_oauth2.yaml` for complete working examples.
 
 ## 🚀 Quick Start
 

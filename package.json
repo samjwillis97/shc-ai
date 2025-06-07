@@ -26,8 +26,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "prepare": "npm run build",
-    "prepublishOnly": "npm test && npm run lint",
-    "migrate-tests": "node --loader ts-node/esm scripts/migrate-tests.ts"
+    "prepublishOnly": "npm test && npm run lint"
   },
   "repository": {
     "type": "git",

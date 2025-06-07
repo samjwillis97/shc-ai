@@ -1,4 +1,4 @@
-# examples/05_multi_api_chain.yaml
+# examples/features/chains/multi_api_chain.yaml
 apis:
   authService:
     baseUrl: "https://auth.example.com"

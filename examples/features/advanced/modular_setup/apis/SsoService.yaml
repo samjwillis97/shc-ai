@@ -1,4 +1,4 @@
-# examples/09_modular_setup/apis/SsoService.yaml
+# examples/features/advanced/modular_setup/apis/SsoService.yaml
 # Defines the 'ssoService' API
 ssoService:
   baseUrl: "{{profile.ssoBaseUrl}}"

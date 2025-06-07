@@ -1,0 +1,43 @@
+# Simple Chain Example
+# Demonstrates basic request chaining with data passing between steps
+
+# Define a simple API for demonstration
+apis:
+  jsonplaceholder:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      createPost:
+        method: POST
+        path: "/posts"
+        headers:
+          Content-Type: "application/json"
+      
+      getPost:
+        method: GET
+        path: "/posts/{{postId}}"
+
+# Define a simple chain
+chains:
+  createAndRetrieve:
+    description: "Create a post and then retrieve it using the returned ID"
+    vars:
+      authorId: 1
+      postTitle: "My Test Post"
+    
+    steps:
+      - id: create
+        call: jsonplaceholder.createPost
+        with:
+          body:
+            title: "{{chain.vars.postTitle}}"
+            body: "This is a test post created by HttpCraft"
+            userId: "{{chain.vars.authorId}}"
+      
+      - id: retrieve
+        call: jsonplaceholder.getPost
+        with:
+          pathParams:
+            postId: "{{steps.create.response.body.id}}"
+
+# Usage:
+# httpcraft chain createAndRetrieve 

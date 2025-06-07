@@ -386,7 +386,7 @@ describe('HttpCraft Configuration Schema Validation', () => {
     });
 
     it('should validate npm-plugin-example.yaml (T10.7)', async () => {
-      const examplePath = path.join(process.cwd(), 'examples', 'npm-plugin-example.yaml');
+      const examplePath = path.join(process.cwd(), 'examples', 'features', 'plugins', 'npm_plugin.yaml');
       
       try {
         const exampleContent = await fs.readFile(examplePath, 'utf-8');

@@ -1,4 +1,4 @@
-# examples/02_with_variables_and_profiles.yaml
+# examples/quick-start/02_with_variables.yaml
 config:
   defaultProfile: "dev" # Default profile to use if --profile is not specified
                         # Phase 13: CLI profiles are now ADDED to this default profile

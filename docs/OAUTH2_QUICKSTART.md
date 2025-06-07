@@ -235,7 +235,7 @@ apis:
 
 - [Complete OAuth2 Documentation](oauth2-plugin.md)
 - [HttpCraft Main Documentation](../README.md)
-- [More Examples](../examples/07_oauth2_examples.yaml)
+- [More Examples](../examples/features/oauth2/client_credentials.yaml)
 
 ---
 

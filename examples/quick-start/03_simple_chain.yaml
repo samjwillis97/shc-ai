@@ -1,4 +1,4 @@
-# examples/04_simple_chain.yaml
+# examples/quick-start/03_simple_chain.yaml
 # Assumes 'jsonplaceholder' API from 01_basic_config.yaml is also loaded or defined.
 
 chains:
