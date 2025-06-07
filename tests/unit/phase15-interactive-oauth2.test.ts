@@ -131,7 +131,7 @@ describe('Phase 15: Interactive OAuth2 Browser Authentication', () => {
       const audience = 'https://api.example.com';
 
       // Manual URL building test
-      const url = new URL(baseUrl);
+      const url = new globalThis.URL(baseUrl);
       url.searchParams.set('response_type', 'code');
       url.searchParams.set('client_id', clientId);
       url.searchParams.set('redirect_uri', redirectUri);
@@ -158,7 +158,7 @@ describe('Phase 15: Interactive OAuth2 Browser Authentication', () => {
       const redirectUri = 'http://localhost:8080/callback?source=httpcraft';
       const scope = 'read:user write:user admin';
 
-      const url = new URL(baseUrl);
+      const url = new globalThis.URL(baseUrl);
       url.searchParams.set('redirect_uri', redirectUri);
       url.searchParams.set('scope', scope);
 
@@ -178,7 +178,7 @@ describe('Phase 15: Interactive OAuth2 Browser Authentication', () => {
         // Create a test server
         const server = http.createServer((req, res) => {
           // Mock the callback handling logic
-          const url = new URL(req.url!, `http://${req.headers.host}`);
+          const url = new globalThis.URL(req.url!, `http://${req.headers.host}`);
           const code = url.searchParams.get('code');
           const state = url.searchParams.get('state');
           
@@ -196,7 +196,7 @@ describe('Phase 15: Interactive OAuth2 Browser Authentication', () => {
         });
 
         server.listen(0, () => {
-          const port = (server.address() as any)?.port;
+          const port = (server.address() as { port: number })?.port;
           const callbackUrl = `http://localhost:${port}/callback?code=${authCode}&state=${expectedState}`;
           
           // Simulate callback request
@@ -213,7 +213,7 @@ describe('Phase 15: Interactive OAuth2 Browser Authentication', () => {
     it('should handle OAuth2 callback errors', async () => {
       return new Promise<void>((resolve, reject) => {
         const server = http.createServer((req, res) => {
-          const url = new URL(req.url!, `http://${req.headers.host}`);
+          const url = new globalThis.URL(req.url!, `http://${req.headers.host}`);
           const error = url.searchParams.get('error');
           
           if (error) {
@@ -225,7 +225,7 @@ describe('Phase 15: Interactive OAuth2 Browser Authentication', () => {
         });
 
         server.listen(0, () => {
-          const port = (server.address() as any)?.port;
+          const port = (server.address() as { port: number })?.port;
           const callbackUrl = `http://localhost:${port}/callback?error=access_denied&error_description=User%20denied%20access`;
           
           http.get(callbackUrl, (res) => {
@@ -244,7 +244,7 @@ describe('Phase 15: Interactive OAuth2 Browser Authentication', () => {
       
       return new Promise<void>((resolve, reject) => {
         const server = http.createServer((req, res) => {
-          const url = new URL(req.url!, `http://${req.headers.host}`);
+          const url = new globalThis.URL(req.url!, `http://${req.headers.host}`);
           const state = url.searchParams.get('state');
           
           if (state !== expectedState) {
@@ -256,7 +256,7 @@ describe('Phase 15: Interactive OAuth2 Browser Authentication', () => {
         });
 
         server.listen(0, () => {
-          const port = (server.address() as any)?.port;
+          const port = (server.address() as { port: number })?.port;
           const callbackUrl = `http://localhost:${port}/callback?code=test&state=${invalidState}`;
           
           http.get(callbackUrl, (res) => {
