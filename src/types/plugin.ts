@@ -6,7 +6,7 @@ export interface HttpRequest {
   url: string;
   method: string;
   headers: Record<string, string>;
-  body?: string | object;
+  body?: unknown;
 }
 
 export interface HttpResponse {
@@ -32,13 +32,13 @@ export interface PluginContext {
 }
 
 export interface PluginConfig {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export type PreRequestHook = (request: HttpRequest) => Promise<void>;
 export type PostResponseHook = (request: HttpRequest, response: HttpResponse) => Promise<void>;
 export type VariableSource = () => Promise<string> | string;
-export type ParameterizedVariableSource = (...args: any[]) => Promise<string> | string;
+export type ParameterizedVariableSource = (...args: unknown[]) => Promise<string> | string;
 
 export interface Plugin {
   setup(context: PluginContext): void | Promise<void>;

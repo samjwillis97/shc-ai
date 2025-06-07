@@ -4,21 +4,38 @@
  */
 
 import path from 'path';
+import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
-import {
+import { createRequire } from 'module';
+import { variableResolver, VariableResolutionError } from './variableResolver.js';
+import type {
+  PluginConfiguration,
+  ApiPluginConfiguration,
+} from '../types/config.js';
+import type {
   Plugin,
-  PluginInstance,
   PluginContext,
-  PluginConfig,
-  PreRequestHook,
-  PostResponseHook,
   VariableSource,
-  HttpRequest,
-  HttpResponse,
   ParameterizedVariableSource,
   SecretResolver,
+  HttpRequest,
+  HttpResponse,
+  PreRequestHook,
+  PostResponseHook,
 } from '../types/plugin.js';
-import { PluginConfiguration } from '../types/config.js';
+
+const require = createRequire(import.meta.url);
+
+export interface PluginInstance {
+  name: string;
+  config?: Record<string, unknown>;
+  instance?: Plugin;
+  variableSources?: Record<string, VariableSource>;
+  parameterizedVariableSources?: Record<string, ParameterizedVariableSource>;
+  secretResolvers?: SecretResolver[];
+  preRequestHooks?: PreRequestHook[];
+  postResponseHooks?: PostResponseHook[];
+}
 
 // Built-in plugins registry
 const BUILTIN_PLUGINS: Record<string, string> = {

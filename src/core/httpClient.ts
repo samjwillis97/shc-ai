@@ -1,5 +1,4 @@
 import axios from 'axios';
-import type { HttpMethod } from '../types/config.js';
 import { HttpRequest, HttpResponse } from '../types/plugin.js';
 import { PluginManager } from './pluginManager.js';
 
@@ -14,8 +13,8 @@ export class HttpClient {
   }
 
   /**
-   * Executes an HTTP request with plugin pre-request and post-response hooks
-   * @param request The request configuration
+   * Execute an HTTP request
+   * @param request - The HTTP request details
    * @returns The response data
    */
   async executeRequest(request: HttpRequest): Promise<HttpResponse> {
@@ -32,7 +31,7 @@ export class HttpClient {
       }
 
       const response = await axios({
-        method: mutableRequest.method.toLowerCase() as any,
+        method: mutableRequest.method.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch',
         url: mutableRequest.url,
         headers: mutableRequest.headers,
         data: mutableRequest.body,
@@ -54,15 +53,17 @@ export class HttpClient {
       }
 
       return httpResponse;
-    } catch (error: any) {
-      if (error.isAxiosError) {
-        if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-          throw new Error(`Network error: ${error.message}`);
+    } catch (error: unknown) {
+      // Check if it's an axios error with proper type checking
+      if (error && typeof error === 'object' && 'isAxiosError' in error && 'message' in error) {
+        const axiosError = error as { code?: string; message: string; isAxiosError: boolean };
+        if (axiosError.code === 'ENOTFOUND' || axiosError.code === 'ECONNREFUSED') {
+          throw new Error(`Network error: ${axiosError.message}`);
         }
-        if (error.code === 'ETIMEDOUT') {
-          throw new Error(`Request timeout: ${error.message}`);
+        if (axiosError.code === 'ETIMEDOUT') {
+          throw new Error(`Request timeout: ${axiosError.message}`);
         }
-        throw new Error(`HTTP error: ${error.message}`);
+        throw new Error(`HTTP error: ${axiosError.message}`);
       }
       throw new Error(`Unknown error: ${error instanceof Error ? error.message : String(error)}`);
     }

@@ -40,7 +40,7 @@ export class ChainExecutor {
     chain: ChainDefinition,
     config: HttpCraftConfig,
     cliVariables: Record<string, string> = {},
-    profiles: Record<string, any> = {},
+    profiles: Record<string, unknown> = {},
     verbose: boolean = false,
     dryRun: boolean = false,
     pluginManager?: import('./pluginManager.js').PluginManager, // T10.15: Plugin manager for variable sources
@@ -141,7 +141,7 @@ export class ChainExecutor {
     step: ChainStep,
     config: HttpCraftConfig,
     cliVariables: Record<string, string>,
-    profiles: Record<string, any>,
+    profiles: Record<string, unknown>,
     chainVars: Record<string, any>,
     previousSteps: StepExecutionResult[], // T8.8 & T8.9: Previous step results for variable resolution
     verbose: boolean,
@@ -300,7 +300,7 @@ export class ChainExecutor {
 
       // Add query parameters to the URL if present
       if (Object.keys(params).length > 0) {
-        const urlObj = new URL(request.url);
+        const urlObj = new globalThis.URL(request.url);
         Object.entries(params).forEach(([key, value]) => {
           urlObj.searchParams.set(key, String(value));
         });

@@ -216,7 +216,7 @@ export class ConfigLoader {
           config,
           path: path.resolve(configPath),
         };
-      } catch (error) {
+      } catch {
         // Continue to next path
         continue;
       }
@@ -229,7 +229,7 @@ export class ConfigLoader {
         config,
         path: globalPath,
       };
-    } catch (error) {
+    } catch {
       // No configuration file found in any location
       return null;
     }
@@ -372,8 +372,8 @@ export class ConfigLoader {
   async loadGlobalVariables(
     variableFiles: string[],
     basePath: string
-  ): Promise<Record<string, any>> {
-    const mergedVariables: Record<string, any> = {};
+  ): Promise<Record<string, unknown>> {
+    const mergedVariables: Record<string, unknown> = {};
 
     for (const filePath of variableFiles) {
       if (typeof filePath !== 'string') {
@@ -397,12 +397,12 @@ export class ConfigLoader {
   /**
    * Loads variables from a single file
    */
-  async loadVariableFile(filePath: string, basePath: string): Promise<Record<string, any>> {
+  async loadVariableFile(filePath: string, basePath: string): Promise<Record<string, unknown>> {
     const fullFilePath = path.resolve(basePath, filePath);
 
     try {
       const fileContent = await fs.readFile(fullFilePath, 'utf-8');
-      const variables = yaml.load(fileContent) as Record<string, any>;
+      const variables = yaml.load(fileContent) as Record<string, unknown>;
 
       if (!variables || typeof variables !== 'object' || Array.isArray(variables)) {
         throw new Error('Invalid variable file: must contain an object');
