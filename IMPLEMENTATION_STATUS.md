@@ -392,6 +392,30 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   3. **Local npm Installation:** `npm install httpcraft` - Built-in OAuth2 plugin included
   4. **Node Package:** All distributions include OAuth2 as built-in plugin accessible via `name: "oauth2"`
 - **V1 Ready:** ✅ OAuth2 authentication is now available as a built-in plugin for the v1 release, addressing enterprise authentication needs while maintaining HttpCraft's plugin-driven architecture. No external files or configuration required - works out of the box with any HttpCraft installation.
+  - [ ] **T11.15:** **[CACHE KEY CUSTOMIZATION]** Implement manual cache key specification for multi-user and multi-tenant scenarios.
+    - _Status:_ **PLANNED** - Enhancement to existing OAuth2 plugin
+    - _Priority:_ **MEDIUM** - Improves multi-user workflows and tenant isolation
+    - _User Impact:_ Enables separate token caches for different users/contexts using same APIs
+    - _Implementation Plan:_
+      - Add optional `cacheKey` parameter to OAuth2Config interface
+      - Implement cache key variable resolution using existing VariableResolver
+      - Update token storage logic to use custom cache keys when specified
+      - Maintain backward compatibility with automatic cache key generation
+      - Add comprehensive unit tests for cache key scenarios
+      - Update documentation with multi-user examples
+    - _Expected Configuration:_
+      ```yaml
+      plugins:
+        - name: "oauth2"
+          config:
+            cacheKey: "{{profile.userId}}-{{api.name}}-{{profile.environment}}"
+      ```
+    - _Benefits:_
+      - Different users maintain separate cached OAuth2 tokens
+      - Multi-tenant applications with isolated token storage
+      - API-specific cache key strategies via API-level plugin configuration
+      - Full variable substitution support (profiles, environment, CLI, API context)
+    - _Testable Outcome:_ Multiple users can use same OAuth2 configuration with separate token caches based on variable-resolved cache keys
 
 ---
 

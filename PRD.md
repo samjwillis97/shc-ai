@@ -227,10 +227,54 @@ HttpCraft v1 includes comprehensive OAuth2 authentication support through the bu
 ### OAuth2 Plugin Features
 - **Multiple Grant Types**: Client Credentials, Authorization Code, and Refresh Token flows
 - **Automatic Token Management**: Intelligent caching, expiration handling, and renewal
+- **Custom Cache Keys**: Manual cache key specification for multi-user and multi-tenant scenarios
 - **Provider Support**: Ready-to-use configurations for Auth0, Azure AD, Google OAuth2, Okta
 - **Security Features**: Token masking in verbose output, PKCE support for enhanced security
 - **Integration**: Seamless integration with variable system, profiles, and request chains
 - **Flexibility**: API-level configuration overrides and dynamic scope management
+
+### OAuth2 Cache Key Customization
+The OAuth2 plugin supports manual cache key specification to enable:
+- **Multi-User Support**: Different users maintain separate cached credentials
+- **User Context Switching**: Same API accessed by different users in different workflows
+- **Multi-Tenant Applications**: Different tenants/customers require separate token caches
+- **Variable Integration**: Cache keys support full `{{variable}}` substitution syntax
+
+**Configuration Example:**
+```yaml
+plugins:
+  - name: "oauth2"
+    config:
+      grantType: "client_credentials"
+      tokenUrl: "https://auth.example.com/oauth2/token"
+      clientId: "{{env.CLIENT_ID}}"
+      clientSecret: "{{secret.CLIENT_SECRET}}"
+      
+      # Manual cache key with variable substitution
+      cacheKey: "{{profile.userId}}-{{profile.environment}}-{{api.name}}"
+
+profiles:
+  alice:
+    userId: "alice"
+    environment: "prod"
+  bob:
+    userId: "bob"
+    environment: "prod"
+
+apis:
+  userAPI:
+    plugins:
+      - name: "oauth2"
+        config:
+          # API-specific cache key override
+          cacheKey: "{{profile.userId}}-userapi-{{profile.environment}}"
+```
+
+**Usage Benefits:**
+- Each user profile gets separate cached OAuth2 tokens
+- API-specific cache key strategies via API-level plugin configuration
+- Backward compatibility: automatic cache keys used when `cacheKey` not specified
+- Full variable resolution including profiles, environment, CLI variables, and API context
 
 ### Implementation Approach
 OAuth2 authentication is implemented as a **built-in plugin** that ships with HttpCraft v1, maintaining the clean plugin-driven architecture while providing out-of-the-box OAuth2 support. This approach allows users to:

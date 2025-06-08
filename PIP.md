@@ -303,6 +303,19 @@
     - _Testable Outcome:_ 45+ test cases covering all OAuth2 flows and error scenarios.
   - **T11.13:** Ensure seamless integration with existing HttpCraft features (chains, profiles, API-level config).
     - _Testable Outcome:_ OAuth2 works correctly with all existing features.
+  - **T11.14:** **DISTRIBUTION READY:** Convert to TypeScript and implement as built-in plugin for global distribution.
+    - _Testable Outcome:_ OAuth2 plugin available as built-in plugin in all HttpCraft distributions.
+  - **T11.15:** **[CACHE KEY CUSTOMIZATION]** Implement manual cache key specification for multi-user and multi-tenant scenarios.
+    - _User Need:_ Different users need separate cached credentials for same APIs/endpoints
+    - _Use Cases:_ Multi-user workflows, user context switching, multi-tenant applications
+    - _Implementation:_ Add optional `cacheKey` parameter to OAuth2Config with full variable substitution support
+    - _Integration:_ Works with profiles, API-level plugin config, environment variables, and CLI variables
+    - _Backward Compatibility:_ Automatic cache key generation when `cacheKey` not specified
+    - _Variable Support:_ Full `{{variable}}` syntax including `{{profile.userId}}`, `{{api.name}}`, `{{env.TENANT_ID}}`
+    - _API-Level Override:_ API-specific cache key strategies via API-level plugin configuration
+    - _Testing:_ Unit tests for cache key generation, variable resolution, and multi-user scenarios
+    - _Documentation:_ Examples for common multi-user patterns and cache key strategies
+    - _Testable Outcome:_ Different users/contexts maintain separate OAuth2 token caches with custom cache keys supporting full variable resolution
 
 ---
 
