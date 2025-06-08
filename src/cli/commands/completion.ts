@@ -135,7 +135,9 @@ _httpcraft() {
             fi
           done
           
-          if [[ \$is_api -eq 1 ]]; then
+          # Only suggest endpoints if we're at the third word position (completing endpoint name)
+          # For positions 4+, let the main _arguments handle flag completion
+          if [[ \$is_api -eq 1 && \$CURRENT -eq 3 ]]; then
             _httpcraft_endpoints
           fi
           ;;
