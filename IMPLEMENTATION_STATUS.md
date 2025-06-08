@@ -359,6 +359,18 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [x] **T11.12:** Implement comprehensive unit and integration tests.
   - [x] **T11.13:** Ensure seamless integration with existing HttpCraft features.
   - [x] **T11.14:** **DISTRIBUTION READY:** Convert to TypeScript and implement as built-in plugin for global distribution.
+  - [x] **T11.15:** **[CACHE KEY CUSTOMIZATION]** Implement manual cache key specification for multi-user and multi-tenant scenarios.
+    - _Implementation Complete:_ Custom cache key support with variable substitution for multi-user workflows
+    - _Features:_ Manual cache key specification via `cacheKey` config parameter with full variable resolution
+    - _Multi-User Support:_ Separate token caches per user using `{{profile.userId}}-{{api.name}}-{{profile.environment}}`
+    - _Multi-Tenant Isolation:_ Tenant-specific cache keys using `{{profile.tenantId}}-{{profile.userId}}-admin`
+    - _Environment Isolation:_ Environment-specific caching via `payment-{{profile.environment}}-{{profile.userId}}`
+    - _API-Specific Strategies:_ Different cache strategies per API with override support
+    - _Backward Compatibility:_ Automatic cache key generation when `cacheKey` not specified
+    - _Variable Integration:_ Full support for profiles, environment, CLI, and secret variables
+    - _Testing:_ Comprehensive unit tests covering all cache key scenarios (8 additional test cases)
+    - _Documentation:_ Complete documentation with examples in `docs/oauth2-plugin.md`
+    - _Example Configuration:_ Working example in `examples/oauth2_cache_key_example.yaml`
 - **Implementation Details:**
   - **OAuth2 Plugin:** Created `src/plugins/oauth2Plugin.ts` with TypeScript support for all OAuth2 flows
   - **Built-in Plugin System:** Enhanced PluginManager to support built-in plugins bundled with HttpCraft
@@ -392,30 +404,6 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   3. **Local npm Installation:** `npm install httpcraft` - Built-in OAuth2 plugin included
   4. **Node Package:** All distributions include OAuth2 as built-in plugin accessible via `name: "oauth2"`
 - **V1 Ready:** ✅ OAuth2 authentication is now available as a built-in plugin for the v1 release, addressing enterprise authentication needs while maintaining HttpCraft's plugin-driven architecture. No external files or configuration required - works out of the box with any HttpCraft installation.
-  - [ ] **T11.15:** **[CACHE KEY CUSTOMIZATION]** Implement manual cache key specification for multi-user and multi-tenant scenarios.
-    - _Status:_ **PLANNED** - Enhancement to existing OAuth2 plugin
-    - _Priority:_ **MEDIUM** - Improves multi-user workflows and tenant isolation
-    - _User Impact:_ Enables separate token caches for different users/contexts using same APIs
-    - _Implementation Plan:_
-      - Add optional `cacheKey` parameter to OAuth2Config interface
-      - Implement cache key variable resolution using existing VariableResolver
-      - Update token storage logic to use custom cache keys when specified
-      - Maintain backward compatibility with automatic cache key generation
-      - Add comprehensive unit tests for cache key scenarios
-      - Update documentation with multi-user examples
-    - _Expected Configuration:_
-      ```yaml
-      plugins:
-        - name: "oauth2"
-          config:
-            cacheKey: "{{profile.userId}}-{{api.name}}-{{profile.environment}}"
-      ```
-    - _Benefits:_
-      - Different users maintain separate cached OAuth2 tokens
-      - Multi-tenant applications with isolated token storage
-      - API-specific cache key strategies via API-level plugin configuration
-      - Full variable substitution support (profiles, environment, CLI, API context)
-    - _Testable Outcome:_ Multiple users can use same OAuth2 configuration with separate token caches based on variable-resolved cache keys
 
 ---
 

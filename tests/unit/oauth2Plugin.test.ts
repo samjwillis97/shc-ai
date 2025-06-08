@@ -574,4 +574,225 @@ describe('OAuth2 Plugin', () => {
       expect(requestConfig.timeout).toBe(60000);
     });
   });
+
+  describe('T11.15: Cache Key Customization', () => {
+    beforeEach(() => {
+      // Reset to client credentials configuration for cache key tests
+      mockContext.config = {
+        tokenUrl: 'https://auth.example.com/oauth2/token',
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret'
+      };
+      
+      mockAxios.post.mockResolvedValue({
+        data: {
+          access_token: 'test-access-token',
+          token_type: 'Bearer',
+          expires_in: 3600
+        }
+      });
+    });
+
+    it('should use custom cache key when provided', async () => {
+      mockContext.config.cacheKey = 'user-alice-production';
+      await plugin.setup(mockContext);
+      
+      const preRequestHook = mockContext.registerPreRequestHook.mock.calls[0][0];
+      
+      const mockRequest1 = { headers: {} };
+      const mockRequest2 = { headers: {} };
+      
+      // First request should make HTTP call and cache with custom key
+      await preRequestHook(mockRequest1);
+      expect(mockAxios.post).toHaveBeenCalledTimes(1);
+      expect(mockRequest1.headers['Authorization']).toBe('Bearer test-access-token');
+      
+      // Second request should use cached token with same custom key
+      await preRequestHook(mockRequest2);
+      expect(mockAxios.post).toHaveBeenCalledTimes(1); // Should reuse cache
+      expect(mockRequest2.headers['Authorization']).toBe('Bearer test-access-token');
+    });
+
+    it('should generate separate caches for different custom cache keys', async () => {
+      // Setup first context with alice's cache key
+      const aliceContext = {
+        config: {
+          tokenUrl: 'https://auth.example.com/oauth2/token',
+          clientId: 'test-client-id',
+          clientSecret: 'test-client-secret',
+          cacheKey: 'user-alice-production'
+        },
+        registerPreRequestHook: vi.fn(),
+        registerVariableSource: vi.fn(),
+        registerParameterizedVariableSource: vi.fn()
+      };
+      await plugin.setup(aliceContext);
+      
+      // Setup second context with bob's cache key
+      const bobContext = {
+        config: {
+          tokenUrl: 'https://auth.example.com/oauth2/token',
+          clientId: 'test-client-id',
+          clientSecret: 'test-client-secret',
+          cacheKey: 'user-bob-production'
+        },
+        registerPreRequestHook: vi.fn(),
+        registerVariableSource: vi.fn(),
+        registerParameterizedVariableSource: vi.fn()
+      };
+      await plugin.setup(bobContext);
+      
+      const preRequestHook1 = aliceContext.registerPreRequestHook.mock.calls[0][0];
+      const preRequestHook2 = bobContext.registerPreRequestHook.mock.calls[0][0];
+      
+      const mockRequest1 = { headers: {} };
+      const mockRequest2 = { headers: {} };
+      
+      // Each user should get their own token cache
+      await preRequestHook1(mockRequest1);
+      expect(mockAxios.post).toHaveBeenCalledTimes(1);
+      expect(mockRequest1.headers['Authorization']).toBe('Bearer test-access-token');
+      
+      // Second request with different cache key should make another HTTP call
+      await preRequestHook2(mockRequest2);
+      expect(mockAxios.post).toHaveBeenCalledTimes(2);
+      expect(mockRequest2.headers['Authorization']).toBe('Bearer test-access-token');
+    });
+
+    it('should support variable-resolved cache keys (already resolved by PluginManager)', async () => {
+      // Simulate variable resolution by PluginManager - the plugin receives resolved values
+      mockContext.config.cacheKey = 'alice-userapi-prod'; // Already resolved from {{profile.userId}}-{{api.name}}-{{profile.environment}}
+      await plugin.setup(mockContext);
+      
+      const preRequestHook = mockContext.registerPreRequestHook.mock.calls[0][0];
+      const mockRequest = { headers: {} };
+      
+      await preRequestHook(mockRequest);
+      
+      expect(mockAxios.post).toHaveBeenCalledTimes(1);
+      expect(mockRequest.headers['Authorization']).toBe('Bearer test-access-token');
+    });
+
+    it('should fall back to automatic cache key generation when cacheKey not provided', async () => {
+      // Don't set cacheKey - should use automatic generation
+      await plugin.setup(mockContext);
+      
+      const preRequestHook = mockContext.registerPreRequestHook.mock.calls[0][0];
+      const mockRequest = { headers: {} };
+      
+      await preRequestHook(mockRequest);
+      
+      expect(mockAxios.post).toHaveBeenCalledTimes(1);
+      expect(mockRequest.headers['Authorization']).toBe('Bearer test-access-token');
+      
+      // Verify that automatic cache key generation still works
+      const mockRequest2 = { headers: {} };
+      await preRequestHook(mockRequest2);
+      expect(mockAxios.post).toHaveBeenCalledTimes(1); // Should reuse cache
+    });
+
+    it('should handle empty custom cache key by falling back to automatic generation', async () => {
+      mockContext.config.cacheKey = ''; // Empty string should fall back to automatic
+      await plugin.setup(mockContext);
+      
+      const preRequestHook = mockContext.registerPreRequestHook.mock.calls[0][0];
+      const mockRequest = { headers: {} };
+      
+      await preRequestHook(mockRequest);
+      
+      expect(mockAxios.post).toHaveBeenCalledTimes(1);
+      expect(mockRequest.headers['Authorization']).toBe('Bearer test-access-token');
+    });
+
+    it('should work with parameterized functions and custom cache keys', async () => {
+      mockContext.config.cacheKey = 'user-alice-production';
+      await plugin.setup(mockContext);
+      
+      const getTokenWithScope = mockContext.registerParameterizedVariableSource.mock.calls
+        .find(call => call[0] === 'getTokenWithScope')[1];
+      
+      // Should use custom cache key with scoped configuration
+      const token = await getTokenWithScope('admin:read');
+      expect(token).toBe('test-access-token');
+      
+      const requestBody = mockAxios.post.mock.calls[0][1];
+      expect(requestBody).toContain('scope=admin%3Aread');
+    });
+
+    it('should support multi-tenant cache isolation', async () => {
+      // Setup contexts for each tenant with completely separate configurations
+      const tenant1Context = {
+        config: {
+          tokenUrl: 'https://auth.example.com/oauth2/token',
+          clientId: 'tenant-1-client',
+          clientSecret: 'test-client-secret',
+          cacheKey: 'tenant-1-oauth-cache'
+        },
+        registerPreRequestHook: vi.fn(),
+        registerVariableSource: vi.fn(),
+        registerParameterizedVariableSource: vi.fn()
+      };
+      await plugin.setup(tenant1Context);
+      
+      const tenant2Context = {
+        config: {
+          tokenUrl: 'https://auth.example.com/oauth2/token',
+          clientId: 'tenant-2-client',
+          clientSecret: 'test-client-secret',
+          cacheKey: 'tenant-2-oauth-cache'
+        },
+        registerPreRequestHook: vi.fn(),
+        registerVariableSource: vi.fn(),
+        registerParameterizedVariableSource: vi.fn()
+      };
+      await plugin.setup(tenant2Context);
+      
+      const tenant1Hook = tenant1Context.registerPreRequestHook.mock.calls[0][0];
+      const tenant2Hook = tenant2Context.registerPreRequestHook.mock.calls[0][0];
+      
+      const tenant1Request = { headers: {} };
+      const tenant2Request = { headers: {} };
+      
+      // Each tenant should maintain separate token caches
+      await tenant1Hook(tenant1Request);
+      expect(mockAxios.post).toHaveBeenCalledTimes(1);
+      
+      await tenant2Hook(tenant2Request);
+      expect(mockAxios.post).toHaveBeenCalledTimes(2);
+      
+      // Verify that requests use different client IDs
+      const call1Body = mockAxios.post.mock.calls[0][1];
+      const call2Body = mockAxios.post.mock.calls[1][1];
+      
+      expect(call1Body).toContain('client_id=tenant-1-client');
+      expect(call2Body).toContain('client_id=tenant-2-client');
+    });
+
+    it('should maintain backward compatibility with existing configurations', async () => {
+      // Test that existing configurations without cacheKey continue to work
+      const legacyConfig = {
+        tokenUrl: 'https://auth.example.com/oauth2/token',
+        clientId: 'legacy-client-id',
+        clientSecret: 'legacy-client-secret',
+        scope: 'legacy-scope'
+        // No cacheKey specified - should use automatic generation
+      };
+      
+      mockContext.config = legacyConfig;
+      await plugin.setup(mockContext);
+      
+      const preRequestHook = mockContext.registerPreRequestHook.mock.calls[0][0];
+      const mockRequest = { headers: {} };
+      
+      await preRequestHook(mockRequest);
+      
+      expect(mockAxios.post).toHaveBeenCalledTimes(1);
+      expect(mockRequest.headers['Authorization']).toBe('Bearer test-access-token');
+      
+      // Verify token caching still works
+      const mockRequest2 = { headers: {} };
+      await preRequestHook(mockRequest2);
+      expect(mockAxios.post).toHaveBeenCalledTimes(1); // Should reuse cache
+    });
+  });
 }); 

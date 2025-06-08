@@ -1,0 +1,162 @@
+# OAuth2 Cache Key Customization Example
+# This example demonstrates how to use custom cache keys for OAuth2 authentication
+# to support multi-user workflows and tenant isolation.
+
+# Profile configurations for different users and environments
+profiles:
+  alice:
+    userId: "alice"
+    email: "alice@example.com"
+    tenantId: "tenant-1"
+  
+  bob:
+    userId: "bob"
+    email: "bob@example.com"
+    tenantId: "tenant-2"
+    
+  production:
+    environment: "prod"
+    apiHost: "api.example.com"
+    
+  development:
+    environment: "dev"
+    apiHost: "dev-api.example.com"
+
+# Global OAuth2 plugin configuration
+plugins:
+  - name: "oauth2"
+    config:
+      grantType: "client_credentials"
+      tokenUrl: "https://auth.example.com/oauth2/token"
+      clientId: "{{env.OAUTH2_CLIENT_ID}}"
+      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
+      authMethod: "basic"
+
+apis:
+  # User API with user-specific cache keys
+  userAPI:
+    baseUrl: "https://{{profile.apiHost}}/users/v1"
+    plugins:
+      - name: "oauth2"
+        config:
+          # Custom cache key combining user ID, API name, and environment
+          cacheKey: "{{profile.userId}}-userapi-{{profile.environment}}"
+          scope: "user:read user:write"
+    endpoints:
+      getProfile:
+        method: GET
+        path: "/profile"
+      updateProfile:
+        method: PUT
+        path: "/profile"
+
+  # Admin API with different cache key strategy
+  adminAPI:
+    baseUrl: "https://{{profile.apiHost}}/admin/v1"
+    plugins:
+      - name: "oauth2"
+        config:
+          # Cache key includes tenant information for multi-tenant isolation
+          cacheKey: "{{profile.tenantId}}-{{profile.userId}}-admin"
+          scope: "admin:read admin:write"
+          audience: "https://{{profile.apiHost}}/admin"
+    endpoints:
+      getUsers:
+        method: GET
+        path: "/users"
+      createUser:
+        method: POST
+        path: "/users"
+
+  # Payment API with environment-specific cache keys
+  paymentAPI:
+    baseUrl: "https://{{profile.apiHost}}/payments/v1"
+    plugins:
+      - name: "oauth2"
+        config:
+          # Environment-specific cache for different payment configurations
+          cacheKey: "payment-{{profile.environment}}-{{profile.userId}}"
+          scope: "payment:process payment:read"
+          tokenUrl: "https://payment-auth.example.com/oauth2/token"
+          clientId: "{{env.PAYMENT_CLIENT_ID}}"
+          clientSecret: "{{secret.PAYMENT_CLIENT_SECRET}}"
+    endpoints:
+      processPayment:
+        method: POST
+        path: "/charge"
+      getPayments:
+        method: GET
+        path: "/history"
+
+  # Legacy API without custom cache key (uses automatic generation)
+  legacyAPI:
+    baseUrl: "https://legacy.example.com/api"
+    plugins:
+      - name: "oauth2"
+        config:
+          # No cacheKey specified - uses automatic generation for backward compatibility
+          scope: "legacy:access"
+    endpoints:
+      getData:
+        method: GET
+        path: "/data"
+
+# Example chains demonstrating cache key behavior
+chains:
+  multiUserWorkflow:
+    description: "Demonstrates separate token caches for different users"
+    vars:
+      userAction: "profile-update"
+    steps:
+      - id: aliceProfile
+        call: userAPI.getProfile
+        # This step will use alice's cache key: "alice-userapi-prod"
+        
+      - id: bobProfile  
+        call: userAPI.getProfile
+        # Different user context would use: "bob-userapi-prod"
+
+  adminWorkflow:
+    description: "Demonstrates tenant-isolated admin operations"
+    steps:
+      - id: listUsers
+        call: adminAPI.getUsers
+        # Uses cache key: "tenant-1-alice-admin" (or "tenant-2-bob-admin")
+        
+      - id: processPayment
+        call: paymentAPI.processPayment
+        # Uses cache key: "payment-prod-alice" (or "payment-prod-bob")
+
+# Usage Examples:
+
+# 1. Alice in production environment:
+#    httpcraft --profile alice --profile production userAPI getProfile
+#    Cache key: "alice-userapi-prod"
+
+# 2. Bob in development environment:
+#    httpcraft --profile bob --profile development userAPI getProfile  
+#    Cache key: "bob-userapi-dev"
+
+# 3. Alice admin operations in tenant 1:
+#    httpcraft --profile alice --profile production adminAPI getUsers
+#    Cache key: "tenant-1-alice-admin"
+
+# 4. Bob admin operations in tenant 2:
+#    httpcraft --profile bob --profile production adminAPI getUsers
+#    Cache key: "tenant-2-bob-admin"
+
+# 5. Payment processing with environment isolation:
+#    httpcraft --profile alice --profile production paymentAPI processPayment
+#    Cache key: "payment-prod-alice"
+
+# 6. Legacy API (automatic cache key generation):
+#    httpcraft --profile alice legacyAPI getData
+#    Cache key: automatically generated hash based on tokenUrl, clientId, grantType, scope
+
+# Benefits:
+# - Each user maintains separate OAuth2 token caches
+# - Multi-tenant applications can isolate tokens by tenant
+# - Environment-specific token caching (dev/staging/prod)
+# - API-specific cache strategies for different service requirements
+# - Backward compatibility with existing configurations
+# - Full variable substitution support (profiles, environment, CLI, secrets) 

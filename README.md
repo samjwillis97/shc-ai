@@ -859,6 +859,7 @@ apis:
 ### Features
 
 - **Automatic Token Management**: Intelligent caching and renewal
+- **Custom Cache Keys**: Manual cache key specification for multi-user and multi-tenant scenarios
 - **Provider Support**: Works with any OAuth2-compliant provider
 - **Security**: Token masking in logs and dry-run output
 - **Flexibility**: API-level configuration overrides

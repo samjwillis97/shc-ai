@@ -60,6 +60,9 @@ interface OAuth2Config {
   tokenStorage?: 'keychain' | 'filesystem' | 'memory'; // Storage method (auto-detect)
   callbackPort?: number;               // Specific callback port (optional)
   callbackPath?: string;               // Callback path (default: '/callback')
+
+  // **NEW: T11.15 Cache Key Customization**
+  cacheKey?: string;                   // Optional manual cache key (supports variable substitution)
 }
 
 // **NEW: Token storage interfaces (T15.2)**
@@ -663,6 +666,12 @@ async function refreshTokenFlow(config: OAuth2Config): Promise<OAuth2TokenRespon
  * Generate cache key for token storage
  */
 function generateCacheKey(config: OAuth2Config): string {
+  // T11.15: Use custom cache key if provided (already resolved by PluginManager)
+  if (config.cacheKey && config.cacheKey.trim() !== '') {
+    return config.cacheKey;
+  }
+  
+  // Fall back to automatic cache key generation for backward compatibility
   const keyData = {
     tokenUrl: config.tokenUrl,
     clientId: config.clientId,

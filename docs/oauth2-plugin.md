@@ -89,7 +89,198 @@ plugins:
 |--------|----------|-------------|
 | `refreshToken` | Yes | Refresh token for token renewal |
 
-*Required for most OAuth2 providers unless using public clients
+**Cache Key Customization**
+
+The OAuth2 plugin supports custom cache key specification to enable multi-user workflows and tenant isolation. This feature allows different users, environments, or tenants to maintain separate OAuth2 token caches.
+
+### Configuration
+
+Add the `cacheKey` parameter to your OAuth2 plugin configuration:
+
+```yaml
+plugins:
+  - name: "oauth2"
+    config:
+      grantType: "client_credentials"
+      tokenUrl: "https://auth.example.com/oauth2/token"
+      clientId: "{{env.OAUTH2_CLIENT_ID}}"
+      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
+      
+      # Custom cache key with variable substitution
+      cacheKey: "{{profile.userId}}-{{api.name}}-{{profile.environment}}"
+```
+
+### Variable Support
+
+Cache keys support full variable substitution including:
+- **Profile variables**: `{{profile.userId}}`, `{{profile.tenantId}}`
+- **Environment variables**: `{{env.TENANT_ID}}`
+- **CLI variables**: `{{cli.userId}}`
+- **API context**: `{{api.name}}`
+- **Secret variables**: `{{secret.CACHE_SUFFIX}}`
+
+### Use Cases
+
+#### 1. Multi-User Support
+Different users maintain separate token caches:
+
+```yaml
+profiles:
+  alice:
+    userId: "alice"
+  bob:
+    userId: "bob"
+
+apis:
+  userAPI:
+    plugins:
+      - name: "oauth2"
+        config:
+          cacheKey: "{{profile.userId}}-userapi"
+```
+
+Usage:
+```bash
+# Alice gets her own token cache
+httpcraft --profile alice userAPI getProfile
+
+# Bob gets a separate token cache  
+httpcraft --profile bob userAPI getProfile
+```
+
+#### 2. Multi-Tenant Isolation
+Separate token caches per tenant:
+
+```yaml
+profiles:
+  tenant1:
+    tenantId: "org-123"
+    userId: "alice"
+  tenant2:
+    tenantId: "org-456" 
+    userId: "alice"
+
+apis:
+  adminAPI:
+    plugins:
+      - name: "oauth2"
+        config:
+          cacheKey: "{{profile.tenantId}}-{{profile.userId}}-admin"
+```
+
+#### 3. Environment Isolation
+Different token caches for dev/staging/prod:
+
+```yaml
+profiles:
+  dev:
+    environment: "development"
+  prod:
+    environment: "production"
+
+apis:
+  paymentAPI:
+    plugins:
+      - name: "oauth2"
+        config:
+          cacheKey: "payment-{{profile.environment}}-{{profile.userId}}"
+```
+
+#### 4. API-Specific Strategies
+Different cache strategies per API:
+
+```yaml
+apis:
+  userAPI:
+    plugins:
+      - name: "oauth2"
+        config:
+          cacheKey: "{{profile.userId}}-user"
+          
+  adminAPI:
+    plugins:
+      - name: "oauth2"
+        config:
+          cacheKey: "{{profile.tenantId}}-admin"
+          
+  legacyAPI:
+    plugins:
+      - name: "oauth2"
+        config:
+          # No cacheKey - uses automatic generation
+```
+
+### Benefits
+
+- **User Isolation**: Each user maintains separate authenticated sessions
+- **Tenant Security**: Multi-tenant applications prevent token leakage between tenants
+- **Environment Safety**: Development tokens don't interfere with production
+- **Performance**: Optimized token reuse within appropriate boundaries
+- **Flexibility**: Custom cache strategies per API or use case
+
+### Backward Compatibility
+
+When `cacheKey` is not specified, the plugin automatically generates cache keys based on:
+- Token URL
+- Client ID  
+- Grant type
+- Scope
+
+This ensures existing configurations continue to work without changes.
+
+### Example: Complete Multi-User Setup
+
+```yaml
+profiles:
+  alice:
+    userId: "alice"
+    tenantId: "company-a"
+  bob:
+    userId: "bob"
+    tenantId: "company-b"
+  production:
+    environment: "prod"
+
+plugins:
+  - name: "oauth2"
+    config:
+      grantType: "client_credentials"
+      tokenUrl: "https://auth.example.com/oauth2/token"
+      clientId: "{{env.OAUTH2_CLIENT_ID}}"
+      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
+
+apis:
+  userAPI:
+    baseUrl: "https://api.example.com/users"
+    plugins:
+      - name: "oauth2"
+        config:
+          cacheKey: "{{profile.userId}}-{{profile.environment}}"
+          scope: "user:read user:write"
+          
+  adminAPI:
+    baseUrl: "https://api.example.com/admin"
+    plugins:
+      - name: "oauth2"
+        config:
+          cacheKey: "{{profile.tenantId}}-{{profile.userId}}-admin"
+          scope: "admin:full"
+```
+
+Usage scenarios:
+```bash
+# Alice user operations (cache: "alice-prod")
+httpcraft --profile alice --profile production userAPI getProfile
+
+# Bob user operations (cache: "bob-prod") 
+httpcraft --profile bob --profile production userAPI getProfile
+
+# Alice admin operations (cache: "company-a-alice-admin")
+httpcraft --profile alice --profile production adminAPI getUsers
+
+# Bob admin operations (cache: "company-b-bob-admin")
+httpcraft --profile bob --profile production adminAPI getUsers
+```
 
 ## Authentication Methods
 
