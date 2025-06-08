@@ -131,14 +131,7 @@ _httpcraft() {
   esac
 }
 
-# Only set up completion when script is sourced
-if [[ $ZSH_EVAL_CONTEXT == 'toplevel' ]] || [[ -n $BASH_VERSION ]]; then
-  # Script is being sourced, set up completion
-  # Ensure completion system is loaded
-  autoload -Uz compinit
-  compinit -i
-  compdef _httpcraft httpcraft
-fi`;
+compdef _httpcraft httpcraft`;
 }
 
 /**
@@ -281,4 +274,4 @@ export async function handleGetProfileNamesCommand(args: GetProfileNamesArgs): P
     // Silently ignore errors in completion to avoid breaking tab completion
     return;
   }
-}
+} 
