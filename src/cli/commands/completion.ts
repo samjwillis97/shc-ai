@@ -50,8 +50,8 @@ _httpcraft_apis() {
 
 _httpcraft_endpoints() {
   local endpoints
-  if [[ -n $words[3] ]]; then
-    endpoints=($(httpcraft --get-endpoint-names $words[3] 2>/dev/null))
+  if [[ -n $words[2] ]]; then
+    endpoints=($(httpcraft --get-endpoint-names $words[2] 2>/dev/null))
     _describe 'endpoint' endpoints
   fi
 }
@@ -88,21 +88,26 @@ _httpcraft() {
 
   case $state in
     (command)
+      # First show built-in commands
       local commands
       commands=(
         'completion:Generate shell completion script'
         'request:Make a direct HTTP request'
         'chain:Execute a chain of HTTP requests'
       )
+      _describe 'commands' commands
       
-      # Add API commands dynamically
+      # Then show API commands dynamically
       local apis
       apis=($(httpcraft --get-api-names 2>/dev/null))
-      for api in $apis; do
-        commands+=("$api:Execute API endpoints")
-      done
-      
-      _describe 'command' commands
+      if [[ \${#apis[@]} -gt 0 ]]; then
+        local api_commands
+        api_commands=()
+        for api in \$apis; do
+          api_commands+=("\$api:Execute API endpoints")
+        done
+        _describe 'APIs' api_commands
+      fi
       ;;
     (args)
       case $words[2] in
@@ -119,10 +124,18 @@ _httpcraft() {
             '1: :_httpcraft_chains'
           ;;
         (*)
-          # Handle API endpoints
+          # Handle API endpoints - check if the second word is a valid API name
           local apis
           apis=($(httpcraft --get-api-names 2>/dev/null))
-          if [[ " $apis " =~ " $words[2] " ]]; then
+          local is_api=0
+          for api in \$apis; do
+            if [[ "\$words[2]" == "\$api" ]]; then
+              is_api=1
+              break
+            fi
+          done
+          
+          if [[ \$is_api -eq 1 ]]; then
             _httpcraft_endpoints
           fi
           ;;
