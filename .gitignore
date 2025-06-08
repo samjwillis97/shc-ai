@@ -2,6 +2,7 @@
 .env
 dist/
 node_modules/
+coverage/
 
 # Test files (should be in tests/fixtures/ or cleaned up)
 *test*.yaml

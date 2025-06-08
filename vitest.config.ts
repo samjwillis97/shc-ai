@@ -15,5 +15,32 @@ export default defineConfig({
     },
     testTimeout: 15000,
     retry: 1,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'coverage/**',
+        'dist/**',
+        'node_modules/**',
+        '.direnv/**',
+        '**/*.d.ts',
+        '**/*.test.ts',
+        '**/*.config.ts',
+        'tests/**',
+        'examples/**',
+        'docs/**',
+        'schemas/**'
+      ],
+      include: ['src/**/*.ts'],
+      reportsDirectory: 'coverage',
+      thresholds: {
+        global: {
+          branches: 80,
+          functions: 80,
+          lines: 80,
+          statements: 80
+        }
+      }
+    }
   },
 }); 

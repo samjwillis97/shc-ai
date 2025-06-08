@@ -1453,3 +1453,39 @@ chains:
 ---
 
 **HttpCraft** - Making HTTP testing simple, powerful, and enjoyable! 🚀 
+
+## Testing
+
+HttpCraft includes comprehensive tests built with Vitest. Run the test suite with:
+
+```bash
+npm test
+```
+
+### Coverage Reports
+
+HttpCraft supports comprehensive test coverage reporting. You can generate coverage reports in multiple formats:
+
+```bash
+# Run tests with coverage (generates text, JSON, and HTML reports)
+npm run test:coverage
+
+# Run tests with coverage in watch mode
+npm run test:coverage:watch
+
+# Run tests with coverage and open the UI interface
+npm run test:coverage:ui
+```
+
+Coverage reports are generated in the `coverage/` directory:
+- **Text report**: Displayed in terminal during test run
+- **HTML report**: Open `coverage/index.html` in your browser for interactive coverage exploration
+- **JSON report**: `coverage/coverage-final.json` for programmatic access
+
+The project maintains coverage thresholds of 80% for:
+- **Branches**: Decision points in code
+- **Functions**: Function coverage
+- **Lines**: Line coverage  
+- **Statements**: Statement coverage
+
+Coverage excludes test files, configuration files, examples, and documentation to focus on source code quality. 
