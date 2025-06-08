@@ -347,19 +347,5 @@ describe('VariableResolver - Phase 7 Plugin Support', () => {
       const result = await resolver.resolveValue(array, context);
       expect(result).toEqual(['async-value', 'static-value', 'async-value']);
     });
-
-    // Test timeout behavior
-    const timeoutPromise = new Promise((_, reject) => {
-      globalThis.setTimeout(() => {
-        reject(new Error('Timeout'));
-      }, 100);
-    });
-
-    // Test timeout behavior  
-    const timeoutPromise2 = new Promise((_, reject) => {
-      globalThis.setTimeout(() => {
-        reject(new Error('Timeout'));
-      }, 100);
-    });
   });
 }); 

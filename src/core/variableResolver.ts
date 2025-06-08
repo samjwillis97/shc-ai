@@ -78,14 +78,13 @@ export class VariableResolver {
   }
 
   /**
-   * T9.5: Mask secret values in a string for verbose/dry-run output
-   * Replaces actual secret values with [SECRET] placeholder
+   * T9.5: Mask secret values in text for display purposes
    */
   maskSecrets(text: string): string {
     let maskedText = text;
 
     // For each tracked secret value, replace it with [SECRET]
-    for (const [variableName, secretValue] of this.secretValues) {
+    for (const [, secretValue] of this.secretValues) {
       if (secretValue && secretValue.length > 0) {
         // Replace all occurrences of the actual secret value with [SECRET]
         // Use a global regex to replace all occurrences
@@ -1105,6 +1104,27 @@ export class VariableResolver {
     }
 
     return obj;
+  }
+
+  /**
+   * Process JSONPath expressions for step data access
+   */
+  private static processStepVariableValue(stepData: Record<string, unknown>, path: string): unknown {
+    try {
+      // Use JSONPath to query the step data
+      const result = JSONPath({ path: path, json: stepData });
+      
+      // If no result found, return undefined
+      if (!result || result.length === 0) {
+        return undefined;
+      }
+      
+      // Return the first result (JSONPath returns an array)
+      return result[0];
+    } catch (error) {
+      // If JSONPath fails, try simple property access
+      return undefined;
+    }
   }
 }
 

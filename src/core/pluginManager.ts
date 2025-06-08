@@ -38,7 +38,7 @@ export class PluginManager {
   private globalPluginConfigs: PluginConfiguration[] = [];
 
   constructor() {
-    // Constructor is now empty - no module cache manipulation needed
+    // Constructor is now clean
   }
 
   /**
