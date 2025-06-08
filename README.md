@@ -497,6 +497,8 @@ source ~/.zshrc
 
 If you encounter `_arguments:comparguments:327: can only be called from completion function`, ensure you're using the latest version - this was fixed to properly use `compdef` for completion setup.
 
+**Note:** The completion script automatically initializes the ZSH completion system (`compinit`) if needed, so no manual setup is required.
+
 ### Usage
 
 ```bash
@@ -1246,6 +1248,8 @@ source ~/.zshrc
 ### Troubleshooting
 
 If you encounter `_arguments:comparguments:327: can only be called from completion function`, ensure you're using the latest version - this was fixed to properly use `compdef` for completion setup.
+
+**Note:** The completion script automatically initializes the ZSH completion system (`compinit`) if needed, so no manual setup is required.
 
 ### Usage
 
