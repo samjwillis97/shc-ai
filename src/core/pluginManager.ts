@@ -165,15 +165,33 @@ export class PluginManager {
       // Set this plugin manager on variable resolver temporarily for secret resolution
       variableResolver.setPluginManager(apiPluginManager);
       
-      // Use provided context or create a basic one
-      const context = variableContext || variableResolver.createContext(
-        {}, // No CLI variables during plugin loading
-        {}, // No profile variables at this stage
-        {}, // No API variables
-        {}, // No endpoint variables  
-        {}, // No plugin variables yet
-        {} // No global variables at this stage
-      );
+      // Use provided context but ensure it includes global plugin sources
+      let context;
+      if (variableContext) {
+        // Merge provided context with global plugin sources
+        context = {
+          ...variableContext,
+          pluginVariables: {
+            ...(variableContext.pluginVariables || {}),
+            ...this.getVariableSources()
+          },
+          parameterizedPluginSources: {
+            ...(variableContext.parameterizedPluginSources || {}),
+            ...this.getParameterizedVariableSources()
+          }
+        };
+      } else {
+        // Create a basic context with global plugin sources available
+        context = variableResolver.createContext(
+          {}, // No CLI variables during plugin loading
+          {}, // No profile variables at this stage
+          {}, // No API variables
+          {}, // No endpoint variables  
+          this.getVariableSources(), // Include global plugin variable sources
+          {}, // No global variables at this stage
+          this.getParameterizedVariableSources() // Include global plugin parameterized sources
+        );
+      }
 
       for (const config of configsToResolve) {
         try {

@@ -1340,4 +1340,383 @@ export default {
       expect(request.headers['X-Plugin2-Setup-Count']).toBe('1');
     });
   });
+
+  describe('Bug Fix: Global plugin parameterized functions available in API-level configs', () => {
+    it('should make global plugin parameterized functions available during API-level plugin configuration resolution', async () => {
+      // Create a global plugin that registers a parameterized function
+      const globalPluginPath = path.join(tempDir, 'global-plugin.js');
+      const globalPluginContent = `
+export default {
+  async setup(context) {
+    context.registerParameterizedVariableSource('getConfig', (key, environment) => {
+      const configs = {
+        'dev': { authUrl: 'https://dev.auth.com', apiKey: 'dev-key' },
+        'prod': { authUrl: 'https://prod.auth.com', apiKey: 'prod-key' }
+      };
+      return configs[environment][key];
+    });
+  }
+};
+`;
+      await fs.writeFile(globalPluginPath, globalPluginContent);
+
+      // Create an API-level plugin that will use the global plugin's function
+      const apiPluginPath = path.join(tempDir, 'api-plugin.js');
+      const apiPluginContent = `
+export default {
+  async setup(context) {
+    // Store the resolved config for verification
+    this.resolvedConfig = context.config;
+    
+    context.registerPreRequestHook(async (request) => {
+      request.headers['X-Resolved-Config'] = JSON.stringify(context.config);
+    });
+  }
+};
+`;
+      await fs.writeFile(apiPluginPath, apiPluginContent);
+
+      // Setup global plugins
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './global-plugin.js',
+          name: 'globalPlugin',
+          config: {}
+        },
+        {
+          path: './api-plugin.js', 
+          name: 'apiPlugin',
+          config: {}
+        }
+      ];
+
+      // Setup API-level plugin config that uses the global plugin's parameterized function
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          name: 'apiPlugin',
+          config: {
+            authUrl: '{{plugins.globalPlugin.getConfig("authUrl", "prod")}}',
+            apiKey: '{{plugins.globalPlugin.getConfig("apiKey", "dev")}}',
+            staticValue: 'unchanged'
+          }
+        }
+      ];
+
+      // Load global plugins first
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      // Verify global plugin has parameterized functions
+      const globalParameterizedSources = pluginManager.getParameterizedVariableSources();
+      expect(globalParameterizedSources.globalPlugin.getConfig).toBeDefined();
+
+      // Create a variable context (simulating what the API command does)
+      const { variableResolver } = await import('../../src/core/variableResolver.js');
+      const variableContext = variableResolver.createContext(
+        {}, // CLI vars
+        { environment: 'prod' }, // Profile vars
+        {}, // API vars
+        {}, // Endpoint vars
+        {}, // Plugin vars (empty initially)
+        {}, // Global vars
+        {} // Parameterized plugin sources (empty initially)
+      );
+
+      // Load API-specific plugins with the context - this should resolve variables
+      const apiPluginManager = await pluginManager.loadApiPlugins(apiConfigs, tempDir, variableContext);
+      
+      // Verify that the API plugin was loaded with resolved configuration
+      const apiPlugins = apiPluginManager.getPlugins();
+      const apiPlugin = apiPlugins.find(p => p.name === 'apiPlugin');
+      
+      expect(apiPlugin).toBeDefined();
+      expect(apiPlugin!.config).toEqual({
+        authUrl: 'https://prod.auth.com',
+        apiKey: 'dev-key', 
+        staticValue: 'unchanged'
+      });
+    });
+
+    it('should handle the case when no variable context is provided', async () => {
+      // Create a global plugin that registers a parameterized function
+      const globalPluginPath = path.join(tempDir, 'global-plugin-2.js');
+      const globalPluginContent = `
+export default {
+  async setup(context) {
+    context.registerParameterizedVariableSource('getEnvConfig', (env) => {
+      return env === 'test' ? 'test-value' : 'default-value';
+    });
+  }
+};
+`;
+      await fs.writeFile(globalPluginPath, globalPluginContent);
+
+      const apiPluginPath = path.join(tempDir, 'api-plugin-2.js');
+      const apiPluginContent = `
+export default {
+  async setup(context) {
+    // Plugin setup
+  }
+};
+`;
+      await fs.writeFile(apiPluginPath, apiPluginContent);
+
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './global-plugin-2.js',
+          name: 'globalPlugin2',
+          config: {}
+        },
+        {
+          path: './api-plugin-2.js',
+          name: 'apiPlugin2',
+          config: {}
+        }
+      ];
+
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          name: 'apiPlugin2',
+          config: {
+            value: '{{plugins.globalPlugin2.getEnvConfig("test")}}'
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      // Load API plugins without providing a variable context
+      const apiPluginManager = await pluginManager.loadApiPlugins(apiConfigs, tempDir);
+      
+      // Should still work because the global plugin sources are included in the fallback context
+      const apiPlugins = apiPluginManager.getPlugins();
+      const apiPlugin = apiPlugins.find(p => p.name === 'apiPlugin2');
+      
+      expect(apiPlugin).toBeDefined();
+      expect(apiPlugin!.config.value).toBe('test-value');
+    });
+
+    it('should not overwrite existing plugin sources in provided context', async () => {
+      // Create global plugin
+      const globalPluginPath = path.join(tempDir, 'global-plugin-3.js');
+      const globalPluginContent = `
+export default {
+  async setup(context) {
+    context.registerParameterizedVariableSource('globalFunc', () => 'global-value');
+    context.registerVariableSource('globalVar', () => 'global-var-value');
+  }
+};
+`;
+      await fs.writeFile(globalPluginPath, globalPluginContent);
+
+      const apiPluginPath = path.join(tempDir, 'api-plugin-3.js');
+      const apiPluginContent = `
+export default {
+  async setup(context) {
+    // Plugin setup
+  }
+};
+`;
+      await fs.writeFile(apiPluginPath, apiPluginContent);
+
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './global-plugin-3.js',
+          name: 'globalPlugin3',
+          config: {}
+        },
+        {
+          path: './api-plugin-3.js',
+          name: 'apiPlugin3',
+          config: {}
+        }
+      ];
+
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          name: 'apiPlugin3',
+          config: {
+            globalValue: '{{plugins.globalPlugin3.globalFunc()}}',
+            existingValue: '{{plugins.existingPlugin.existingFunc()}}'
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+
+      // Create a variable context with existing plugin sources
+      const { variableResolver } = await import('../../src/core/variableResolver.js');
+      const existingPluginSources = {
+        existingPlugin: {
+          existingFunc: () => 'existing-value'
+        }
+      };
+      const existingParameterizedSources = {
+        existingPlugin: {
+          existingFunc: () => 'existing-param-value'
+        }
+      };
+
+      const variableContext = variableResolver.createContext(
+        {}, // CLI vars
+        {}, // Profile vars
+        {}, // API vars
+        {}, // Endpoint vars
+        existingPluginSources, // Existing plugin vars
+        {}, // Global vars
+        existingParameterizedSources // Existing parameterized sources
+      );
+
+      const apiPluginManager = await pluginManager.loadApiPlugins(apiConfigs, tempDir, variableContext);
+      
+      const apiPlugins = apiPluginManager.getPlugins();
+      const apiPlugin = apiPlugins.find(p => p.name === 'apiPlugin3');
+      
+      expect(apiPlugin).toBeDefined();
+      expect(apiPlugin!.config).toEqual({
+        globalValue: 'global-value',
+        existingValue: 'existing-param-value'
+      });
+    });
+
+    it('should handle the exact scenario from the bug report', async () => {
+      // Create configProvider plugin (like the user's plugin)
+      const configProviderPath = path.join(tempDir, 'config-provider.js');
+      const configProviderContent = `
+export default {
+  async setup(context) {
+    context.registerParameterizedVariableSource('getDataSourceConfig', (configKey, dataSource) => {
+      const configurations = {
+        nib: {
+          authorizationUrl: "https://id.nib-cf-test.com/authorize",
+          tokenUrl: "https://id.nib-cf-test.com/oauth/token",
+          clientId: "test-client-id"
+        }
+      };
+
+      const config = configurations[dataSource];
+      if (!config) {
+        throw new Error(\`Unknown dataSource: \${dataSource}\`);
+      }
+
+      return config[configKey];
+    });
+  }
+};
+`;
+      await fs.writeFile(configProviderPath, configProviderContent);
+
+      // Mock oauth2 plugin (built-in)
+      const oauth2PluginPath = path.join(tempDir, 'oauth2-plugin.js');
+      const oauth2PluginContent = `
+export default {
+  async setup(context) {
+    // Store config for verification
+    this.resolvedConfig = context.config;
+  }
+};
+`;
+      await fs.writeFile(oauth2PluginPath, oauth2PluginContent);
+
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './config-provider.js',
+          name: 'configProvider',
+          config: {}
+        },
+        {
+          path: './oauth2-plugin.js',
+          name: 'oauth2',
+          config: {}
+        }
+      ];
+
+      // This is the exact API-level config that was failing
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          name: 'oauth2',
+          config: {
+            authorizationUrl: '{{plugins.configProvider.getDataSourceConfig("authorizationUrl", "{{dataSource}}")}}',
+            tokenUrl: 'https://id.nib-cf-test.com/oauth/token',
+            clientId: 'test-client-id'
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+
+      // Create context with dataSource from profile (like in the user's setup)
+      const { variableResolver } = await import('../../src/core/variableResolver.js');
+      const variableContext = variableResolver.createContext(
+        {}, // CLI vars
+        { dataSource: 'nib' }, // Profile vars with dataSource
+        {}, // API vars
+        {}, // Endpoint vars
+        {}, // Plugin vars
+        {}, // Global vars
+        {} // Parameterized sources
+      );
+
+      // This should now work without throwing an error
+      const apiPluginManager = await pluginManager.loadApiPlugins(apiConfigs, tempDir, variableContext);
+      
+      const oauth2Plugin = apiPluginManager.getPlugins().find(p => p.name === 'oauth2');
+      expect(oauth2Plugin).toBeDefined();
+      expect(oauth2Plugin!.config).toEqual({
+        authorizationUrl: 'https://id.nib-cf-test.com/authorize',
+        tokenUrl: 'https://id.nib-cf-test.com/oauth/token',
+        clientId: 'test-client-id'
+      });
+    });
+
+    it('should throw appropriate error when parameterized function does not exist', async () => {
+      const globalPluginPath = path.join(tempDir, 'limited-plugin.js');
+      const globalPluginContent = `
+export default {
+  async setup(context) {
+    context.registerParameterizedVariableSource('existingFunc', () => 'exists');
+  }
+};
+`;
+      await fs.writeFile(globalPluginPath, globalPluginContent);
+
+      const apiPluginPath = path.join(tempDir, 'api-plugin-error.js');
+      const apiPluginContent = `
+export default {
+  async setup(context) {
+    // Plugin setup
+  }
+};
+`;
+      await fs.writeFile(apiPluginPath, apiPluginContent);
+
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          path: './limited-plugin.js',
+          name: 'limitedPlugin',
+          config: {}
+        },
+        {
+          path: './api-plugin-error.js',
+          name: 'apiPluginError',
+          config: {}
+        }
+      ];
+
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          name: 'apiPluginError',
+          config: {
+            value: '{{plugins.limitedPlugin.nonExistentFunc("test")}}'
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+
+      // This should throw an error about the non-existent function
+      await expect(pluginManager.loadApiPlugins(apiConfigs, tempDir)).rejects.toThrow(
+        /Parameterized function 'nonExistentFunc' not found in plugin 'limitedPlugin'/
+      );
+    });
+  });
 }); 

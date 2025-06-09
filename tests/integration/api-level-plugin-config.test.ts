@@ -259,4 +259,98 @@ apis:
     // Verify global config is still present
     expect(pluginConfig.globalKey).toBe('globalValue');
   });
+
+  it('should support parameterized plugin functions from global plugins in API-level configurations', async () => {
+    const mockBaseUrl = testEnv.getTestBaseUrl();
+    
+    // Create a configProvider plugin similar to the user's
+    const configProviderPlugin = `
+export default {
+  async setup(context) {
+    context.registerParameterizedVariableSource('getDataSourceConfig', (configKey, dataSource) => {
+      const configurations = {
+        test: {
+          authorizationUrl: "${mockBaseUrl}/auth",
+          tokenUrl: "${mockBaseUrl}/token",
+          clientId: "test-client-id"
+        }
+      };
+
+      const config = configurations[dataSource];
+      if (!config) {
+        throw new Error(\`Unknown dataSource: \${dataSource}\`);
+      }
+
+      return config[configKey];
+    });
+  }
+};
+`;
+
+    const configProviderFile = path.join(testDir, 'configProvider.js');
+    await fs.writeFile(configProviderFile, configProviderPlugin);
+
+    // Create a mock plugin that will use the configProvider's parameterized function
+    const mockPlugin = `
+export default {
+  async setup(context) {
+    context.registerPreRequestHook(async (request) => {
+      // Add the resolved config to headers for verification
+      request.headers['X-Auth-URL'] = context.config.authUrl;
+      request.headers['X-Client-ID'] = context.config.clientId;
+    });
+  }
+};
+`;
+
+    const mockPluginFile = path.join(testDir, 'mockPlugin.js');
+    await fs.writeFile(mockPluginFile, mockPlugin);
+
+    const config = `
+profiles:
+  test:
+    dataSource: "test"
+
+plugins:
+  - path: "./configProvider.js"
+    name: "configProvider"
+  - path: "./mockPlugin.js"  
+    name: "mockPlugin"
+
+apis:
+  test-api:
+    baseUrl: ${mockBaseUrl}
+    plugins:
+      - name: "mockPlugin"
+        config:
+          authUrl: '{{plugins.configProvider.getDataSourceConfig("authorizationUrl", "{{dataSource}}")}}'
+          clientId: '{{plugins.configProvider.getDataSourceConfig("clientId", "{{dataSource}}")}}'
+    endpoints:
+      test-endpoint:
+        method: GET
+        path: /headers
+`;
+
+    const configFile = path.join(testDir, 'config.yaml');
+    await fs.writeFile(configFile, config);
+
+    // This should work without throwing the "Plugin not found" error
+    const result = await execFileAsync('node', [
+      cliPath,
+      'test-api',
+      'test-endpoint',
+      '--config',
+      configFile,
+      '--profile',
+      'test'
+    ], {
+      env: { ...process.env, TEST_ENV_VAR: 'envTestValue' }
+    });
+    
+    const responseData = JSON.parse(result.stdout);
+    
+    // Verify that the parameterized function was resolved correctly
+    expect(responseData.headers['x-auth-url'] || responseData.headers['X-Auth-URL']).toBe(`${mockBaseUrl}/auth`);
+    expect(responseData.headers['x-client-id'] || responseData.headers['X-Client-ID']).toBe('test-client-id');
+  });
 }); 
