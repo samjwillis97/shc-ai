@@ -63,6 +63,8 @@ interface OAuth2Config {
 
   // **NEW: T11.15 Cache Key Customization**
   cacheKey?: string;                   // Optional manual cache key (supports variable substitution)
+
+  overwriteCache?: boolean;             // Optional flag to overwrite cache (default: false)
 }
 
 // **NEW: Token storage interfaces (T15.2)**
@@ -227,7 +229,7 @@ function shouldUseInteractiveFlow(config: OAuth2Config): boolean {
   if (config.interactive !== undefined) {
     return config.interactive;
   }
-  
+
   // Auto-detect conditions
   return (
     config.grantType === 'authorization_code' &&
@@ -245,7 +247,7 @@ async function initializeTokenStorage(config: OAuth2Config): Promise<TokenStorag
   }
 
   const storageType = config.tokenStorage;
-  
+
   // Try in order: keychain → filesystem → memory
   const storageOptions: TokenStorage[] = [
     new KeychainTokenStorage(),
@@ -269,7 +271,7 @@ async function initializeTokenStorage(config: OAuth2Config): Promise<TokenStorag
       default:
         preferredStorage = new KeychainTokenStorage();
     }
-    
+
     if (await preferredStorage.isAvailable()) {
       tokenStorage = preferredStorage;
       return tokenStorage;
@@ -345,7 +347,7 @@ const plugin: Plugin = {
     // Register parameterized function for custom scopes
     context.registerParameterizedVariableSource('getTokenWithScope', async (...args: unknown[]) => {
       const scope = args[0] as string;
-      
+
       // Validate required configuration when accessing parameterized variables
       if (!config.tokenUrl) {
         throw new Error('OAuth2 plugin requires tokenUrl in configuration');
@@ -376,51 +378,59 @@ async function getAccessToken(config: OAuth2Config): Promise<string> {
   const cacheKey = generateCacheKey(config);
   const storage = await initializeTokenStorage(config);
 
-  // Check in-memory cache first
-  if (tokenCache.has(cacheKey)) {
-    const cachedToken = tokenCache.get(cacheKey)!;
-    if (cachedToken.expiresAt > Date.now()) {
-      return cachedToken.accessToken;
+  // Skip cache checks if overwriteCache is true
+  if (!config.overwriteCache) {
+    // Check in-memory cache first
+    if (tokenCache.has(cacheKey)) {
+      const cachedToken = tokenCache.get(cacheKey)!;
+      if (cachedToken.expiresAt > Date.now()) {
+        return cachedToken.accessToken;
+      }
+      tokenCache.delete(cacheKey);
     }
-    tokenCache.delete(cacheKey);
-  }
 
-  // Check persistent storage
-  const storedTokens = await storage.retrieve(cacheKey);
-  if (storedTokens && storedTokens.expiresAt > Date.now()) {
-    // Update in-memory cache
-    tokenCache.set(cacheKey, {
-      accessToken: storedTokens.accessToken,
-      expiresAt: storedTokens.expiresAt,
-      refreshToken: storedTokens.refreshToken,
-      tokenType: storedTokens.tokenType,
-      scope: storedTokens.scope,
-    });
-    console.error('🔑 Using stored access token');
-    return storedTokens.accessToken;
-  }
-
-  // Try refresh token if available
-  if (storedTokens?.refreshToken) {
-    try {
-      const refreshConfig = {
-        ...config,
-        grantType: 'refresh_token' as const,
+    // Check persistent storage
+    const storedTokens = await storage.retrieve(cacheKey);
+    if (storedTokens && storedTokens.expiresAt > Date.now()) {
+      // Update in-memory cache
+      tokenCache.set(cacheKey, {
+        accessToken: storedTokens.accessToken,
+        expiresAt: storedTokens.expiresAt,
         refreshToken: storedTokens.refreshToken,
-      };
-      
-      console.error('🔄 Access token expired, refreshing...');
-      const tokenResponse = await refreshTokenFlow(refreshConfig);
-      
-      // Store refreshed tokens
-      await storeTokens(storage, cacheKey, tokenResponse, config);
-      console.error('✅ Token refreshed successfully');
-      
-      return tokenResponse.access_token;
-    } catch {
-      // Refresh failed, remove stored tokens and continue to get new ones
-      await storage.remove(cacheKey);
+        tokenType: storedTokens.tokenType,
+        scope: storedTokens.scope,
+      });
+      console.error('🔑 Using stored access token');
+      return storedTokens.accessToken;
     }
+
+    // Try refresh token if available
+    if (storedTokens?.refreshToken) {
+      try {
+        const refreshConfig = {
+          ...config,
+          grantType: 'refresh_token' as const,
+          refreshToken: storedTokens.refreshToken,
+        };
+
+        console.error('🔄 Access token expired, refreshing...');
+        const tokenResponse = await refreshTokenFlow(refreshConfig);
+
+        // Store refreshed tokens
+        await storeTokens(storage, cacheKey, tokenResponse, config);
+        console.error('✅ Token refreshed successfully');
+
+        return tokenResponse.access_token;
+      } catch {
+        // Refresh failed, remove stored tokens and continue to get new ones
+        await storage.remove(cacheKey);
+      }
+    }
+  } else {
+    console.error('🔄 Overwriting cached tokens, fetching new token...');
+    // Clear existing cache when overwriting
+    tokenCache.delete(cacheKey);
+    await storage.remove(cacheKey);
   }
 
   let tokenResponse: OAuth2TokenResponse;
@@ -449,6 +459,10 @@ async function getAccessToken(config: OAuth2Config): Promise<string> {
 
   // Store tokens in both cache and persistent storage
   await storeTokens(storage, cacheKey, tokenResponse, config);
+
+  if (config.overwriteCache) {
+    console.error('✅ Cache overwritten with new token');
+  }
 
   return tokenResponse.access_token;
 }
@@ -662,7 +676,7 @@ function generateCacheKey(config: OAuth2Config): string {
   if (config.cacheKey && config.cacheKey.trim() !== '') {
     return config.cacheKey;
   }
-  
+
   // Fall back to automatic cache key generation for backward compatibility
   const keyData = {
     tokenUrl: config.tokenUrl,
@@ -707,10 +721,10 @@ async function interactiveAuthorizationCodeFlow(config: OAuth2Config): Promise<O
   // Generate PKCE parameters
   const pkceParams = generatePKCE();
   const state = crypto.randomUUID();
-  
+
   // Start local callback server
   const callbackServer = await startCallbackServer(config, state);
-  
+
   try {
     // Generate authorization URL
     const authUrl = buildAuthorizationUrl(config, {
@@ -720,12 +734,12 @@ async function interactiveAuthorizationCodeFlow(config: OAuth2Config): Promise<O
       // redirectUri: callbackServer.redirectUri,
       redirectUri: callbackServer.redirectUri,
     });
-    
+
     // Launch browser
     console.error('🌐 Opening browser for OAuth2 authentication...');
     console.error('🌐 Authorization URL: ', authUrl);
     console.error('⏳ Waiting for authorization (timeout: 5 minutes)...');
-    
+
     try {
       await open(authUrl);
     } catch {
@@ -733,10 +747,10 @@ async function interactiveAuthorizationCodeFlow(config: OAuth2Config): Promise<O
       console.error('📋 Please open this URL manually in your browser:');
       console.error(`   ${authUrl}`);
     }
-    
+
     // Wait for callback
     const authorizationCode = await callbackServer.promise;
-    
+
     // Exchange code for tokens
     const tokenResponse = await authorizationCodeFlow({
       ...config,
@@ -744,7 +758,7 @@ async function interactiveAuthorizationCodeFlow(config: OAuth2Config): Promise<O
       redirectUri: callbackServer.redirectUri,
       codeVerifier: pkceParams.codeVerifier,
     });
-    
+
     return tokenResponse;
   } finally {
     // Clean up server
@@ -767,22 +781,22 @@ async function startCallbackServer(
 }> {
   const callbackPath = config.callbackPath || '/callback';
   const startPort = config.callbackPort || 8080;
-  
+
   let server: http.Server;
   let port: number;
   let resolvePromise: (code: string) => void;
   let rejectPromise: (error: Error) => void;
-  
+
   const promise = new Promise<string>((resolve, reject) => {
     resolvePromise = resolve;
     rejectPromise = reject;
-    
+
     // Set timeout
     globalThis.setTimeout(() => {
       reject(new Error('OAuth2 authorization timeout (5 minutes)'));
     }, 5 * 60 * 1000);
   });
-  
+
   // Try to find available port
   for (port = startPort; port < startPort + 100; port++) {
     try {
@@ -790,10 +804,10 @@ async function startCallbackServer(
         const srv = http.createServer((req, res) => {
           handleCallback(req, res, expectedState, resolvePromise, rejectPromise);
         });
-        
+
         srv.on('error', reject);
         srv.on('listening', () => resolve(srv));
-        
+
         srv.listen(port, 'localhost');
         console.error('🌐 Callback server listening on port: ', port);
       });
@@ -803,13 +817,13 @@ async function startCallbackServer(
       continue;
     }
   }
-  
+
   if (!server!) {
     throw new Error('Could not find available port for OAuth2 callback server');
   }
-  
+
   const redirectUri = `http://localhost:${port}${callbackPath}`;
-  
+
   return {
     server,
     redirectUri,
@@ -828,32 +842,32 @@ function handleCallback(
   reject: (error: Error) => void
 ): void {
   const url = new URL(req.url!, `http://${req.headers.host}`);
-  
+
   // Extract parameters
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   const error = url.searchParams.get('error');
   const errorDescription = url.searchParams.get('error_description');
-  
+
   if (error) {
     const errorMessage = errorDescription || error;
     sendErrorPage(res, `Authorization failed: ${errorMessage}`);
     reject(new Error(`OAuth2 authorization failed: ${errorMessage}`));
     return;
   }
-  
+
   if (!code) {
     sendErrorPage(res, 'Authorization code not received');
     reject(new Error('OAuth2 authorization code not received'));
     return;
   }
-  
+
   if (state !== expectedState) {
     sendErrorPage(res, 'Invalid state parameter (possible CSRF attack)');
     reject(new Error('OAuth2 state parameter validation failed'));
     return;
   }
-  
+
   // Success!
   sendSuccessPage(res);
   resolve(code);
@@ -887,7 +901,7 @@ function sendSuccessPage(res: http.ServerResponse): void {
     </div>
 </body>
 </html>`;
-  
+
   res.writeHead(200, {
     'Content-Type': 'text/html',
     'Content-Length': Buffer.byteLength(html),
@@ -923,7 +937,7 @@ function sendErrorPage(res: http.ServerResponse, errorMessage: string): void {
     </div>
 </body>
 </html>`;
-  
+
   res.writeHead(400, {
     'Content-Type': 'text/html',
     'Content-Length': Buffer.byteLength(html),
@@ -946,36 +960,36 @@ function buildAuthorizationUrl(
   if (!config.authorizationUrl) {
     throw new Error('authorizationUrl is required for interactive flow');
   }
-  
+
   const url = new URL(config.authorizationUrl);
-  
+
   // Required OAuth2 parameters
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('client_id', config.clientId);
   url.searchParams.set('redirect_uri', params.redirectUri);
   url.searchParams.set('state', params.state);
-  
+
   // PKCE parameters (enabled by default)
   if (config.usePKCE !== false) {
     url.searchParams.set('code_challenge', params.codeChallenge);
     url.searchParams.set('code_challenge_method', params.codeChallengeMethod);
   }
-  
+
   // Optional parameters
   if (config.scope) {
     url.searchParams.set('scope', config.scope);
   }
-  
+
   if (config.audience) {
     url.searchParams.set('audience', config.audience);
   }
-  
+
   // Additional parameters
   if (config.additionalParams) {
     for (const [key, value] of Object.entries(config.additionalParams)) {
       url.searchParams.set(key, String(value));
     }
   }
-  
+
   return url.toString();
 }
