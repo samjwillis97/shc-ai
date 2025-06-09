@@ -29,7 +29,8 @@
 
           src = ./.;
 
-          npmDepsHash = "sha256-5FiNyR7tykLROMreCWlvPQWnj6f+3EUNsz8cgasxsX";
+          npmDepsHash = "sha256-5FiNyR7tykLROMreCWlvPQWnj6f+3EUNsz8cgasxsX0=";
+          # npmDepsHash = pkgs.lib.fakeHash;
 
           # Build script
           buildPhase = ''
