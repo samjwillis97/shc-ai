@@ -355,7 +355,7 @@ export class VariableResolver {
         // T14.3: Try custom secret resolvers first, then fall back to environment variables
         if (this.pluginManager) {
           const secretResolvers = this.pluginManager.getSecretResolvers();
-          
+
           for (const resolver of secretResolvers) {
             try {
               const resolvedValue = await resolver(key);
@@ -375,7 +375,7 @@ export class VariableResolver {
             }
           }
         }
-        
+
         // T9.4: Fall back to environment variable (original behavior)
         if (context.env && context.env[key] !== undefined) {
           this.secretVariables.add(variableName);
@@ -477,7 +477,7 @@ export class VariableResolver {
       );
     }
 
-    let targetData: any;
+    let targetData: import('../types/plugin.js').HttpResponse | import('../types/plugin.js').HttpRequest;
 
     switch (dataType) {
       case 'response':
@@ -504,7 +504,7 @@ export class VariableResolver {
         try {
           // Parse the JSON string to an object for JSONPath processing
           targetData = { ...targetData, body: JSON.parse(targetData.body) };
-        } catch (parseError) {
+        } catch {
           // If it's not valid JSON, treat it as a plain string
           // JSONPath will need to access it differently
         }
@@ -552,15 +552,15 @@ export class VariableResolver {
    * 10. {{$dynamic}} built-in dynamic variables (scoped access only)
    * Note: Secret, env, and dynamic variables are only accessible via their scoped syntax
    */
-  private resolveUnscopedVariable(variableName: string, context: VariableContext): any {
+  private resolveUnscopedVariable(variableName: string, context: VariableContext): unknown {
     // 1. CLI variables (highest precedence) - support both old and new names
-    const cliVars = context.cliVariables || (context as any).cli || {};
+    const cliVars = context.cliVariables || {};
     if (cliVars && cliVars[variableName] !== undefined) {
       return cliVars[variableName];
     }
 
     // 2. Step with overrides (for chains) - support both old and new names  
-    const stepWith = context.stepWith || (context as any).stepWith || {};
+    const stepWith = context.stepWith || {};
     if (stepWith && stepWith[variableName] !== undefined) {
       return stepWith[variableName];
     }
@@ -602,7 +602,7 @@ export class VariableResolver {
   /**
    * Converts any value to string for HTTP contexts
    */
-  private stringifyValue(value: any): string {
+  private stringifyValue(value: unknown): string {
     if (typeof value === 'string') {
       return value;
     }
@@ -617,7 +617,7 @@ export class VariableResolver {
    * For strings, applies template substitution
    * For objects/arrays, recursively processes string values
    */
-  async resolveValue(value: any, context: VariableContext): Promise<any> {
+  async resolveValue(value: unknown, context: VariableContext): Promise<unknown> {
     if (typeof value === 'string') {
       return this.resolve(value, context);
     }
@@ -631,7 +631,7 @@ export class VariableResolver {
     }
 
     if (value && typeof value === 'object') {
-      const resolved: any = {};
+      const resolved: Record<string, unknown> = {};
       for (const [key, val] of Object.entries(value)) {
         resolved[key] = await this.resolveValue(val, context);
       }
@@ -648,11 +648,11 @@ export class VariableResolver {
    */
   createContext(
     cliVars: Record<string, string>,
-    profiles?: Record<string, any>,
-    api?: Record<string, any>,
-    endpoint?: Record<string, any>,
+    profiles?: Record<string, unknown>,
+    api?: Record<string, unknown>,
+    endpoint?: Record<string, unknown>,
     plugins?: Record<string, Record<string, VariableSource>>,
-    globalVariables?: Record<string, any>, // T9.3: Global variables
+    globalVariables?: Record<string, unknown>, // T9.3: Global variables
     parameterizedPlugins?: Record<
       string,
       Record<string, import('../types/plugin.js').ParameterizedVariableSource>
@@ -681,10 +681,10 @@ export class VariableResolver {
    */
   mergeProfiles(
     profileNames: string[],
-    profiles: Record<string, Record<string, any>>,
+    profiles: Record<string, Record<string, unknown>>,
     verbose: boolean = false
-  ): Record<string, any> {
-    const merged: Record<string, any> = {};
+  ): Record<string, unknown> {
+    const merged: Record<string, unknown> = {};
     const variableOrigins: Record<string, string> = {}; // Track which profile each variable comes from
 
     for (const profileName of profileNames) {
@@ -770,7 +770,7 @@ export class VariableResolver {
    * T9.6: Generates a UUID v4 (simple implementation without external dependencies)
    */
   private generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
       const r = (Math.random() * 16) | 0;
       const v = c === 'x' ? r : (r & 0x3) | 0x8;
       return v.toString(16);
@@ -844,7 +844,7 @@ export class VariableResolver {
     }
 
     // Resolve function arguments
-    const resolvedArgs: any[] = [];
+    const resolvedArgs: unknown[] = [];
     for (const arg of functionCall.arguments) {
       if (arg.type === 'string') {
         resolvedArgs.push(arg.value);
@@ -1113,15 +1113,15 @@ export class VariableResolver {
     try {
       // Use JSONPath to query the step data
       const result = JSONPath({ path: path, json: stepData });
-      
+
       // If no result found, return undefined
       if (!result || result.length === 0) {
         return undefined;
       }
-      
+
       // Return the first result (JSONPath returns an array)
       return result[0];
-    } catch (error) {
+    } catch {
       // If JSONPath fails, try simple property access
       return undefined;
     }

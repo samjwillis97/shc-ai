@@ -97,7 +97,7 @@ describe('VariableResolver - Phase 7 Plugin Support', () => {
 
       await expect(resolver.resolve('{{plugins.testPlugin.nonExistentVar}}', context))
         .rejects.toThrow(VariableResolutionError);
-      
+
       await expect(resolver.resolve('{{plugins.nonExistentPlugin.someVar}}', context))
         .rejects.toThrow(VariableResolutionError);
     });
@@ -156,7 +156,7 @@ describe('VariableResolver - Phase 7 Plugin Support', () => {
       };
 
       const result = await resolver.resolveValue(complexObject, context);
-      
+
       expect(result).toEqual({
         user: {
           id: 'user-123',
@@ -194,15 +194,6 @@ describe('VariableResolver - Phase 7 Plugin Support', () => {
       const result = await resolver.resolve('{{testVar}}', context);
       expect(result).toBe('cli-value'); // CLI should win
 
-      // Test that plugin variables work when no higher precedence variables exist
-      const contextWithoutCli = resolver.createContext(
-        {}, // No CLI
-        {}, // No Profile
-        {}, // No API
-        {}, // No Endpoint
-        pluginSources // Plugins
-      );
-
       const resultPlugin = await resolver.resolve('{{plugins.testPlugin.testVar}}', context);
       expect(resultPlugin).toBe('plugin-value');
     });
@@ -224,7 +215,7 @@ describe('VariableResolver - Phase 7 Plugin Support', () => {
 
       const template = 'CLI: {{cliVar}}, Profile: {{profile.profileVar}}, API: {{api.apiVar}}, Endpoint: {{endpoint.endpointVar}}, Plugin: {{plugins.authPlugin.getToken}}';
       const result = await resolver.resolve(template, context);
-      
+
       expect(result).toBe('CLI: cli-value, Profile: profile-value, API: api-value, Endpoint: endpoint-value, Plugin: plugin-token');
     });
   });

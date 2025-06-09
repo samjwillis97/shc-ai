@@ -19,7 +19,7 @@ import { VariableSource } from '../../src/types/plugin.js';
 
 describe('T9.7: Complete Variable Precedence Order', () => {
   let resolver: VariableResolver;
-  let originalEnv: NodeJS.ProcessEnv;
+  let originalEnv: typeof process.env;
 
   beforeEach(() => {
     resolver = new VariableResolver();
@@ -46,7 +46,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
 
       // Create context with all variable sources
       const context: VariableContext = {
-        cli: { testVar: 'cli_value' },                    // 1. CLI (highest)
+        cliVariables: { testVar: 'cli_value' },           // 1. CLI (highest)
         stepWith: { testVar: 'step_with_value' },         // 2. Step with
         chainVars: { testVar: 'chain_vars_value' },       // 3. Chain vars
         endpoint: { testVar: 'endpoint_value' },          // 4. Endpoint
@@ -75,7 +75,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
 
       // Test Step with precedence (no CLI)
       let context: VariableContext = {
-        cli: {},                                          // No CLI
+        cliVariables: {},                                          // No CLI
         stepWith: { testVar: 'step_with_value' },         // 2. Step with
         chainVars: { testVar: 'chain_vars_value' },       // 3. Chain vars
         endpoint: { testVar: 'endpoint_value' },          // 4. Endpoint
@@ -91,7 +91,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
 
       // Test Chain vars precedence (no CLI, no Step with)
       context = {
-        cli: {},                                          // No CLI
+        cliVariables: {},                                          // No CLI
         stepWith: {},                                     // No Step with
         chainVars: { testVar: 'chain_vars_value' },       // 3. Chain vars
         endpoint: { testVar: 'endpoint_value' },          // 4. Endpoint
@@ -107,7 +107,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
 
       // Test Endpoint precedence
       context = {
-        cli: {},
+        cliVariables: {},
         stepWith: {},
         chainVars: {},                                    // No Chain vars
         endpoint: { testVar: 'endpoint_value' },          // 4. Endpoint
@@ -123,7 +123,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
 
       // Test API precedence
       context = {
-        cli: {},
+        cliVariables: {},
         stepWith: {},
         chainVars: {},
         endpoint: {},                                     // No Endpoint
@@ -139,7 +139,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
 
       // Test Profile precedence
       context = {
-        cli: {},
+        cliVariables: {},
         stepWith: {},
         chainVars: {},
         endpoint: {},
@@ -155,7 +155,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
 
       // Test Global variables precedence
       context = {
-        cli: {},
+        cliVariables: {},
         stepWith: {},
         chainVars: {},
         endpoint: {},
@@ -182,7 +182,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
       };
 
       const context: VariableContext = {
-        cli: { regularVar: 'cli_regular' },
+        cliVariables: { regularVar: 'cli_regular' },
         stepWith: {},
         chainVars: {},
         endpoint: {},
@@ -223,7 +223,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
       };
 
       const context: VariableContext = {
-        cli: { userId: 'user_123' },
+        cliVariables: { userId: 'user_123' },
         stepWith: {},
         chainVars: {},
         endpoint: { timeout: '5000' },
@@ -252,7 +252,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
     it('should handle complex precedence overrides', async () => {
       // Test where same variable exists at multiple levels
       const context: VariableContext = {
-        cli: { 
+        cliVariables: { 
           cliOnlyVar: 'cli_only',
           overrideVar: 'cli_override'
         },
@@ -314,13 +314,13 @@ describe('T9.7: Complete Variable Precedence Order', () => {
     it('should handle precedence with missing intermediate levels', async () => {
       // Test precedence when some intermediate levels are missing
       const context: VariableContext = {
-        cli: { cliVar: 'cli_value' },
-        stepWith: undefined,                              // Missing step with
-        chainVars: undefined,                             // Missing chain vars
-        endpoint: undefined,                              // Missing endpoint
-        api: { testVar: 'api_value' },                    // API present
-        profiles: undefined,                              // Missing profiles
-        globalVariables: { testVar: 'global_value' },     // Global present
+        cliVariables: { cliVar: 'cli_value' },
+        stepWith: {},                                     // Empty instead of undefined
+        chainVars: {},                                    // Empty instead of undefined
+        endpoint: { endpointVar: 'endpoint_value' },
+        api: { testVar: 'api_value' },                    // Add testVar to API level  
+        profiles: {},
+        globalVariables: { testVar: 'global_value' },     // Add testVar to global level
         plugins: {},
         env: { ...process.env } as Record<string, string>
       };
@@ -330,14 +330,14 @@ describe('T9.7: Complete Variable Precedence Order', () => {
       expect(result1).toBe('api_value'); // API should win over global
 
       // Test with only global available
-      context.api = undefined;
+      context.api = {};  // Empty API instead of undefined
       const result2 = await resolver.resolve('{{testVar}}', context);
       expect(result2).toBe('global_value'); // Global should be used
     });
 
     it('should throw error when variable cannot be resolved at any level', async () => {
       const context: VariableContext = {
-        cli: {},
+        cliVariables: {},
         stepWith: {},
         chainVars: {},
         endpoint: {},
@@ -358,7 +358,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
       process.env.SECRET_KEY = 'super_secret_value';
 
       const context: VariableContext = {
-        cli: {},
+        cliVariables: {},
         stepWith: {},
         chainVars: {},
         endpoint: {},
@@ -386,7 +386,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
   describe('Dynamic Variables in Precedence', () => {
     it('should handle dynamic variables correctly in precedence context', async () => {
       const context: VariableContext = {
-        cli: {},
+        cliVariables: {},
         stepWith: {},
         chainVars: {},
         endpoint: {},
@@ -423,7 +423,7 @@ describe('T9.7: Complete Variable Precedence Order', () => {
       };
 
       const context: VariableContext = {
-        cli: { getValue: 'cli_value' }, // Same name as plugin variable
+        cliVariables: { getValue: 'cli_value' }, // Same name as plugin variable
         stepWith: {},
         chainVars: {},
         endpoint: {},

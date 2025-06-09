@@ -248,14 +248,14 @@ export class ChainExecutor {
 
       // Resolve only the API-level properties (not all endpoints) and the specific endpoint we need
       const resolvedApiBase: Pick<ApiDefinition, 'baseUrl' | 'headers' | 'params' | 'variables'> & {
-        endpoints?: any;
+        endpoints?: Record<string, EndpointDefinition>;
       } = {
-        baseUrl: await variableResolver.resolveValue(api.baseUrl, variableContext),
+        baseUrl: await variableResolver.resolveValue(api.baseUrl, variableContext) as string,
         headers: api.headers
-          ? await variableResolver.resolveValue(api.headers, variableContext)
+          ? await variableResolver.resolveValue(api.headers, variableContext) as Record<string, unknown>
           : undefined,
         params: api.params
-          ? await variableResolver.resolveValue(api.params, variableContext)
+          ? await variableResolver.resolveValue(api.params, variableContext) as Record<string, unknown>
           : undefined,
         variables: api.variables, // Don't resolve variables themselves, just pass them through
         endpoints: {}, // Add empty endpoints to satisfy ApiDefinition interface

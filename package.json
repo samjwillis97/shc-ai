@@ -71,7 +71,8 @@
     "prettier": "^3.5.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
-    "vitest": "^3.1.4"
+    "vitest": "^3.1.4",
+    "zod": "^3.25.56"
   },
   "dependencies": {
     "@types/axios": "^0.9.36",

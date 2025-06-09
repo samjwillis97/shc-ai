@@ -91,14 +91,6 @@ interface OAuth2TokenResponse {
   id_token?: string;
 }
 
-// **NEW: Interactive flow state (T15.3)**
-interface InteractiveFlowState {
-  codeVerifier?: string;
-  state: string;
-  server?: http.Server;
-  promise?: Promise<string>;
-}
-
 // **NEW: Token storage implementations (T15.2)**
 class KeychainTokenStorage implements TokenStorage {
   private serviceName = 'httpcraft-oauth2';
@@ -425,7 +417,7 @@ async function getAccessToken(config: OAuth2Config): Promise<string> {
       console.error('✅ Token refreshed successfully');
       
       return tokenResponse.access_token;
-    } catch (error) {
+    } catch {
       // Refresh failed, remove stored tokens and continue to get new ones
       await storage.remove(cacheKey);
     }
@@ -685,7 +677,11 @@ function generateCacheKey(config: OAuth2Config): string {
 /**
  * Utility function to generate PKCE challenge (for authorization code flow)
  */
-function generatePKCE() {
+function generatePKCE(): {
+  codeVerifier: string;
+  codeChallenge: string;
+  codeChallengeMethod: string;
+} {
   const codeVerifier = crypto.randomBytes(32).toString('base64url');
   const codeChallenge = crypto
     .createHash('sha256')
@@ -732,7 +728,7 @@ async function interactiveAuthorizationCodeFlow(config: OAuth2Config): Promise<O
     
     try {
       await open(authUrl);
-    } catch (error) {
+    } catch {
       console.error('❌ Failed to open browser automatically.');
       console.error('📋 Please open this URL manually in your browser:');
       console.error(`   ${authUrl}`);

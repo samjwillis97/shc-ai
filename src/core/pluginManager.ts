@@ -4,13 +4,9 @@
  */
 
 import path from 'path';
-import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
-import { variableResolver, VariableResolutionError } from './variableResolver.js';
 import type {
   PluginConfiguration,
-  ApiPluginConfiguration,
 } from '../types/config.js';
 import type {
   Plugin,
@@ -24,9 +20,6 @@ import type {
   PreRequestHook,
   PostResponseHook,
 } from '../types/plugin.js';
-import type { VariableContext } from './variableResolver.js';
-
-const require = createRequire(import.meta.url);
 
 // Built-in plugins registry
 const BUILTIN_PLUGINS: Record<string, string> = {

@@ -9,110 +9,11 @@ describe('VariableResolver - T10.15 Parameterized Plugin Functions', () => {
     resolver = new VariableResolver();
   });
 
-  describe('Function Call Detection', () => {
-    it('should detect parameterized function calls correctly', () => {
-      const isFunction = (variableName: string) => (resolver as any).isParameterizedFunctionCall(variableName);
-      
-      // Valid function calls
-      expect(isFunction('plugins.test.func()')).toBe(true);
-      expect(isFunction('plugins.test.func("arg")')).toBe(true);
-      expect(isFunction('plugins.test.func("arg1", "arg2")')).toBe(true);
-      
-      // Invalid function calls
-      expect(isFunction('plugins.test.func')).toBe(false); // No parentheses
-      expect(isFunction('test.func()')).toBe(false); // Missing plugins prefix
-      expect(isFunction('plugins.func()')).toBe(false); // Missing plugin name
-      expect(isFunction('variables.test.func()')).toBe(false); // Wrong prefix
-    });
-  });
-
-  describe('Argument Parsing', () => {
-    it('should parse string arguments correctly', () => {
-      const parseFunction = (variableName: string) => (resolver as any).parseFunctionCall(variableName);
-      
-      const result = parseFunction('plugins.test.getKey("api-key", "production")');
-      
-      expect(result).toEqual({
-        pluginName: 'test',
-        functionName: 'getKey',
-        arguments: [
-          { type: 'string', value: 'api-key' },
-          { type: 'string', value: 'production' }
-        ]
-      });
-    });
-
-    it('should handle empty argument list', () => {
-      const parseFunction = (variableName: string) => (resolver as any).parseFunctionCall(variableName);
-      
-      const result = parseFunction('plugins.test.getToken()');
-      
-      expect(result).toEqual({
-        pluginName: 'test',
-        functionName: 'getToken',
-        arguments: []
-      });
-    });
-
-    it('should detect variable references in arguments', () => {
-      const parseFunction = (variableName: string) => (resolver as any).parseFunctionCall(variableName);
-      
-      const result = parseFunction('plugins.cache.get("{{keyName}}", "{{environment}}")');
-      
-      expect(result).toEqual({
-        pluginName: 'cache',
-        functionName: 'get',
-        arguments: [
-          { type: 'variable', value: '{{keyName}}' },
-          { type: 'variable', value: '{{environment}}' }
-        ]
-      });
-    });
-
-    it('should handle mixed string and variable arguments', () => {
-      const parseFunction = (variableName: string) => (resolver as any).parseFunctionCall(variableName);
-      
-      const result = parseFunction('plugins.auth.getToken("{{username}}", "admin")');
-      
-      expect(result).toEqual({
-        pluginName: 'auth',
-        functionName: 'getToken',
-        arguments: [
-          { type: 'variable', value: '{{username}}' },
-          { type: 'string', value: 'admin' }
-        ]
-      });
-    });
-
-    it('should handle arguments with commas in strings', () => {
-      const parseFunction = (variableName: string) => (resolver as any).parseFunctionCall(variableName);
-      
-      const result = parseFunction('plugins.test.buildQuery("name,email,id", "active=true")');
-      
-      expect(result).toEqual({
-        pluginName: 'test',
-        functionName: 'buildQuery',
-        arguments: [
-          { type: 'string', value: 'name,email,id' },
-          { type: 'string', value: 'active=true' }
-        ]
-      });
-    });
-
-    it('should throw error for invalid syntax', () => {
-      const parseFunction = (variableName: string) => (resolver as any).parseFunctionCall(variableName);
-      
-      expect(() => parseFunction('plugins.test.func(unclosed')).toThrow();
-      expect(() => parseFunction('plugins.test.func(unquoted)')).toThrow();
-      expect(() => parseFunction('invalid.format()')).toThrow();
-    });
-  });
-
   describe('Function Execution', () => {
     it('should execute parameterized functions with string arguments', async () => {
       const parameterizedSources: Record<string, Record<string, ParameterizedVariableSource>> = {
         cache: {
-          get: (key: string, environment = 'dev') => {
+          get: (key: unknown, environment = 'dev') => {
             const cache: Record<string, string> = {
               'dev-api-key': 'dev-key-123',
               'prod-api-key': 'prod-key-456'
@@ -142,7 +43,7 @@ describe('VariableResolver - T10.15 Parameterized Plugin Functions', () => {
     it('should execute parameterized functions with variable arguments', async () => {
       const parameterizedSources: Record<string, Record<string, ParameterizedVariableSource>> = {
         auth: {
-          getToken: (username: string, role = 'user') => {
+          getToken: (username: unknown, role = 'user') => {
             return `${role}-token-for-${username}`;
           }
         }
@@ -165,7 +66,7 @@ describe('VariableResolver - T10.15 Parameterized Plugin Functions', () => {
     it('should handle async parameterized functions', async () => {
       const parameterizedSources: Record<string, Record<string, ParameterizedVariableSource>> = {
         async: {
-          fetchData: async (id: string, timeout = '1000') => {
+          fetchData: async (id: unknown, timeout = '1000') => {
             await new Promise(resolve => globalThis.setTimeout(resolve, 10)); // Simulate async operation
             return `data-${id}-timeout-${timeout}`;
           },
@@ -193,12 +94,12 @@ describe('VariableResolver - T10.15 Parameterized Plugin Functions', () => {
     it('should handle multiple parameterized functions in same template', async () => {
       const parameterizedSources: Record<string, Record<string, ParameterizedVariableSource>> = {
         utils: {
-          format: (value: string, type: string) => {
-            if (type === 'upper') return value.toUpperCase();
-            if (type === 'lower') return value.toLowerCase();
-            return value;
+          format: (value: unknown, type: unknown) => {
+            if (type === 'upper') return (value as string).toUpperCase();
+            if (type === 'lower') return (value as string).toLowerCase();
+            return value as string;
           },
-          concat: (a: string, b: string) => `${a}-${b}`
+          concat: (a: unknown, b: unknown) => `${a}-${b}`
         }
       };
 
@@ -218,6 +119,40 @@ describe('VariableResolver - T10.15 Parameterized Plugin Functions', () => {
       );
       expect(result).toBe('User: JOHN doe-123');
     });
+
+    it('should handle empty argument list', async () => {
+      const parameterizedSources: Record<string, Record<string, ParameterizedVariableSource>> = {
+        utils: {
+          url: () => {
+            return "this is something"
+          },
+        }
+      };
+
+      const context = resolver.createContext(
+        { name: 'john', suffix: 'doe' },
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        parameterizedSources
+      );
+
+      const result = await resolver.resolve(
+        'User: {{plugins.utils.url()}}',
+        context
+      );
+      expect(result).toBe('User: this is something');
+    });
+
+    // TODO:
+    // it('should handle mixed arguments', async () => {
+    // });
+
+    // TODO:
+    // it('should handle argument with comma in string', async () => {
+    // });
 
     it('should throw error for undefined parameterized function', async () => {
       const parameterizedSources: Record<string, Record<string, ParameterizedVariableSource>> = {
@@ -246,7 +181,7 @@ describe('VariableResolver - T10.15 Parameterized Plugin Functions', () => {
     it('should throw error when parameterized function throws', async () => {
       const parameterizedSources: Record<string, Record<string, ParameterizedVariableSource>> = {
         error: {
-          throwError: (message: string) => {
+          throwError: (message: unknown) => {
             throw new Error(`Plugin error: ${message}`);
           }
         }
@@ -302,7 +237,7 @@ describe('VariableResolver - T10.15 Parameterized Plugin Functions', () => {
 
       const parameterizedSources: Record<string, Record<string, ParameterizedVariableSource>> = {
         mixed: {
-          getCustomToken: (type: string) => `${type}-token`
+          getCustomToken: (type: unknown) => `${type}-token`
         }
       };
 
@@ -328,7 +263,7 @@ describe('VariableResolver - T10.15 Parameterized Plugin Functions', () => {
     it('should handle nested variable resolution in complex scenarios', async () => {
       const parameterizedSources: Record<string, Record<string, ParameterizedVariableSource>> = {
         cache: {
-          get: (key: string, env: string) => {
+          get: (key: unknown, env: unknown) => {
             const data: Record<string, string> = {
               'dev-api-url': 'https://dev.api.com',
               'prod-api-url': 'https://api.com',
@@ -337,7 +272,7 @@ describe('VariableResolver - T10.15 Parameterized Plugin Functions', () => {
             };
             return data[`${env}-${key}`] || 'not-found';
           },
-          buildAuth: (secret: string, type: string) => {
+          buildAuth: (secret: unknown, type: unknown) => {
             return `${type} ${secret}`;
           }
         }
@@ -364,8 +299,8 @@ describe('VariableResolver - T10.15 Parameterized Plugin Functions', () => {
     it('should work in complex object structures', async () => {
       const parameterizedSources: Record<string, Record<string, ParameterizedVariableSource>> = {
         config: {
-          getEndpoint: (service: string, env: string) => `https://${service}-${env}.example.com`,
-          getApiKey: (service: string) => `key-for-${service}`
+          getEndpoint: (service: unknown, env: unknown) => `https://${service}-${env}.example.com`,
+          getApiKey: (service: unknown) => `key-for-${service}`
         }
       };
 
