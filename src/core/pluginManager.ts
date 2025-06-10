@@ -69,11 +69,12 @@ export class PluginManager {
 
     // Process API-level plugin configurations
     for (const apiConfig of apiPluginConfigs) {
-      // Check if this is an inline plugin definition
+      // Check if this is an inline plugin definition or built-in plugin
       const isInlinePlugin = apiConfig.path || apiConfig.npmPackage;
+      const isBuiltinPlugin = BUILTIN_PLUGINS[apiConfig.name] && !apiConfig.path && !apiConfig.npmPackage;
       
-      if (isInlinePlugin) {
-        // Inline plugin definition - use as-is, no global definition required
+      if (isInlinePlugin || isBuiltinPlugin) {
+        // Inline plugin definition or built-in plugin - use as-is, no global definition required
         mergedConfigs.push(apiConfig);
       } else {
         // Traditional reference to global plugin - validate and merge
