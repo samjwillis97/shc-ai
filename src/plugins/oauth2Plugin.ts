@@ -837,7 +837,7 @@ async function startCallbackServer(
     if (timeoutHandle) {
       clearTimeout(timeoutHandle);
     }
-    
+
     // Force close the server and all connections
     if (server) {
       server.closeAllConnections?.(); // Close all connections (Node.js 18+)

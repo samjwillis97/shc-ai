@@ -65,14 +65,14 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
 
     // Determine which profiles to use - T13.1 & T13.2: Additive profile merging
     let profileNames: string[] = [];
-    
+
     // Always start with default profiles (if any)
     if (config.config?.defaultProfile) {
-      profileNames = Array.isArray(config.config.defaultProfile) 
-        ? [...config.config.defaultProfile] 
+      profileNames = Array.isArray(config.config.defaultProfile)
+        ? [...config.config.defaultProfile]
         : [config.config.defaultProfile];
     }
-    
+
     // Add CLI-specified profiles (unless --no-default-profile is used)
     if (args.profiles && args.profiles.length > 0) {
       if (args.noDefaultProfile) {
@@ -87,7 +87,7 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     // T13.6: Enhanced verbose output for profile operations
     if (args.verbose) {
       process.stderr.write('[VERBOSE] Loading profiles:\n');
-      
+
       // Show default profiles
       const defaultProfiles = config.config?.defaultProfile;
       if (defaultProfiles) {
@@ -96,19 +96,19 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       } else {
         process.stderr.write(`[VERBOSE]   Default profiles: none\n`);
       }
-      
+
       // Show CLI profiles
       if (args.profiles && args.profiles.length > 0) {
         process.stderr.write(`[VERBOSE]   CLI profiles: ${args.profiles.join(', ')}\n`);
       } else {
         process.stderr.write(`[VERBOSE]   CLI profiles: none\n`);
       }
-      
+
       // Show override behavior
       if (args.noDefaultProfile && args.profiles && args.profiles.length > 0) {
         process.stderr.write(`[VERBOSE]   --no-default-profile used: ignoring default profiles\n`);
       }
-      
+
       // Show final profile order
       if (profileNames.length > 0) {
         process.stderr.write(`[VERBOSE]   Final profile order: ${profileNames.join(', ')}\n`);
@@ -366,12 +366,12 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     if (error instanceof Error) {
       // Check for variable resolution errors by message content
       const errorMessage = error.message;
-      
+
       // Check for variable-related errors
-      if (errorMessage.includes('could not be resolved') || 
-          errorMessage.includes('Variable ') ||
-          errorMessage.includes('not defined') ||
-          errorMessage.includes('resolution failed')) {
+      if (errorMessage.includes('could not be resolved') ||
+        errorMessage.includes('Variable ') ||
+        errorMessage.includes('not defined') ||
+        errorMessage.includes('resolution failed')) {
         process.stderr.write(`Variable Error: ${errorMessage}\n`);
       } else {
         process.stderr.write(`Configuration Error: ${errorMessage}\n`);

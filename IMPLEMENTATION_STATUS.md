@@ -621,3 +621,106 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Plugin Registration:** `context.registerSecretResolver(resolver)` in plugin setup
   - **Variable Resolution:** Custom resolvers tried sequentially before environment variables for {{secret.*}}
   - **Secret Masking:** Automatic participation in existing secret masking system through `secretVariables` and `secretValues`
+
+---
+
+## Phase 15: Enhanced Plugin System - Inline Plugin Definitions
+
+- **Goal:** Enhance the plugin system to support inline plugin definitions at the API level while maintaining global plugins for reuse.
+- **Status:** [x] **COMPLETED**
+- **Priority:** **HIGH** - Reduces plugin definition ceremony and improves developer experience
+- **User Impact:** Enables API-specific plugins without requiring global definition, simplifying one-off and experimental plugins
+- **Tasks:**
+  - [x] **T15.1:** **[CORE ARCHITECTURE]** Update type definitions to support inline plugin definitions.
+    - _Implementation:_ Enhanced `ApiPluginConfiguration` interface to include `path` and `npmPackage` fields
+    - _Backward Compatibility:_ Maintains full compatibility with existing global plugin references
+    - _Type Safety:_ Added proper TypeScript types for both global references and inline definitions
+    - _Testable Outcome:_ ✅ Types support both `{ name: "plugin" }` (global) and `{ name: "plugin", path: "./plugin.js" }` (inline)
+  - [x] **T15.2:** **[PLUGIN MANAGER]** Enhance PluginManager to handle inline plugin definitions.
+    - _Core Logic:_ Modified `getMergedPluginConfigurations()` to detect inline plugins via `path` or `npmPackage` presence
+    - _Processing:_ Inline plugins used as-is, global plugins validated and merged with API overrides
+    - _Error Handling:_ Enhanced error messages to suggest inline definition option when global plugin not found
+    - _Testable Outcome:_ ✅ `PluginManager.getMergedPluginConfigurations()` handles mixed global/inline plugin configurations
+  - [x] **T15.3:** **[JSON SCHEMA]** Update JSON schema to validate inline plugin definitions.
+    - _Schema Structure:_ Enhanced `ApiPluginConfiguration` schema with `oneOf` validation for three scenarios:
+      - Global plugin reference (name + optional config)
+      - Inline plugin with local file (name + path + optional config)
+      - Inline plugin with npm package (name + npmPackage + optional config)
+    - _Validation Rules:_ Prevents invalid combinations (both path and npmPackage) while allowing all valid scenarios
+    - _Testable Outcome:_ ✅ Schema validates inline plugins and rejects invalid configurations
+  - [x] **T15.4:** **[COMPREHENSIVE TESTING]** Implement comprehensive test coverage for inline plugin functionality.
+    - _Unit Tests:_ Added 8 new comprehensive test cases to `tests/unit/pluginManager.test.ts`:
+      - Inline plugins with local file paths
+      - Inline plugins with npm packages
+      - Mixed global and inline plugin configurations
+      - API-specific plugin manager creation
+      - Variable resolution in inline plugin configurations
+      - Error handling for missing global plugin references
+    - _Schema Tests:_ Added 7 new schema validation tests covering valid and invalid inline plugin scenarios
+    - _Test Results:_ All inline plugin tests passing (100% success rate)
+    - _Testable Outcome:_ ✅ Comprehensive test suite verifies all inline plugin functionality
+  - [x] **T15.5:** **[DOCUMENTATION]** Create comprehensive documentation for enhanced plugin system.
+    - _README Update:_ Complete overhaul of Plugin System section with:
+      - Clear explanation of global vs inline plugin approaches
+      - Comprehensive examples for each approach
+      - Mixed plugin strategy (recommended approach)
+      - Benefits and use cases for each method
+      - Best practices for plugin architecture
+    - _Example Configuration:_ Created `examples/inline_plugin_definitions.yaml` with real-world usage patterns
+    - _Migration Guide:_ Backward compatibility information and new feature explanation
+    - _Testable Outcome:_ ✅ Clear documentation explains new functionality and usage patterns
+  - [x] **T15.6:** **[VALIDATION TESTING]** Verify real-world functionality with practical examples.
+    - _Core Functionality:_ ✅ Inline plugins work alongside global plugins seamlessly
+    - _Variable Resolution:_ ✅ Full variable support in inline plugin configurations
+    - _API-Specific Managers:_ ✅ Different APIs can have different plugin configurations
+    - _Error Handling:_ ✅ Clear error messages for undefined global plugins suggest inline definition option
+    - _Schema Validation:_ ✅ All valid configurations accepted, invalid configurations properly rejected
+    - _Testable Outcome:_ ✅ Real-world usage patterns validated and working correctly
+- **Implementation Details:**
+  - **Plugin Definition Options:**
+    ```yaml
+    # Option 1: Global Plugin Reference
+    plugins:
+      - name: "globalPlugin"
+        path: "./plugins/global.js"
+    apis:
+      myAPI:
+        plugins:
+          - name: "globalPlugin"  # References global definition
+            config: { apiSpecific: true }
+    
+    # Option 2: Inline Plugin Definition  
+    apis:
+      myAPI:
+        plugins:
+          - name: "inlinePlugin"
+            path: "./plugins/inline.js"  # No global definition required
+            config: { onlyForThisAPI: true }
+          
+          - name: "npmInlinePlugin"
+            npmPackage: "my-plugin-package"  # npm package inline
+            config: { setting: "value" }
+    ```
+  - **Core Changes:**
+    - Enhanced `ApiPluginConfiguration` type with `path?: string` and `npmPackage?: string`
+    - Modified `PluginManager.getMergedPluginConfigurations()` to detect and handle inline plugins
+    - Updated JSON schema with `oneOf` validation for plugin definition scenarios
+    - Improved error messages to guide users toward inline definitions when appropriate
+  - **Backward Compatibility:**
+    - ✅ All existing configurations continue to work unchanged
+    - ✅ Global plugin references maintain same behavior
+    - ✅ API-level plugin overrides work identically for both global and inline plugins
+  - **Benefits Achieved:**
+    - **Reduced Ceremony:** ✅ No need to define global plugins for one-off use cases
+    - **API-Specific Functionality:** ✅ Tailored plugins for specific API needs without global pollution
+    - **Experimentation:** ✅ Easy to test plugins without modifying global configuration
+    - **Flexibility:** ✅ Choose the right approach (global vs inline) for each use case
+    - **Migration Path:** ✅ Can gradually move from inline to global as plugins mature
+- **Usage Examples:**
+  - **API-Specific Authentication:** `{ name: "oauth", npmPackage: "my-oauth-plugin", config: { clientId: "api-specific" } }`
+  - **Custom Transformations:** `{ name: "xmlToJson", path: "./plugins/xml-transform.js" }`
+  - **Service Integration:** `{ name: "stripe", npmPackage: "@company/stripe-plugin", config: { version: "2023-10-16" } }`
+  - **Development/Testing:** `{ name: "debugLogger", path: "./dev-plugins/debug.js", config: { verbose: true } }`
+- **V1 Ready:** ✅ Enhanced plugin system significantly improves developer experience while maintaining full backward compatibility. The dual approach (global + inline) provides optimal flexibility for different use cases and organizational needs.
+
+---

@@ -409,6 +409,162 @@ describe('HttpCraft Configuration Schema Validation', () => {
         }
       }
     });
+
+    it('should validate API-level inline plugin definition with local file', () => {
+      const config = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            plugins: [
+              {
+                name: 'inlinePlugin',
+                path: './plugins/inline-plugin.js',
+                config: {
+                  apiKey: '{{testVar}}',
+                  feature: 'inlineFeature'
+                }
+              }
+            ],
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      if (!valid) {
+        console.log('Inline plugin (local file) validation errors:', validate.errors);
+      }
+      
+      expect(valid).toBe(true);
+    });
+
+    it('should validate API-level inline plugin definition with npm package', () => {
+      const config = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            plugins: [
+              {
+                name: 'npmInlinePlugin',
+                npmPackage: 'my-custom-plugin',
+                config: {
+                  setting: 'value'
+                }
+              }
+            ],
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      if (!valid) {
+        console.log('Inline plugin (npm package) validation errors:', validate.errors);
+      }
+      
+      expect(valid).toBe(true);
+    });
+
+    it('should validate mix of global plugin references and inline plugin definitions', () => {
+      const config = {
+        plugins: [
+          {
+            name: 'globalPlugin',
+            path: './plugins/global.js',
+            config: {
+              globalSetting: 'globalValue'
+            }
+          }
+        ],
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            plugins: [
+              {
+                // Global plugin reference
+                name: 'globalPlugin',
+                config: {
+                  apiOverride: 'apiValue'
+                }
+              },
+              {
+                // Inline plugin with local file
+                name: 'inlineLocalPlugin',
+                path: './plugins/inline-local.js',
+                config: {
+                  localSetting: 'localValue'
+                }
+              },
+              {
+                // Inline plugin with npm package
+                name: 'inlineNpmPlugin',
+                npmPackage: 'inline-npm-plugin',
+                config: {
+                  npmSetting: 'npmValue'
+                }
+              }
+            ],
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      if (!valid) {
+        console.log('Mixed plugin validation errors:', validate.errors);
+      }
+      
+      expect(valid).toBe(true);
+    });
+
+    it('should validate inline plugin without config section', () => {
+      const config = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            plugins: [
+              {
+                name: 'simpleInlinePlugin',
+                path: './plugins/simple.js'
+                // No config section - should be valid
+              }
+            ],
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      expect(valid).toBe(true);
+    });
   });
 
   describe('Invalid Configurations', () => {
@@ -861,7 +1017,51 @@ describe('HttpCraft Configuration Schema Validation', () => {
             plugins: [
               {
                 name: 'testPlugin',
-                path: './invalid/path.js', // API-level plugins shouldn't have path
+                config: {
+                  apiKey: 'value'
+                },
+                invalidProperty: 'shouldNotBeAllowed'
+              }
+            ],
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      expect(valid).toBe(false);
+      expect(validate.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            keyword: 'additionalProperties'
+          })
+        ])
+      );
+    });
+
+    it('should reject API-level plugin with both path and npmPackage', () => {
+      const config = {
+        plugins: [
+          {
+            name: 'testPlugin',
+            path: './plugins/test.js'
+          }
+        ],
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            plugins: [
+              {
+                name: 'testPlugin',
+                path: './invalid/path.js',
+                npmPackage: 'npm-plugin',
                 config: {
                   apiKey: 'value'
                 }
@@ -884,7 +1084,81 @@ describe('HttpCraft Configuration Schema Validation', () => {
       expect(validate.errors).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            keyword: 'additionalProperties'
+            keyword: 'oneOf'
+          })
+        ])
+      );
+    });
+
+    it('should reject API-level plugin with path but without name', () => {
+      const config = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            plugins: [
+              {
+                path: './plugins/plugin.js',
+                config: {
+                  setting: 'value'
+                }
+              }
+            ],
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      expect(valid).toBe(false);
+      expect(validate.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            keyword: 'required',
+            params: { missingProperty: 'name' }
+          })
+        ])
+      );
+    });
+
+    it('should reject API-level plugin with npmPackage but without name', () => {
+      const config = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            plugins: [
+              {
+                npmPackage: 'npm-plugin',
+                config: {
+                  setting: 'value'
+                }
+              }
+            ],
+            endpoints: {
+              test: {
+                method: 'GET',
+                path: '/test'
+              }
+            }
+          }
+        }
+      };
+
+      const validate = ajv.compile(schema);
+      const valid = validate(config);
+      
+      expect(valid).toBe(false);
+      expect(validate.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            keyword: 'required',
+            params: { missingProperty: 'name' }
           })
         ])
       );

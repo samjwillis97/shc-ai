@@ -747,7 +747,7 @@ export default {
       
       expect(() => {
         pluginManager.getMergedPluginConfigurations(apiConfigs);
-      }).toThrow("API references undefined plugin 'nonexistentPlugin'. Plugin must be defined in the global plugins section.");
+      }).toThrow("API references undefined plugin 'nonexistentPlugin'. Plugin must be defined in the global plugins section, or provide 'path' or 'npmPackage' for inline definition.");
     });
 
     it('should return global configs when no API configs provided', async () => {
@@ -1717,6 +1717,371 @@ export default {
       await expect(pluginManager.loadApiPlugins(apiConfigs, tempDir)).rejects.toThrow(
         /Parameterized function 'nonExistentFunc' not found in plugin 'limitedPlugin'/
       );
+    });
+  });
+
+  describe('Inline Plugin Definitions (Enhanced API-level plugins)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should support inline plugin definitions with local file path', async () => {
+      // Create an inline plugin file
+      const inlinePluginPath = path.join(tempDir, 'inline-plugin.js');
+      const inlinePluginContent = `
+export default {
+  async setup(context) {
+    context.registerPreRequestHook(async (request) => {
+      request.headers['X-Inline-Plugin'] = 'local-file';
+    });
+  }
+};
+`;
+      await fs.writeFile(inlinePluginPath, inlinePluginContent);
+
+      // No global plugins - inline plugin should work without global definition
+      const globalConfigs: PluginConfiguration[] = [];
+
+      // API-level inline plugin configuration
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          name: 'inlinePlugin',
+          path: './inline-plugin.js',
+          config: {
+            inlineKey: 'inlineValue'
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      const mergedConfigs = pluginManager.getMergedPluginConfigurations(apiConfigs);
+      
+      expect(mergedConfigs).toHaveLength(1);
+      expect(mergedConfigs[0].name).toBe('inlinePlugin');
+      expect(mergedConfigs[0].path).toBe('./inline-plugin.js');
+      expect(mergedConfigs[0].config).toEqual({
+        inlineKey: 'inlineValue'
+      });
+    });
+
+    it('should support inline plugin definitions with npm package', async () => {
+      // Mock npm plugin
+      const mockNpmPlugin = {
+        async setup(context: any) {
+          context.registerPreRequestHook(async (request: any) => {
+            request.headers['X-Inline-Plugin'] = 'npm-package';
+          });
+        }
+      };
+
+      vi.doMock('inline-npm-plugin', () => ({ default: mockNpmPlugin }));
+
+      // No global plugins
+      const globalConfigs: PluginConfiguration[] = [];
+
+      // API-level inline plugin configuration with npm package
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          name: 'inlineNpmPlugin',
+          npmPackage: 'inline-npm-plugin',
+          config: {
+            npmKey: 'npmValue'
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      const mergedConfigs = pluginManager.getMergedPluginConfigurations(apiConfigs);
+      
+      expect(mergedConfigs).toHaveLength(1);
+      expect(mergedConfigs[0].name).toBe('inlineNpmPlugin');
+      expect(mergedConfigs[0].npmPackage).toBe('inline-npm-plugin');
+      expect(mergedConfigs[0].config).toEqual({
+        npmKey: 'npmValue'
+      });
+
+      // Clean up the mock
+      vi.doUnmock('inline-npm-plugin');
+    });
+
+    it('should support mix of global plugin references and inline plugin definitions', async () => {
+      // Create files for both global and inline plugins
+      const globalPluginPath = path.join(tempDir, 'global-plugin.js');
+      const inlinePluginPath = path.join(tempDir, 'inline-plugin.js');
+      
+      const pluginContent = `
+export default {
+  async setup(context) {
+    // Test plugin
+  }
+};
+`;
+      await fs.writeFile(globalPluginPath, pluginContent);
+      await fs.writeFile(inlinePluginPath, pluginContent);
+
+      // Global plugin configuration
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          name: 'globalPlugin',
+          path: './global-plugin.js',
+          config: {
+            globalKey: 'globalValue'
+          }
+        }
+      ];
+
+      // API configs with both types
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          // Reference global plugin
+          name: 'globalPlugin',
+          config: { apiSpecific: true }
+        },
+        {
+          // Inline plugin
+          name: 'inlinePlugin',
+          path: './inline-plugin.js',
+          config: {
+            inlineKey: 'inlineValue'
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      const mergedConfigs = pluginManager.getMergedPluginConfigurations(apiConfigs);
+      
+      expect(mergedConfigs).toHaveLength(2);
+      
+      // Check global plugin reference (merged configuration)
+      const globalPluginConfig = mergedConfigs.find(c => c.name === 'globalPlugin');
+      expect(globalPluginConfig).toBeDefined();
+      expect(globalPluginConfig!.path).toBe('./global-plugin.js');
+      expect(globalPluginConfig!.config).toEqual({
+        globalKey: 'globalValue',
+        apiSpecific: true
+      });
+      
+      // Check inline plugin definition (used as-is)
+      const inlinePluginConfig = mergedConfigs.find(c => c.name === 'inlinePlugin');
+      expect(inlinePluginConfig).toBeDefined();
+      expect(inlinePluginConfig!.path).toBe('./inline-plugin.js');
+      expect(inlinePluginConfig!.config).toEqual({
+        inlineKey: 'inlineValue'
+      });
+    });
+
+    it('should create API-specific plugin manager with inline plugins', async () => {
+      // Create an inline plugin file
+      const inlinePluginPath = path.join(tempDir, 'api-specific-plugin.js');
+      const inlinePluginContent = `
+export default {
+  async setup(context) {
+    context.registerPreRequestHook(async (request) => {
+      request.headers['X-API-Specific'] = JSON.stringify(context.config);
+    });
+  }
+};
+`;
+      await fs.writeFile(inlinePluginPath, inlinePluginContent);
+
+      // No global plugins
+      const globalConfigs: PluginConfiguration[] = [];
+
+      // API-level inline plugin
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          name: 'apiSpecificPlugin',
+          path: './api-specific-plugin.js',
+          config: {
+            apiId: 'userAPI',
+            feature: 'userTracking'
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      const apiPluginManager = await pluginManager.loadApiPlugins(apiConfigs, tempDir);
+      
+      // Verify that the API plugin manager has the inline plugin loaded
+      const apiPlugins = apiPluginManager.getPlugins();
+      expect(apiPlugins).toHaveLength(1);
+      expect(apiPlugins[0].name).toBe('apiSpecificPlugin');
+      expect(apiPlugins[0].config).toEqual({
+        apiId: 'userAPI',
+        feature: 'userTracking'
+      });
+
+      // Test that the plugin hook works
+      const request = {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {}
+      };
+
+      await apiPluginManager.executePreRequestHooks(request);
+      
+      expect(request.headers['X-API-Specific']).toBe(
+        JSON.stringify({ apiId: 'userAPI', feature: 'userTracking' })
+      );
+    });
+
+    it('should maintain improved error message for missing global plugin references', async () => {
+      // No global plugins
+      const globalConfigs: PluginConfiguration[] = [];
+
+      // API config referencing non-existent global plugin (no path/npmPackage)
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          name: 'nonexistentPlugin',
+          config: {}
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      expect(() => {
+        pluginManager.getMergedPluginConfigurations(apiConfigs);
+      }).toThrow(
+        "API references undefined plugin 'nonexistentPlugin'. Plugin must be defined in the global plugins section, or provide 'path' or 'npmPackage' for inline definition."
+      );
+    });
+
+    it('should handle inline plugins alongside global plugins in API plugin manager', async () => {
+      // Create plugin files
+      const globalPluginPath = path.join(tempDir, 'shared-plugin.js');
+      const inlinePluginPath = path.join(tempDir, 'specific-plugin.js');
+      
+      const globalPluginContent = `
+export default {
+  async setup(context) {
+    context.registerPreRequestHook(async (request) => {
+      request.headers['X-Shared-Plugin'] = 'shared';
+    });
+  }
+};
+`;
+      
+      const inlinePluginContent = `
+export default {
+  async setup(context) {
+    context.registerPreRequestHook(async (request) => {
+      request.headers['X-Specific-Plugin'] = 'specific';
+    });
+  }
+};
+`;
+      
+      await fs.writeFile(globalPluginPath, globalPluginContent);
+      await fs.writeFile(inlinePluginPath, inlinePluginContent);
+
+      // Global plugin for reuse
+      const globalConfigs: PluginConfiguration[] = [
+        {
+          name: 'sharedPlugin',
+          path: './shared-plugin.js',
+          config: { shared: true }
+        }
+      ];
+
+      // API configs with both types
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          // Reference global plugin
+          name: 'sharedPlugin',
+          config: { apiSpecific: true }
+        },
+        {
+          // Inline plugin
+          name: 'specificPlugin',
+          path: './specific-plugin.js',
+          config: { onlyForThisAPI: true }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      const apiPluginManager = await pluginManager.loadApiPlugins(apiConfigs, tempDir);
+      
+      // Verify both plugins are loaded
+      const apiPlugins = apiPluginManager.getPlugins();
+      expect(apiPlugins).toHaveLength(2);
+      
+      // Test that both plugins work together
+      const request = {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {}
+      };
+
+      await apiPluginManager.executePreRequestHooks(request);
+      
+      expect(request.headers['X-Shared-Plugin']).toBe('shared');
+      expect(request.headers['X-Specific-Plugin']).toBe('specific');
+    });
+
+    it('should support variable resolution in inline plugin configurations', async () => {
+      // Create an inline plugin that uses its configuration
+      const inlinePluginPath = path.join(tempDir, 'configurable-plugin.js');
+      const inlinePluginContent = `
+export default {
+  async setup(context) {
+    context.registerPreRequestHook(async (request) => {
+      request.headers['X-Plugin-Config'] = JSON.stringify(context.config);
+    });
+  }
+};
+`;
+      await fs.writeFile(inlinePluginPath, inlinePluginContent);
+
+      // Import variable resolver for context creation
+      const { variableResolver } = await import('../../src/core/variableResolver.js');
+
+      // Create variable context with values for resolution
+      const variableContext = variableResolver.createContext(
+        { cliVar: 'cliValue' }, // CLI vars
+        { profileVar: 'profileValue' }, // Profile vars
+        { apiVar: 'apiValue' }, // API vars
+        {}, // Endpoint vars
+        {}, // Plugin vars
+        { globalVar: 'globalValue' } // Global vars
+      );
+
+      // No global plugins
+      const globalConfigs: PluginConfiguration[] = [];
+
+      // Inline plugin with variables in configuration
+      const apiConfigs: PluginConfiguration[] = [
+        {
+          name: 'configurablePlugin',
+          path: './configurable-plugin.js',
+          config: {
+            staticValue: 'static',
+            fromCli: '{{cliVar}}',
+            fromProfile: '{{profileVar}}',
+            fromApi: '{{apiVar}}',
+            fromGlobal: '{{globalVar}}'
+          }
+        }
+      ];
+
+      await pluginManager.loadPlugins(globalConfigs, tempDir);
+      
+      const apiPluginManager = await pluginManager.loadApiPlugins(apiConfigs, tempDir, variableContext);
+      
+      // Verify that variables were resolved in the inline plugin config
+      const apiPlugins = apiPluginManager.getPlugins();
+      expect(apiPlugins).toHaveLength(1);
+      expect(apiPlugins[0].config).toEqual({
+        staticValue: 'static',
+        fromCli: 'cliValue',
+        fromProfile: 'profileValue',
+        fromApi: 'apiValue',
+        fromGlobal: 'globalValue'
+      });
     });
   });
 }); 

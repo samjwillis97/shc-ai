@@ -435,42 +435,181 @@ Access step data using:
 - `{{steps.stepId.request.url}}` - Request URL
 - `{{steps.stepId.request.body.field}}` - Request body data
 
-### Plugin System
+## 🔌 Plugin System
 
-Extend HttpCraft with custom JavaScript/TypeScript plugins:
+HttpCraft supports an extensible plugin system with **two approaches** for plugin definitions:
+
+1. **Global plugins** - Defined once and reused across multiple APIs
+2. **Inline plugins** - Defined directly within API configurations for API-specific functionality
+
+### Global Plugin Configuration (Reusable)
+
+Define plugins once in the global `plugins` section for reuse across multiple APIs:
+
+```yaml
+# Global plugin definitions
+plugins:
+  - name: "sharedAuth"
+    path: "./plugins/shared-auth.js"
+    config:
+      baseUrl: "https://auth.example.com"
+      timeout: 30000
+  
+  - name: "logging"
+    npmPackage: "httpcraft-logging-plugin"
+    config:
+      level: "info"
+
+apis:
+  userAPI:
+    baseUrl: "https://api.example.com"
+    plugins:
+      # Reference global plugins with API-specific overrides
+      - name: "sharedAuth"
+        config:
+          scope: "user:read user:write"
+      - name: "logging"
+
+  paymentAPI:
+    baseUrl: "https://payments.example.com"
+    plugins:
+      # Same global plugins, different configuration
+      - name: "sharedAuth"
+        config:
+          scope: "payment:read payment:write"
+      - name: "logging"
+        config:
+          level: "debug"  # Override global config
+```
+
+### Inline Plugin Definitions (API-Specific)
+
+Define plugins directly within API configurations for API-specific functionality:
+
+```yaml
+apis:
+  userAPI:
+    baseUrl: "https://api.example.com"
+    plugins:
+      # Inline plugin with local file
+      - name: "userValidator"
+        path: "./plugins/user-validator.js"
+        config:
+          strictMode: true
+          requiredFields: ["email", "username"]
+      
+      # Inline plugin with npm package
+      - name: "userMetrics"
+        npmPackage: "@company/user-metrics-plugin"
+        config:
+          trackingId: "user-api-v1"
+
+  paymentAPI:
+    baseUrl: "https://payments.example.com"
+    plugins:
+      # Different inline plugins for payment API
+      - name: "fraudDetection"
+        path: "./plugins/fraud-detection.js"
+        config:
+          threshold: 0.85
+          
+      - name: "stripeIntegration"
+        npmPackage: "stripe-httpcraft-plugin"
+        config:
+          apiVersion: "2023-10-16"
+          webhookSecret: "{{secret.STRIPE_WEBHOOK_SECRET}}"
+```
+
+### Mixed Plugin Approach (Recommended)
+
+Combine global and inline plugins for maximum flexibility:
+
+```yaml
+# Global plugins for common functionality
+plugins:
+  - name: "oauth2"
+    config:
+      clientId: "{{env.OAUTH2_CLIENT_ID}}"
+      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
+      tokenUrl: "https://auth.example.com/oauth2/token"
+
+apis:
+  userAPI:
+    baseUrl: "https://api.example.com"
+    plugins:
+      # Reference built-in global plugin
+      - name: "oauth2"
+        config:
+          scope: "user:read user:write"
+      
+      # API-specific inline plugin
+      - name: "userAudit"
+        path: "./plugins/user-audit.js"
+        config:
+          auditLevel: "detailed"
+          logDestination: "user-api-logs"
+
+  notificationAPI:
+    baseUrl: "https://notifications.example.com"
+    plugins:
+      # Only inline plugins (no global dependencies)
+      - name: "twilioSMS"
+        npmPackage: "@httpcraft/twilio-plugin"
+        config:
+          accountSid: "{{secret.TWILIO_ACCOUNT_SID}}"
+          authToken: "{{secret.TWILIO_AUTH_TOKEN}}"
+```
+
+### Example Plugin Development
 
 ```javascript
-// plugins/auth-plugin.js
+// plugins/customAuth.js
 export default {
-  name: 'authPlugin',
-  
-  setup(config, context) {
-    // Plugin initialization
-  },
-  
-  // Pre-request hook
-  async preRequest(request, context) {
-    // Modify request before sending
-    request.headers['X-Custom-Auth'] = await getAuthToken();
-    return request;
-  },
-  
-  // Post-response hook  
-  async postResponse(response, context) {
-    // Transform response after receiving
-    if (response.headers['content-type']?.includes('xml')) {
-      response.body = await xmlToJson(response.body);
-    }
-    return response;
-  },
-  
-  // Custom variables
-  variables: {
-    authToken: async () => await getAuthToken(),
-    timestamp: () => Date.now()
+  async setup(context) {
+    // Pre-request hook
+    context.registerPreRequestHook(async (request) => {
+      const token = await getApiToken(context.config.apiKey);
+      request.headers['Authorization'] = `Bearer ${token}`;
+    });
+    
+    // Custom variables
+    context.registerVariableSource('apiToken', async () => {
+      return await getApiToken(context.config.apiKey);
+    });
+    
+    // Parameterized functions
+    context.registerParameterizedVariableSource('getTokenWithScope', async (scope) => {
+      return await getApiToken(context.config.apiKey, scope);
+    });
+    
+    // Post-response hook
+    context.registerPostResponseHook(async (request, response) => {
+      if (response.headers['content-type']?.includes('xml')) {
+        response.body = convertXmlToJson(response.body);
+      }
+    });
   }
 };
 ```
+
+### Plugin Benefits
+
+**Global Plugins:**
+- ✅ **Reusability** - Define once, use everywhere
+- ✅ **Consistency** - Same plugin version across APIs
+- ✅ **Maintenance** - Single place for updates
+- ✅ **Configuration sharing** - Base config with API overrides
+
+**Inline Plugins:**
+- ✅ **Simplicity** - No global definition required
+- ✅ **API-specific** - Tailored to specific API needs
+- ✅ **Reduced ceremony** - Direct definition where needed
+- ✅ **Experimentation** - Easy to test one-off plugins
+
+**Best Practices:**
+- Use **global plugins** for authentication, logging, and shared functionality
+- Use **inline plugins** for API-specific validation, transformations, and integrations
+- Combine both approaches in complex applications for optimal flexibility
 
 ## 🏗️ ZSH Tab Completion
 
@@ -1176,9 +1315,130 @@ httpcraft myApi secureEndpoint  # Uses {{secret.API_SECRET}}
 
 ## 🔌 Plugin System
 
-Extend HttpCraft with custom plugins for authentication, response transformation, and more:
+HttpCraft supports an extensible plugin system with **two approaches** for plugin definitions:
 
-### Example Plugin
+1. **Global plugins** - Defined once and reused across multiple APIs
+2. **Inline plugins** - Defined directly within API configurations for API-specific functionality
+
+### Global Plugin Configuration (Reusable)
+
+Define plugins once in the global `plugins` section for reuse across multiple APIs:
+
+```yaml
+# Global plugin definitions
+plugins:
+  - name: "sharedAuth"
+    path: "./plugins/shared-auth.js"
+    config:
+      baseUrl: "https://auth.example.com"
+      timeout: 30000
+  
+  - name: "logging"
+    npmPackage: "httpcraft-logging-plugin"
+    config:
+      level: "info"
+
+apis:
+  userAPI:
+    baseUrl: "https://api.example.com"
+    plugins:
+      # Reference global plugins with API-specific overrides
+      - name: "sharedAuth"
+        config:
+          scope: "user:read user:write"
+      - name: "logging"
+
+  paymentAPI:
+    baseUrl: "https://payments.example.com"
+    plugins:
+      # Same global plugins, different configuration
+      - name: "sharedAuth"
+        config:
+          scope: "payment:read payment:write"
+      - name: "logging"
+        config:
+          level: "debug"  # Override global config
+```
+
+### Inline Plugin Definitions (API-Specific)
+
+Define plugins directly within API configurations for API-specific functionality:
+
+```yaml
+apis:
+  userAPI:
+    baseUrl: "https://api.example.com"
+    plugins:
+      # Inline plugin with local file
+      - name: "userValidator"
+        path: "./plugins/user-validator.js"
+        config:
+          strictMode: true
+          requiredFields: ["email", "username"]
+      
+      # Inline plugin with npm package
+      - name: "userMetrics"
+        npmPackage: "@company/user-metrics-plugin"
+        config:
+          trackingId: "user-api-v1"
+
+  paymentAPI:
+    baseUrl: "https://payments.example.com"
+    plugins:
+      # Different inline plugins for payment API
+      - name: "fraudDetection"
+        path: "./plugins/fraud-detection.js"
+        config:
+          threshold: 0.85
+          
+      - name: "stripeIntegration"
+        npmPackage: "stripe-httpcraft-plugin"
+        config:
+          apiVersion: "2023-10-16"
+          webhookSecret: "{{secret.STRIPE_WEBHOOK_SECRET}}"
+```
+
+### Mixed Plugin Approach (Recommended)
+
+Combine global and inline plugins for maximum flexibility:
+
+```yaml
+# Global plugins for common functionality
+plugins:
+  - name: "oauth2"
+    config:
+      clientId: "{{env.OAUTH2_CLIENT_ID}}"
+      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
+      tokenUrl: "https://auth.example.com/oauth2/token"
+
+apis:
+  userAPI:
+    baseUrl: "https://api.example.com"
+    plugins:
+      # Reference built-in global plugin
+      - name: "oauth2"
+        config:
+          scope: "user:read user:write"
+      
+      # API-specific inline plugin
+      - name: "userAudit"
+        path: "./plugins/user-audit.js"
+        config:
+          auditLevel: "detailed"
+          logDestination: "user-api-logs"
+
+  notificationAPI:
+    baseUrl: "https://notifications.example.com"
+    plugins:
+      # Only inline plugins (no global dependencies)
+      - name: "twilioSMS"
+        npmPackage: "@httpcraft/twilio-plugin"
+        config:
+          accountSid: "{{secret.TWILIO_ACCOUNT_SID}}"
+          authToken: "{{secret.TWILIO_AUTH_TOKEN}}"
+```
+
+### Example Plugin Development
 
 ```javascript
 // plugins/customAuth.js
@@ -1195,6 +1455,11 @@ export default {
       return await getApiToken(context.config.apiKey);
     });
     
+    // Parameterized functions
+    context.registerParameterizedVariableSource('getTokenWithScope', async (scope) => {
+      return await getApiToken(context.config.apiKey, scope);
+    });
+    
     // Post-response hook
     context.registerPostResponseHook(async (request, response) => {
       if (response.headers['content-type']?.includes('xml')) {
@@ -1205,25 +1470,24 @@ export default {
 };
 ```
 
-### Plugin Configuration
+### Plugin Benefits
 
-```yaml
-plugins:
-  - path: "./plugins/customAuth.js"
-    name: "auth"
-    config:
-      apiKey: "{{secret.API_KEY}}"
-      timeout: 30000
+**Global Plugins:**
+- ✅ **Reusability** - Define once, use everywhere
+- ✅ **Consistency** - Same plugin version across APIs
+- ✅ **Maintenance** - Single place for updates
+- ✅ **Configuration sharing** - Base config with API overrides
 
-apis:
-  secureApi:
-    baseUrl: "https://secure-api.example.com"
-    plugins:
-      - name: "auth"
-        config:
-          # Override plugin config for this API
-          timeout: 60000
-```
+**Inline Plugins:**
+- ✅ **Simplicity** - No global definition required
+- ✅ **API-specific** - Tailored to specific API needs
+- ✅ **Reduced ceremony** - Direct definition where needed
+- ✅ **Experimentation** - Easy to test one-off plugins
+
+**Best Practices:**
+- Use **global plugins** for authentication, logging, and shared functionality
+- Use **inline plugins** for API-specific validation, transformations, and integrations
+- Combine both approaches in complex applications for optimal flexibility
 
 ## 🏗️ ZSH Tab Completion
 

@@ -52,6 +52,7 @@ export class PluginManager {
   /**
    * T10.2 & T10.3: Create merged plugin configurations for a specific API
    * API-level plugin configurations override global configurations
+   * Enhanced to support inline plugin definitions
    */
   getMergedPluginConfigurations(apiPluginConfigs?: PluginConfiguration[]): PluginConfiguration[] {
     if (!apiPluginConfigs || apiPluginConfigs.length === 0) {
@@ -68,27 +69,35 @@ export class PluginManager {
 
     // Process API-level plugin configurations
     for (const apiConfig of apiPluginConfigs) {
-      // T10.5: Validate that API references a globally defined plugin
-      const globalConfig = globalConfigsMap.get(apiConfig.name);
-      if (!globalConfig) {
-        throw new Error(
-          `API references undefined plugin '${apiConfig.name}'. Plugin must be defined in the global plugins section.`
-        );
+      // Check if this is an inline plugin definition
+      const isInlinePlugin = apiConfig.path || apiConfig.npmPackage;
+      
+      if (isInlinePlugin) {
+        // Inline plugin definition - use as-is, no global definition required
+        mergedConfigs.push(apiConfig);
+      } else {
+        // Traditional reference to global plugin - validate and merge
+        const globalConfig = globalConfigsMap.get(apiConfig.name);
+        if (!globalConfig) {
+          throw new Error(
+            `API references undefined plugin '${apiConfig.name}'. Plugin must be defined in the global plugins section, or provide 'path' or 'npmPackage' for inline definition.`
+          );
+        }
+
+        // T10.3: Merge configurations (API-level overwrites global keys)
+        const mergedConfig: PluginConfiguration = {
+          // T10.7: Copy the source field (path or npmPackage) from global config
+          path: globalConfig.path,
+          npmPackage: globalConfig.npmPackage,
+          name: apiConfig.name,
+          config: {
+            ...globalConfig.config, // Start with global config
+            ...apiConfig.config, // Override with API-level config
+          },
+        };
+
+        mergedConfigs.push(mergedConfig);
       }
-
-      // T10.3: Merge configurations (API-level overwrites global keys)
-      const mergedConfig: PluginConfiguration = {
-        // T10.7: Copy the source field (path or npmPackage) from global config
-        path: globalConfig.path,
-        npmPackage: globalConfig.npmPackage,
-        name: apiConfig.name,
-        config: {
-          ...globalConfig.config, // Start with global config
-          ...apiConfig.config, // Override with API-level config
-        },
-      };
-
-      mergedConfigs.push(mergedConfig);
     }
 
     // Add any global plugins not overridden by API-level configs
@@ -161,10 +170,10 @@ export class PluginManager {
     if (configsToResolve.length > 0) {
       // Import variable resolver here to avoid circular dependency
       const { variableResolver } = await import('./variableResolver.js');
-      
+
       // Set this plugin manager on variable resolver temporarily for secret resolution
       variableResolver.setPluginManager(apiPluginManager);
-      
+
       // Use provided context but ensure it includes global plugin sources
       let context;
       if (variableContext) {

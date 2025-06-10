@@ -1,0 +1,153 @@
+# HttpCraft Configuration Example: Inline Plugin Definitions
+# This example demonstrates the enhanced plugin system that supports both global plugin
+# definitions (for reuse) and inline plugin definitions (for API-specific functionality)
+
+# Global plugins for reuse across multiple APIs
+plugins:
+  - name: "sharedAuth"
+    path: "./plugins/shared-auth.js"
+    config:
+      baseUrl: "https://auth.example.com"
+      timeout: 30000
+
+  - name: "logging"
+    npmPackage: "httpcraft-logging-plugin"
+    config:
+      level: "info"
+      destination: "file"
+
+# Environment-specific configuration
+profiles:
+  development:
+    environment: "dev"
+    logLevel: "debug"
+  
+  production:
+    environment: "prod"
+    logLevel: "warn"
+
+apis:
+  # User API using both global and inline plugins
+  userAPI:
+    baseUrl: "https://api.example.com"
+    plugins:
+      # Reference to global plugin with API-specific overrides
+      - name: "sharedAuth"
+        config:
+          scope: "user:read user:write"
+          audience: "user-service"
+      
+      # Reference to global plugin (used as-is)
+      - name: "logging"
+      
+      # Inline plugin definition with local file (API-specific)
+      - name: "userValidator"
+        path: "./plugins/user-validator.js"
+        config:
+          strictMode: true
+          requiredFields: ["email", "username"]
+          environment: "{{environment}}"
+    
+    endpoints:
+      getUser:
+        method: GET
+        path: "/users/{{userId}}"
+      
+      createUser:
+        method: POST
+        path: "/users"
+        body:
+          email: "{{email}}"
+          username: "{{username}}"
+
+  # Payment API with different plugin configuration
+  paymentAPI:
+    baseUrl: "https://payments.example.com"
+    plugins:
+      # Same global plugin, different configuration
+      - name: "sharedAuth"
+        config:
+          scope: "payment:read payment:write"
+          audience: "payment-service"
+      
+      # Inline plugin with npm package (payment-specific)
+      - name: "paymentSecurity"
+        npmPackage: "stripe-security-plugin"
+        config:
+          apiVersion: "2023-10-16"
+          webhookSecret: "{{secret.STRIPE_WEBHOOK_SECRET}}"
+          environment: "{{environment}}"
+      
+      # Another inline plugin with local file
+      - name: "fraudDetection"
+        path: "./plugins/fraud-detection.js"
+        config:
+          threshold: 0.85
+          enableRealTimeCheck: true
+    
+    endpoints:
+      processPayment:
+        method: POST
+        path: "/payments"
+        body:
+          amount: "{{amount}}"
+          currency: "{{currency}}"
+          source: "{{paymentSource}}"
+
+  # Simple API with only inline plugins (no global dependencies)
+  notificationAPI:
+    baseUrl: "https://notifications.example.com"
+    plugins:
+      # Inline plugin for API-specific notification handling
+      - name: "notificationFormatter"
+        path: "./plugins/notification-formatter.js"
+        config:
+          template: "email"
+          includeMetadata: true
+          
+      # Inline plugin from npm for specific notification provider
+      - name: "twilioIntegration"
+        npmPackage: "@httpcraft/twilio-plugin"
+        config:
+          accountSid: "{{secret.TWILIO_ACCOUNT_SID}}"
+          authToken: "{{secret.TWILIO_AUTH_TOKEN}}"
+          fromNumber: "{{env.TWILIO_PHONE_NUMBER}}"
+    
+    endpoints:
+      sendEmail:
+        method: POST
+        path: "/email"
+        body:
+          to: "{{email}}"
+          subject: "{{subject}}"
+          message: "{{message}}"
+      
+      sendSMS:
+        method: POST
+        path: "/sms"
+        body:
+          to: "{{phoneNumber}}"
+          message: "{{smsMessage}}"
+
+# Chain example showing inline plugins in action
+chains:
+  userRegistrationFlow:
+    description: "Complete user registration with validation and notifications"
+    vars:
+      environment: "{{profile.environment}}"
+    
+    steps:
+      - id: "validateUser"
+        call: "userAPI.createUser"
+        with:
+          body:
+            email: "{{registrationEmail}}"
+            username: "{{registrationUsername}}"
+      
+      - id: "sendWelcome"
+        call: "notificationAPI.sendEmail"
+        with:
+          body:
+            to: "{{steps.validateUser.request.body.email}}"
+            subject: "Welcome to our platform!"
+            message: "Hello {{steps.validateUser.request.body.username}}, welcome!" 

@@ -270,20 +270,57 @@
     },
     "ApiPluginConfiguration": {
       "type": "object",
-      "description": "API-level plugin configuration override with variable substitution support",
+      "description": "API-level plugin configuration with support for inline plugin definitions",
       "properties": {
         "name": {
           "type": "string",
-          "description": "Plugin name/identifier (must reference a globally defined plugin)"
+          "description": "Plugin name/identifier"
+        },
+        "path": {
+          "type": "string",
+          "description": "Path to plugin file (for inline plugin definitions)"
+        },
+        "npmPackage": {
+          "type": "string", 
+          "description": "NPM package name (for inline plugin definitions)"
         },
         "config": {
           "type": "object",
-          "description": "Plugin-specific configuration overrides (merged with global plugin config, supports {{variable}} substitution)",
+          "description": "Plugin-specific configuration (merged with global plugin config if referencing global plugin, supports {{variable}} substitution)",
           "additionalProperties": true
         }
       },
       "required": ["name"],
-      "additionalProperties": false
+      "oneOf": [
+        {
+          "description": "Global plugin reference (name only)",
+          "properties": {
+            "name": true,
+            "config": true
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Inline plugin with local file",
+          "properties": {
+            "name": true,
+            "path": true,
+            "config": true
+          },
+          "additionalProperties": false,
+          "required": ["path"]
+        },
+        {
+          "description": "Inline plugin with npm package",
+          "properties": {
+            "name": true,
+            "npmPackage": true,
+            "config": true
+          },
+          "additionalProperties": false,
+          "required": ["npmPackage"]
+        }
+      ]
     },
     "ApiDefinition": {
       "type": "object",

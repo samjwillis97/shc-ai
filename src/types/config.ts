@@ -98,5 +98,8 @@ export interface PluginConfiguration {
 
 export interface ApiPluginConfiguration {
   name: string;
+  // Allow inline plugin definitions
+  path?: string;
+  npmPackage?: string;
   config?: Record<string, unknown>;
 }
