@@ -162,17 +162,42 @@ export class PluginManager {
       }
     }
 
+    // Enhanced dependency-aware loading: prioritize secret providers
+    // Sort configsToResolve to load secret providers first
+    const secretProviders: PluginConfiguration[] = [];
+    const secretConsumers: PluginConfiguration[] = [];
+    
+    for (const config of configsToResolve) {
+      const configStr = JSON.stringify(config.config);
+      // Detect secret providers (plugins that likely register secret resolvers)
+      // Common patterns: secretMapping, secretResolver, secret provider names
+      if (
+        configStr.includes('secretMapping') ||
+        config.name.includes('secret') ||
+        config.name.includes('vault') ||
+        config.name.includes('keystore')
+      ) {
+        secretProviders.push(config);
+      } else {
+        secretConsumers.push(config);
+      }
+    }
+
+    // Load secret providers first, then consumers
+    const sortedConfigsToResolve = [...secretProviders, ...secretConsumers];
+
     // Load plugins that don't need variable resolution first (e.g., secret providers)
     for (const config of configsToLoad) {
       await apiPluginManager.loadPlugin(config, configDir);
     }
 
     // Now resolve variables in remaining configs and load those plugins
-    if (configsToResolve.length > 0) {
+    if (sortedConfigsToResolve.length > 0) {
       // Import variable resolver here to avoid circular dependency
       const { variableResolver } = await import('./variableResolver.js');
 
-      // Set this plugin manager on variable resolver temporarily for secret resolution
+      // IMPORTANT: Set this plugin manager on variable resolver AFTER loading the first batch
+      // This ensures secret resolvers from plugins like rqp-secret are available
       variableResolver.setPluginManager(apiPluginManager);
 
       // Use provided context but ensure it includes global plugin sources
@@ -203,11 +228,15 @@ export class PluginManager {
         );
       }
 
-      for (const config of configsToResolve) {
+      for (const config of sortedConfigsToResolve) {
         try {
           // Resolve variables in the plugin configuration
           const resolvedConfig = await variableResolver.resolveValue(config, context) as PluginConfiguration;
           await apiPluginManager.loadPlugin(resolvedConfig, configDir);
+          
+          // IMPORTANT: Update the plugin manager on variable resolver after each plugin load
+          // This makes newly loaded secret resolvers available for subsequent plugins
+          variableResolver.setPluginManager(apiPluginManager);
         } catch (error) {
           throw new Error(
             `Failed to resolve variables in API-level plugin configuration for '${config.name}': ${error instanceof Error ? error.message : String(error)}`
