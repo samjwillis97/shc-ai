@@ -731,7 +731,6 @@ async function interactiveAuthorizationCodeFlow(config: OAuth2Config): Promise<O
       codeChallenge: pkceParams.codeChallenge,
       codeChallengeMethod: config.codeChallengeMethod || 'S256',
       state,
-      // redirectUri: callbackServer.redirectUri,
       redirectUri: callbackServer.redirectUri,
     });
 
@@ -761,10 +760,8 @@ async function interactiveAuthorizationCodeFlow(config: OAuth2Config): Promise<O
 
     return tokenResponse;
   } finally {
-    // Clean up server
-    if (callbackServer.server) {
-      callbackServer.server.close();
-    }
+    // Clean up server and all resources
+    callbackServer.cleanup();
   }
 }
 
@@ -778,6 +775,7 @@ async function startCallbackServer(
   server: http.Server;
   redirectUri: string;
   promise: Promise<string>;
+  cleanup: () => void;
 }> {
   const callbackPath = config.callbackPath || '/callback';
   const startPort = config.callbackPort || 8080;
@@ -786,13 +784,14 @@ async function startCallbackServer(
   let port: number;
   let resolvePromise: (code: string) => void;
   let rejectPromise: (error: Error) => void;
+  let timeoutHandle: NodeJS.Timeout;
 
   const promise = new Promise<string>((resolve, reject) => {
     resolvePromise = resolve;
     rejectPromise = reject;
 
-    // Set timeout
-    globalThis.setTimeout(() => {
+    // Set timeout with handle to clear it later
+    timeoutHandle = globalThis.setTimeout(() => {
       reject(new Error('OAuth2 authorization timeout (5 minutes)'));
     }, 5 * 60 * 1000);
   });
@@ -802,11 +801,20 @@ async function startCallbackServer(
     try {
       server = await new Promise<http.Server>((resolve, reject) => {
         const srv = http.createServer((req, res) => {
-          handleCallback(req, res, expectedState, resolvePromise, rejectPromise);
+          handleCallback(req, res, expectedState, resolvePromise, rejectPromise, () => {
+            // Clear timeout immediately when callback is received
+            if (timeoutHandle) {
+              clearTimeout(timeoutHandle);
+            }
+          });
         });
 
         srv.on('error', reject);
         srv.on('listening', () => resolve(srv));
+
+        // Disable keep-alive to prevent hanging connections
+        srv.keepAliveTimeout = 1000;
+        srv.headersTimeout = 2000;
 
         srv.listen(port, 'localhost');
         console.error('🌐 Callback server listening on port: ', port);
@@ -824,10 +832,24 @@ async function startCallbackServer(
 
   const redirectUri = `http://localhost:${port}${callbackPath}`;
 
+  const cleanup = () => {
+    // Clear the timeout
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+    
+    // Force close the server and all connections
+    if (server) {
+      server.closeAllConnections?.(); // Close all connections (Node.js 18+)
+      server.close();
+    }
+  };
+
   return {
     server,
     redirectUri,
     promise,
+    cleanup,
   };
 }
 
@@ -839,7 +861,8 @@ function handleCallback(
   res: http.ServerResponse,
   expectedState: string,
   resolve: (code: string) => void,
-  reject: (error: Error) => void
+  reject: (error: Error) => void,
+  cleanup: () => void
 ): void {
   const url = new URL(req.url!, `http://${req.headers.host}`);
 
@@ -852,24 +875,28 @@ function handleCallback(
   if (error) {
     const errorMessage = errorDescription || error;
     sendErrorPage(res, `Authorization failed: ${errorMessage}`);
+    cleanup(); // Clear timeout before rejecting
     reject(new Error(`OAuth2 authorization failed: ${errorMessage}`));
     return;
   }
 
   if (!code) {
     sendErrorPage(res, 'Authorization code not received');
+    cleanup(); // Clear timeout before rejecting
     reject(new Error('OAuth2 authorization code not received'));
     return;
   }
 
   if (state !== expectedState) {
     sendErrorPage(res, 'Invalid state parameter (possible CSRF attack)');
+    cleanup(); // Clear timeout before rejecting
     reject(new Error('OAuth2 state parameter validation failed'));
     return;
   }
 
   // Success!
   sendSuccessPage(res);
+  cleanup(); // Clear timeout before resolving
   resolve(code);
 }
 
