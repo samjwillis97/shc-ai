@@ -6,6 +6,7 @@
 import { VariableSource, ParameterizedVariableSource, HttpResponse } from '../types/plugin.js';
 import { JSONPath } from 'jsonpath-plus';
 import type { StepExecutionResult } from './chainExecutor.js';
+import dayjs from 'dayjs';
 
 // T10.15: Types for parameterized function calls
 export interface FunctionCall {
@@ -719,20 +720,47 @@ export class VariableResolver {
     params: string,
     fullVariableName: string
   ): string {
-    switch (variableName) {
+    // Extract base variable name and parameters if they exist
+    let baseVariableName = variableName;
+    let extractedParams = params;
+
+    // Check if variableName contains parameters (e.g., $randomInt(1,100))
+    const paramMatch = variableName.match(/^(\$\w+)(\(.+\))$/);
+    if (paramMatch) {
+      baseVariableName = paramMatch[1];
+      extractedParams = paramMatch[2];
+    }
+
+    switch (baseVariableName) {
       case '$timestamp':
         // Unix timestamp in seconds
         return Math.floor(Date.now() / 1000).toString();
 
+      case '$customTimestamp':
+        if (extractedParams) {
+          // Strip parentheses from the format string
+          const formatMatch = extractedParams.match(/^\((.+)\)$/);
+          if (formatMatch) {
+            const formatString = formatMatch[1];
+            return dayjs().format(formatString);
+          } else {
+            throw new VariableResolutionError(
+              `Invalid parameters for ${fullVariableName}. Use format: {{$customTimestamp(format)}}`,
+              fullVariableName
+            );
+          }
+        } else {
+          // ISO 8601 timestamp by default
+          return new Date().toISOString();
+        }
       case '$isoTimestamp':
         // ISO 8601 timestamp
         return new Date().toISOString();
-
       case '$randomInt':
         // Random integer - supports optional range parameters like $randomInt(1,100)
-        if (params) {
+        if (extractedParams) {
           // Try to parse range parameters from parentheses
-          const rangeMatch = params.match(/^\((\d+),(\d+)\)$/);
+          const rangeMatch = extractedParams.match(/^\((\d+),(\d+)\)$/);
           if (rangeMatch) {
             const min = parseInt(rangeMatch[1], 10);
             const max = parseInt(rangeMatch[2], 10);
@@ -760,7 +788,7 @@ export class VariableResolver {
 
       default:
         throw new VariableResolutionError(
-          `Unknown dynamic variable '${variableName}'`,
+          `Unknown dynamic variable '${baseVariableName}'`,
           fullVariableName
         );
     }

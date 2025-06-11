@@ -1042,9 +1042,49 @@ describe('VariableResolver', () => {
     });
 
     it('should support $randomInt with range parameters', async () => {
-      // Note: This syntax isn't supported yet based on current implementation
-      // but let's test error handling for invalid formats
-      await expect(resolver.resolve('{{$randomInt.invalid}}', mockContext))
+      // Test valid range parameters
+      const result1 = await resolver.resolve('{{$randomInt(1,10)}}', mockContext);
+      const result2 = await resolver.resolve('{{$randomInt(1,10)}}', mockContext);
+      const result3 = await resolver.resolve('{{$randomInt(50,100)}}', mockContext);
+
+      // Parse results as numbers
+      const num1 = parseInt(result1);
+      const num2 = parseInt(result2);
+      const num3 = parseInt(result3);
+
+      // Verify they are valid integers
+      expect(Number.isInteger(num1)).toBe(true);
+      expect(Number.isInteger(num2)).toBe(true);
+      expect(Number.isInteger(num3)).toBe(true);
+
+      // Verify they are within the specified ranges
+      expect(num1).toBeGreaterThanOrEqual(1);
+      expect(num1).toBeLessThanOrEqual(10);
+
+      expect(num2).toBeGreaterThanOrEqual(1);
+      expect(num2).toBeLessThanOrEqual(10);
+
+      expect(num3).toBeGreaterThanOrEqual(50);
+      expect(num3).toBeLessThanOrEqual(100);
+
+      // Test edge case: single value range (should throw error)
+      await expect(resolver.resolve('{{$randomInt(5,5)}}', mockContext))
+        .rejects.toThrow(VariableResolutionError);
+
+      // Test invalid format: min > max (should throw error)
+      await expect(resolver.resolve('{{$randomInt(10,5)}}', mockContext))
+        .rejects.toThrow(VariableResolutionError);
+
+      // Test invalid format: non-numeric parameters
+      await expect(resolver.resolve('{{$randomInt(a,b)}}', mockContext))
+        .rejects.toThrow(VariableResolutionError);
+
+      // Test invalid format: missing parameters
+      await expect(resolver.resolve('{{$randomInt()}}', mockContext))
+        .rejects.toThrow(VariableResolutionError);
+
+      // Test invalid format: single parameter
+      await expect(resolver.resolve('{{$randomInt(5)}}', mockContext))
         .rejects.toThrow(VariableResolutionError);
     });
 
