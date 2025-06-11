@@ -148,14 +148,88 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       config.globalVariables // T9.3: Global variables
     );
 
-    // Resolve variables in global plugin configurations before loading plugins
+    // T14.5: Apply two-pass loading strategy to global plugins (same as API-level plugins)
+    // This resolves the issue where global plugins depend on other global plugins for secret resolution
     let resolvedGlobalPluginConfigs: PluginConfiguration[] | undefined;
     if (config.plugins && config.plugins.length > 0) {
       try {
-        resolvedGlobalPluginConfigs = (await variableResolver.resolveValue(
-          config.plugins,
-          initialVariableContext
-        )) as PluginConfiguration[];
+        // IMPORTANT: Store global plugin configurations for later merging with API-level configs
+        // This must happen before we start loading plugins individually
+        globalPluginManager.setGlobalPluginConfigs(config.plugins);
+
+        // Two-pass loading for global plugins: load plugins without variables first, then resolve variables for remaining plugins
+        const configsToLoad: PluginConfiguration[] = [];
+        const configsToResolve: PluginConfiguration[] = [];
+
+        // First pass: identify configs that need variable resolution vs those that don't
+        for (const pluginConfig of config.plugins) {
+          const configStr = JSON.stringify(pluginConfig.config || {});
+          if (configStr.includes('{{')) {
+            configsToResolve.push(pluginConfig);
+          } else {
+            configsToLoad.push(pluginConfig);
+          }
+        }
+
+        // Enhanced dependency-aware loading: prioritize secret providers
+        const secretProviders: PluginConfiguration[] = [];
+        const secretConsumers: PluginConfiguration[] = [];
+        
+        for (const config of configsToResolve) {
+          const configStr = JSON.stringify(config.config || {});
+          // Detect secret providers (plugins that likely register secret resolvers)
+          if (
+            configStr.includes('secretMapping') ||
+            config.name.includes('secret') ||
+            config.name.includes('vault') ||
+            config.name.includes('keystore')
+          ) {
+            secretProviders.push(config);
+          } else {
+            secretConsumers.push(config);
+          }
+        }
+
+        // Load secret providers first, then consumers
+        const sortedConfigsToResolve = [...secretProviders, ...secretConsumers];
+
+        // Load plugins that don't need variable resolution first
+        for (const pluginConfig of configsToLoad) {
+          await globalPluginManager.loadPlugin(pluginConfig, configDir);
+        }
+
+        // Set plugin manager on variable resolver to enable secret resolution for subsequent plugins
+        variableResolver.setPluginManager(globalPluginManager);
+
+        // Now resolve variables in remaining configs and load those plugins
+        const resolvedConfigs: PluginConfiguration[] = [...configsToLoad];
+        for (const pluginConfig of sortedConfigsToResolve) {
+          try {
+            // Resolve variables in the plugin configuration with updated context that includes already loaded plugins
+            const updatedContext = variableResolver.createContext(
+              args.variables || {},
+              mergedProfileVars,
+              api.variables,
+              endpoint.variables,
+              globalPluginManager.getVariableSources(), // Include plugin sources from already loaded plugins
+              config.globalVariables,
+              globalPluginManager.getParameterizedVariableSources()
+            );
+
+            const resolvedConfig = await variableResolver.resolveValue(pluginConfig, updatedContext) as PluginConfiguration;
+            await globalPluginManager.loadPlugin(resolvedConfig, configDir);
+            resolvedConfigs.push(resolvedConfig);
+            
+            // Update the plugin manager on variable resolver after each plugin load
+            variableResolver.setPluginManager(globalPluginManager);
+          } catch (error) {
+            throw new Error(
+              `Failed to resolve variables in global plugin configuration for '${pluginConfig.name}': ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        }
+
+        resolvedGlobalPluginConfigs = resolvedConfigs;
       } catch (error) {
         if (error instanceof VariableResolutionError) {
           console.error(
@@ -166,10 +240,10 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
           throw error;
         }
       }
+    } else {
+      // No global plugins to load
+      await globalPluginManager.loadPlugins([], configDir);
     }
-
-    // Load global plugins
-    await globalPluginManager.loadPlugins(resolvedGlobalPluginConfigs || [], configDir);
 
     // T14.3: Set global plugin manager on variable resolver for secret resolution
     // This needs to happen BEFORE resolving API-level plugin configurations

@@ -451,4 +451,11 @@ export class PluginManager {
   getPlugins(): PluginInstance[] {
     return [...this.plugins];
   }
+
+  /**
+   * Set global plugin configurations (used for API-level plugin merging)
+   */
+  setGlobalPluginConfigs(configs: PluginConfiguration[]): void {
+    this.globalPluginConfigs = [...configs];
+  }
 }
