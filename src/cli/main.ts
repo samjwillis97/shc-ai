@@ -12,6 +12,13 @@ import {
   handleGetChainNamesCommand,
   handleGetProfileNamesCommand,
 } from './commands/completion.js';
+import {
+  handleCacheListCommand,
+  handleCacheGetCommand,
+  handleCacheDeleteCommand,
+  handleCacheClearCommand,
+  handleCacheStatsCommand,
+} from './commands/cache.js';
 
 async function main(): Promise<void> {
   try {
@@ -96,6 +103,103 @@ async function main(): Promise<void> {
         async (argv) => {
           await handleCompletionCommand({ shell: argv.shell as string });
         }
+      )
+      .command(
+        'cache',
+        'Manage HttpCraft cache',
+        (yargs) => {
+          return yargs
+            .command(
+              'list [namespace]',
+              'List cache contents',
+              (yargs) => {
+                yargs.positional('namespace', {
+                  describe: 'Cache namespace to list (omit to list all namespaces)',
+                  type: 'string',
+                });
+              },
+              async (argv) => {
+                await handleCacheListCommand({
+                  namespace: argv.namespace as string | undefined,
+                  config: argv.config as string | undefined,
+                });
+              }
+            )
+            .command(
+              'get <key> [namespace]',
+              'Get cache value',
+              (yargs) => {
+                yargs
+                  .positional('key', {
+                    describe: 'Cache key to retrieve',
+                    type: 'string',
+                    demandOption: true,
+                  })
+                  .positional('namespace', {
+                    describe: 'Cache namespace (default: default)',
+                    type: 'string',
+                  });
+              },
+              async (argv) => {
+                await handleCacheGetCommand({
+                  key: argv.key as string,
+                  namespace: argv.namespace as string | undefined,
+                  config: argv.config as string | undefined,
+                });
+              }
+            )
+            .command(
+              'delete <key> [namespace]',
+              'Delete cache key',
+              (yargs) => {
+                yargs
+                  .positional('key', {
+                    describe: 'Cache key to delete',
+                    type: 'string',
+                    demandOption: true,
+                  })
+                  .positional('namespace', {
+                    describe: 'Cache namespace (default: default)',
+                    type: 'string',
+                  });
+              },
+              async (argv) => {
+                await handleCacheDeleteCommand({
+                  key: argv.key as string,
+                  namespace: argv.namespace as string | undefined,
+                  config: argv.config as string | undefined,
+                });
+              }
+            )
+            .command(
+              'clear [namespace]',
+              'Clear cache',
+              (yargs) => {
+                yargs.positional('namespace', {
+                  describe: 'Cache namespace to clear (omit to clear all)',
+                  type: 'string',
+                });
+              },
+              async (argv) => {
+                await handleCacheClearCommand({
+                  namespace: argv.namespace as string | undefined,
+                  config: argv.config as string | undefined,
+                });
+              }
+            )
+            .command(
+              'stats',
+              'Show cache statistics',
+              () => {},
+              async (argv) => {
+                await handleCacheStatsCommand({
+                  config: argv.config as string | undefined,
+                });
+              }
+            )
+            .demandCommand(1, 'You must specify a cache command');
+        },
+        () => {}
       )
       .option('config', {
         describe: 'Path to configuration file',
@@ -244,6 +348,7 @@ async function main(): Promise<void> {
       );
       console.log('       httpcraft request <url>');
       console.log('       httpcraft completion <shell>');
+      console.log('       httpcraft cache <command>');
       console.log('');
       console.log('Use --help for more information.');
     }

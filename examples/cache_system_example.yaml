@@ -1,0 +1,130 @@
+# HttpCraft Cache System Example Configuration
+# This example demonstrates the cache system capabilities
+
+# Global cache configuration
+config:
+  cache:
+    baseDir: "~/.httpcraft/cache"  # Cache storage directory
+    defaultTtl: 3600000             # Default TTL: 1 hour (in milliseconds)
+    maxSize: 1000                   # Maximum items per plugin namespace
+    cleanupInterval: 300000         # Cleanup interval: 5 minutes
+
+# Global plugins with cache capabilities
+plugins:
+  - name: "responseCache"
+    path: "./examples/plugins/responseCachePlugin.js"
+    config:
+      enableResponseCache: true
+      cacheTtl: 600000              # Cache responses for 10 minutes
+      enableRateLimit: true
+      maxRequestsPerMinute: 30
+
+# Example APIs that will benefit from caching
+apis:
+  # Slow external API that benefits from response caching
+  weatherAPI:
+    baseUrl: "https://api.openweathermap.org/data/2.5"
+    headers:
+      X-API-Key: "{{env.WEATHER_API_KEY}}"
+    endpoints:
+      current:
+        method: GET
+        path: "/weather"
+        params:
+          q: "{{city}}"
+          units: "metric"
+    # Use cache plugin for this API
+    plugins:
+      - name: "responseCache"
+        config:
+          enableResponseCache: true
+          cacheTtl: 1800000           # Cache weather data for 30 minutes
+
+  # Fast API that uses cache for rate limiting
+  fastAPI:
+    baseUrl: "https://jsonplaceholder.typicode.com"
+    endpoints:
+      posts:
+        method: GET
+        path: "/posts"
+      users:
+        method: GET
+        path: "/users"
+    # Use cache plugin for rate limiting
+    plugins:
+      - name: "responseCache"
+        config:
+          enableResponseCache: false
+          enableRateLimit: true
+          maxRequestsPerMinute: 100
+
+  # Demo API showing cache variables
+  demoAPI:
+    baseUrl: "https://httpbin.org"
+    endpoints:
+      test:
+        method: GET
+        path: "/json"
+        # Use cached values in headers
+        headers:
+          X-Cache-Stats: "{{plugins.responseCache.cacheStats}}"
+          X-Cached-Hash: "{{plugins.responseCache.computeHash('hello-world')}}"
+          X-User-Token: "{{plugins.responseCache.getUserToken('user123')}}"
+
+# Example profiles for different environments
+profiles:
+  development:
+    city: "London"
+    userId: "dev-user-123"
+  
+  production:
+    city: "New York"
+    userId: "prod-user-456"
+
+# Example chains demonstrating cache usage
+chains:
+  cacheDemo:
+    description: "Demonstrate cache capabilities across multiple requests"
+    vars:
+      targetCity: "{{profile.city}}"
+    steps:
+      # Step 1: Get weather data (will be cached)
+      - id: getWeather
+        call: "weatherAPI.current"
+        with:
+          params:
+            q: "{{targetCity}}"
+      
+      # Step 2: Get weather again (should use cache)
+      - id: getWeatherCached
+        call: "weatherAPI.current"
+        with:
+          params:
+            q: "{{targetCity}}"
+      
+      # Step 3: Test demo API with cache variables
+      - id: testCacheVars
+        call: "demoAPI.test"
+      
+      # Step 4: Clear specific cache entries
+      - id: clearWeatherCache
+        call: "demoAPI.test"
+        with:
+          headers:
+            X-Clear-Result: "{{plugins.responseCache.clearCache('weather')}}"
+
+  rateLimitDemo:
+    description: "Demonstrate rate limiting with cache"
+    steps:
+      # Make multiple rapid requests to test rate limiting
+      - id: request1
+        call: "fastAPI.posts"
+      
+      - id: request2
+        call: "fastAPI.posts"
+      
+      - id: request3
+        call: "fastAPI.posts"
+      
+      - id: request4
+        call: "fastAPI.users"

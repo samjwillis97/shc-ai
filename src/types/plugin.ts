@@ -19,10 +19,22 @@ export interface HttpResponse {
 // T14.1: Define SecretResolver interface for custom secret resolution
 export type SecretResolver = (secretName: string) => Promise<string | undefined>;
 
+// Cache interface for plugins
+export interface PluginCacheInterface {
+  get<T = unknown>(key: string): Promise<T | undefined>;
+  set<T = unknown>(key: string, value: T, ttl?: number): Promise<void>;
+  has(key: string): Promise<boolean>;
+  delete(key: string): Promise<boolean>;
+  clear(): Promise<void>;
+  keys(): Promise<string[]>;
+  size(): Promise<number>;
+}
+
 export interface PluginContext {
   request: HttpRequest;
   response?: HttpResponse;
   config: PluginConfig;
+  cache: PluginCacheInterface;
   registerPreRequestHook: (hook: PreRequestHook) => void;
   registerPostResponseHook: (hook: PostResponseHook) => void;
   registerVariableSource: (name: string, source: VariableSource) => void;

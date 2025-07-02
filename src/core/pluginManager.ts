@@ -5,6 +5,7 @@
 
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { cacheManager } from './cacheManager.js';
 import type {
   PluginConfiguration,
 } from '../types/config.js';
@@ -323,6 +324,7 @@ export class PluginManager {
         // These will be set when executing requests
         request: {} as HttpRequest,
         config: pluginInstance.config,
+        cache: cacheManager.getPluginCache(pluginConfig.name),
         registerPreRequestHook: (hook: PreRequestHook) => {
           pluginInstance.preRequestHooks.push(hook);
         },

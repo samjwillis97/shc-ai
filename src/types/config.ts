@@ -6,6 +6,16 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
 
 /**
+ * Cache configuration
+ */
+export interface CacheConfig {
+  baseDir?: string;      // Base directory for cache files (default: ~/.httpcraft/cache)
+  defaultTtl?: number;   // Default TTL in milliseconds (default: 1 hour)
+  maxSize?: number;      // Maximum cache size per namespace (default: 1000 items)
+  cleanupInterval?: number; // Cleanup interval in milliseconds (default: 5 minutes)
+}
+
+/**
  * Raw configuration as loaded from YAML files
  * May contain import specifications before processing
  */
@@ -17,6 +27,7 @@ export interface RawHttpCraftConfig {
   plugins?: PluginConfiguration[];
   config?: {
     defaultProfile?: string | string[];
+    cache?: CacheConfig;
   };
   globalVariables?: Record<string, unknown>;
 }
@@ -31,6 +42,7 @@ export interface HttpCraftConfig extends Omit<RawHttpCraftConfig, 'apis' | 'chai
   plugins?: PluginConfiguration[];
   config?: {
     defaultProfile?: string | string[];
+    cache?: CacheConfig;
   };
   globalVariables?: Record<string, unknown>;
 }
