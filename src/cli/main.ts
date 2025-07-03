@@ -199,7 +199,10 @@ async function main(): Promise<void> {
             )
             .demandCommand(1, 'You must specify a cache command');
         },
-        () => {}
+        async () => {
+          // This handler ensures cache commands are properly handled and don't fall through
+          return;
+        }
       )
       .option('config', {
         describe: 'Path to configuration file',
@@ -323,7 +326,11 @@ async function main(): Promise<void> {
     }
 
     // Handle API command pattern: httpcraft <api_name> <endpoint_name>
-    if (argv._.length === 2 && typeof argv._[0] === 'string' && typeof argv._[1] === 'string') {
+    // But first check if this is a known command that was already handled
+    const knownCommands = ['request', 'chain', 'completion', 'cache'];
+    const isKnownCommand = argv._.length > 0 && knownCommands.includes(argv._[0] as string);
+
+    if (!isKnownCommand && argv._.length === 2 && typeof argv._[0] === 'string' && typeof argv._[1] === 'string') {
       const apiName = argv._[0];
       const endpointName = argv._[1];
 
