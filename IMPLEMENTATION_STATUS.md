@@ -211,6 +211,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [x] **T10.16:** Implement profile name completion for `--profile` option in ZSH tab completion.
     - _Testable Outcome:_ `httpcraft --profile <TAB>` completes with available profile names from configuration.
 - **Notes/Blockers:** T10.1 completed successfully! Implemented complete post-response hook system with:
+
   - **PostResponseHook Type:** Added PostResponseHook type definition and support in PluginInstance interface
   - **PluginManager Integration:** Updated PluginManager to register and execute post-response hooks in sequence
   - **HttpClient Integration:** Integrated post-response hooks into HttpClient after response received but before returning
@@ -221,6 +222,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - All post-response hook functionality working correctly with error handling and sequential execution. Ready to proceed to T10.2.
 
   T10.2, T10.3, T10.4, T10.5 completed successfully! Implemented complete API-level plugin configuration system with:
+
   - **T10.2 API-level Plugin Configuration:** Enhanced YAML config to support `plugins` section within API definitions for overriding global plugin configurations
   - **T10.3 Plugin Configuration Merging:** When an API defines plugin configuration, merge it with global plugin config (API-level overwrites global keys)
   - **T10.4 Variable Substitution:** Implemented variable substitution in API-level plugin configurations using the same `{{variable}}` syntax as other configuration elements
@@ -234,6 +236,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - All API-level plugin configuration functionality working correctly with 30 total tests passing. Ready to proceed to T10.6.
 
   T10.6 completed successfully! Updated YAML schema to include API-level plugin configuration with:
+
   - **ApiPluginConfiguration Definition:** Added new schema definition for API-level plugin configurations with required `name` property and optional `config` object
   - **API Definition Enhancement:** Added `plugins` property to `ApiDefinition` schema that accepts array of `ApiPluginConfiguration` objects
   - **Validation Rules:** API-level plugins only require `name` (references global plugin) and optional `config` for overrides, no `path` or `npmPackage` allowed
@@ -244,6 +247,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - All schema validation tests passing (25/25) including new API-level plugin configuration tests. Ready to proceed to T10.7.
 
   T10.7 completed successfully! Implemented plugin loading from npm with:
+
   - **NPM Integration:** Added npm integration for loading plugins from npm packages
   - **PluginManager Enhancement:** Updated PluginManager to support loading plugins from npm
   - **CLI Integration:** Updated CLI to support loading plugins from npm
@@ -253,6 +257,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - All npm plugin loading functionality working correctly with 9 tests passing. Ready to proceed to T10.8.
 
   T10.8 completed successfully! Implemented chain structured JSON output with:
+
   - **CLI Option:** Added `--chain-output` option with choices 'default' and 'full' (defaults to 'default')
   - **Structured JSON Format:** When `--chain-output full` is used, outputs detailed JSON with chainName, success status, and complete step information
   - **Step Details:** Each step includes stepId, complete request object (method, url, headers, body), complete response object (status, statusText, headers, body), success status, and error details if applicable
@@ -263,6 +268,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - All chain structured JSON output functionality working correctly. Ready to proceed to T10.9.
 
   T10.9 completed successfully! Refined ZSH completion system with:
+
   - **Chain Name Completion:** Added `--get-chain-names` hidden command for dynamic chain name completion
   - **Enhanced Completion Script:** Updated ZSH completion script to support `httpcraft chain <TAB>` with contextual chain name completion
   - **New Option Support:** Added `--chain-output` option completion with 'default' and 'full' choices
@@ -274,6 +280,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - All ZSH completion refinements working correctly with 37 tests passing. Ready to proceed to T10.10.
 
   T10.10 completed successfully! Created comprehensive README.md with:
+
   - **Complete Documentation:** Comprehensive README.md covering all major features, installation, usage, and configuration
   - **Quick Start Guide:** Step-by-step quick start with working examples using JSONPlaceholder API
   - **Usage Examples:** Extensive examples covering basic API calls, profiles, chains, verbose output, dry-run mode, and scripting
@@ -289,6 +296,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - All README documentation complete and accurate. Ready to proceed to T10.11.
 
   T10.11 completed successfully! Created comprehensive YAML schema documentation with:
+
   - **Complete JSON Schema:** Created `schemas/httpcraft-config.schema.json` with full validation for all HttpCraft configuration options
   - **Editor Integration:** Added setup instructions for VS Code, IntelliJ IDEA, and WebStorm with autocompletion and validation
   - **Comprehensive Testing:** Added 20 unit tests covering valid and invalid configurations, including edge cases
@@ -300,11 +308,12 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **README Integration:** Added comprehensive schema section to main README with features and setup instructions
   - **Backward Compatibility:** All existing example configurations validate successfully against the new schema
   - **Testable Outcome Achieved:** Schema file exists and is fully usable with YAML linters and editors
-  All YAML schema implementation complete and tested. Ready to proceed to T10.12.
+    All YAML schema implementation complete and tested. Ready to proceed to T10.12.
 
   T10.12 completed successfully! Implemented comprehensive end-to-end testing with:
+
   - **Test Coverage:** Created comprehensive end-to-end test suite covering all major features working together
-  - **Real HTTP Testing:** Tests use actual HTTP requests to httpbin.org to verify functionality 
+  - **Real HTTP Testing:** Tests use actual HTTP requests to httpbin.org to verify functionality
   - **Feature Integration:** Tests verify configuration loading, variable resolution, profiles, plugins, chains, CLI options, and error handling
   - **Test Results:** 459 tests passing out of 467 total tests (98.4% pass rate)
   - **Core Functionality Verified:** All core features working correctly including:
@@ -322,12 +331,13 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
     1. Parameterized plugin function quote escaping in test configuration
     2. JSONPath assumptions about httpbin.org response structure in chain test
     3. Error message format expectations in exit-on-http-error test
-  All end-to-end testing complete and HttpCraft ready for production use. Ready to proceed to T10.13.
+       All end-to-end testing complete and HttpCraft ready for production use. Ready to proceed to T10.13.
 
   T10.13: Code review, cleanup, performance optimizations ✅ COMPLETED
+
 - **Status**: ✅ COMPLETED
 - **Description**: Comprehensive code review, cleanup, and performance optimizations for V1 release
-- **Implementation**: 
+- **Implementation**:
   - **Code Quality**: Addressed critical linting issues in core source files (pluginManager.ts, variableResolver.ts)
   - **Performance**: Maintained excellent test performance with 637 tests passing in 36 seconds
   - **Cleanup**: Removed unused imports and variables from core modules
@@ -352,6 +362,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 - **Ready for V1**: All critical functionality working, performance optimized, code cleaned up
 
   T10.14: Prepare for V1 release
+
 - **Status**: 🔄 IN PROGRESS
 - **Description**: Final preparation for HttpCraft V1 release including documentation, packaging, and distribution
 - **Tasks**:
@@ -413,7 +424,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
     - Comprehensive error handling and debugging
     - Security features including token masking in verbose output
   - **Provider Support:** Tested configurations for Auth0, Azure AD, Google OAuth2, Okta
-  - **Documentation:** 
+  - **Documentation:**
     - Complete OAuth2 documentation in `docs/oauth2-plugin.md`
     - Quick start guide in `docs/OAUTH2_QUICKSTART.md`
     - README.md integration with OAuth2 section and built-in plugin usage
@@ -433,16 +444,18 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 ## Phase 12: Test Reliability and Stability
 
 ### T12.1: Fix test environment setup and teardown issues ✅ COMPLETED
+
 - **Status**: ✅ COMPLETED
 - **Description**: Resolved test environment setup and teardown issues that were causing test failures
 - **Implementation**: Fixed test environment setup and teardown issues
 - **Testing**: All test environment issues resolved
 
 ### T12.2: Fix YAML configuration generation in parameterized plugin function tests ✅ COMPLETED
-- **Status**: ✅ COMPLETED  
+
+- **Status**: ✅ COMPLETED
 - **Description**: Fixed "module is not defined" error in parameterized plugin function tests
 - **Root Cause**: The PluginManager constructor had a problematic reference to `module.require` which caused runtime errors when loading plugins
-- **Implementation**: 
+- **Implementation**:
   - Removed the problematic `module.require` reference from PluginManager constructor
   - Fixed TypeScript compilation errors by:
     - Adding missing imports for `ParameterizedVariableSource` and `HttpResponse` in variableResolver.ts
@@ -455,6 +468,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
 - **Note**: The original issue was not actually YAML generation problems, but TypeScript compilation and runtime module loading errors
 
 ### T12.3: Improve test isolation and prevent cross-test interference
+
 - **Status**: 🔄 IN PROGRESS
 - **Description**: Improve test isolation to prevent tests from affecting each other
 
@@ -487,7 +501,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
     - _Testable Outcome:_ ✅ `--no-default-profile --profile me` loads only `me` profile, ignoring defaults
   - [x] **T13.4:** **[TESTING]** Add comprehensive tests for enhanced profile merging behavior.
     - _API Tests:_ Added 8 comprehensive test cases to `tests/unit/cli/commands/api.test.ts`
-    - _Chain Tests:_ Added 8 comprehensive test cases to `tests/unit/cli/commands/chain.test.ts` 
+    - _Chain Tests:_ Added 8 comprehensive test cases to `tests/unit/cli/commands/chain.test.ts`
     - _Variable Resolver Tests:_ Added 7 test cases to `tests/unit/variableResolver.test.ts` for enhanced `mergeProfiles`
     - _Test Coverage:_ 100% coverage for additive merging, override behavior, verbose output, and edge cases
     - _Scenarios Tested:_ Default + CLI profiles, --no-default-profile override, single vs array defaults, verbose output
@@ -495,7 +509,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - [x] **T13.5:** **[DOCUMENTATION]** Update documentation and examples for enhanced profile behavior.
     - _README Update:_ Added comprehensive "Enhanced Profile Merging" section to README.md
     - _Command Options:_ Updated CLI options table to include `--no-default-profile` flag
-    - _Examples Created:_ 
+    - _Examples Created:_
       - New comprehensive example: `examples/13_enhanced_profile_merging.yaml`
       - Updated existing examples with Phase 13 behavior comments
       - Enhanced `examples/03_multiple_profiles_applied.yaml` with new behavior explanations
@@ -508,7 +522,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
     - _Profile Origin Tracking:_ Enhanced verbose output shows which profile each variable comes from
     - _Debugging Information:_ Added comprehensive verbose logging for profile loading process:
       - Shows default profiles being loaded
-      - Shows CLI profiles being loaded  
+      - Shows CLI profiles being loaded
       - Shows --no-default-profile usage indication
       - Shows final profile order
       - Shows merged variables with their origins
@@ -522,16 +536,17 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
     - Enhanced `src/core/variableResolver.ts` `mergeProfiles` function with verbose support
     - Added `--no-default-profile` option to `src/cli/main.ts` with full integration
   - **Profile Loading Logic:**
+
     ```typescript
     let profileNames: string[] = [];
-    
+
     // Always start with default profiles (if any)
     if (config.config?.defaultProfile) {
-      profileNames = Array.isArray(config.config.defaultProfile) 
-        ? [...config.config.defaultProfile] 
+      profileNames = Array.isArray(config.config.defaultProfile)
+        ? [...config.config.defaultProfile]
         : [config.config.defaultProfile];
     }
-    
+
     // Add CLI-specified profiles (unless --no-default-profile is used)
     if (args.profiles && args.profiles.length > 0) {
       if (args.noDefaultProfile) {
@@ -541,6 +556,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
       }
     }
     ```
+
   - **Testing:**
     - 23 new test cases across API, Chain, and VariableResolver test suites
     - All tests passing with 100% coverage of new functionality
@@ -678,6 +694,7 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
     - _Testable Outcome:_ ✅ Real-world usage patterns validated and working correctly
 - **Implementation Details:**
   - **Plugin Definition Options:**
+
     ```yaml
     # Option 1: Global Plugin Reference
     plugins:
@@ -688,19 +705,20 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
         plugins:
           - name: "globalPlugin"  # References global definition
             config: { apiSpecific: true }
-    
-    # Option 2: Inline Plugin Definition  
+
+    # Option 2: Inline Plugin Definition
     apis:
       myAPI:
         plugins:
           - name: "inlinePlugin"
             path: "./plugins/inline.js"  # No global definition required
             config: { onlyForThisAPI: true }
-          
+
           - name: "npmInlinePlugin"
             npmPackage: "my-plugin-package"  # npm package inline
             config: { setting: "value" }
     ```
+
   - **Core Changes:**
     - Enhanced `ApiPluginConfiguration` type with `path?: string` and `npmPackage?: string`
     - Modified `PluginManager.getMergedPluginConfigurations()` to detect and handle inline plugins
@@ -722,5 +740,137 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Service Integration:** `{ name: "stripe", npmPackage: "@company/stripe-plugin", config: { version: "2023-10-16" } }`
   - **Development/Testing:** `{ name: "debugLogger", path: "./dev-plugins/debug.js", config: { verbose: true } }`
 - **V1 Ready:** ✅ Enhanced plugin system significantly improves developer experience while maintaining full backward compatibility. The dual approach (global + inline) provides optimal flexibility for different use cases and organizational needs.
+
+---
+
+## Phase 16: Binary Data Handling
+
+- **Goal:** Fix binary data corruption issue when using shell redirection (e.g., `httpcraft api endpoint > file.zip`) by properly handling binary responses without text encoding.
+- **Status:** [ ] **NOT STARTED**
+- **Priority:** **HIGH** - Critical bug affecting file downloads and binary API responses
+- **User Impact:** Enables proper handling of binary files (ZIP, images, PDFs, etc.) without corruption when using shell redirection
+- **Problem Statement:** Currently, binary data gets corrupted because:
+  1. HttpClient always converts response data to strings (line 43 in httpClient.ts)
+  2. Non-string data gets JSON.stringify() applied, destroying binary structure
+  3. Output commands use text-based console.log() and process.stdout.write() with string data
+  4. Shell redirection receives corrupted text representation instead of raw binary data
+- **Tasks:**
+
+  - [ ] **T16.1:** **[CORE ARCHITECTURE]** Enhance HttpResponse interface to support binary data.
+    - _Current Issue:_ `HttpResponse.body` is always a string, losing binary data integrity
+    - _Solution:_ Add support for Buffer data type while maintaining backward compatibility
+    - _Implementation:_ Update `HttpResponse` interface to include `body: string | Buffer` and `isBinary: boolean` flag
+    - _Type Safety:_ Ensure all response handling code can work with both string and binary data
+    - _Testable Outcome:_ HttpResponse can represent both text and binary responses without data loss
+  - [ ] **T16.2:** **[HTTP CLIENT]** Update HttpClient to preserve binary data based on Content-Type.
+    - _Content-Type Detection:_ Implement binary content detection using Content-Type headers
+    - _Binary Types:_ Detect common binary MIME types (application/octet-stream, image/\*, application/zip, application/pdf, etc.)
+    - _Response Processing:_ Preserve axios response.data as Buffer for binary content, string for text content
+    - _Backward Compatibility:_ Ensure text responses continue to work exactly as before
+    - _Testable Outcome:_ Binary responses preserved as Buffer, text responses as string, based on Content-Type
+  - [ ] **T16.3:** **[OUTPUT HANDLING]** Update command handlers to output binary data correctly.
+    - _API Command:_ Modify `src/cli/commands/api.ts` to detect binary responses and use `process.stdout.write(buffer)` instead of `console.log(string)`
+    - _Request Command:_ Modify `src/cli/commands/request.ts` to handle binary data appropriately
+    - _Chain Command:_ Update chain execution to handle binary data in step outputs
+    - _Verbose Output:_ Ensure verbose mode shows binary data size and type instead of corrupted content
+    - _Testable Outcome:_ Binary data written to stdout as raw bytes, text data as strings
+  - [ ] **T16.4:** **[CONTENT-TYPE DETECTION]** Implement robust binary content type detection.
+    - _MIME Type Database:_ Create comprehensive list of binary MIME types
+    - _Detection Logic:_ Implement content type parsing and binary classification
+    - _Fallback Strategy:_ Handle missing or non-standard Content-Type headers
+    - _Configuration:_ Allow users to override binary detection via configuration if needed
+    - _Testable Outcome:_ Accurate binary vs text detection for all common file types
+  - [ ] **T16.5:** **[PLUGIN COMPATIBILITY]** Ensure plugin system works with binary data.
+    - _Plugin Hooks:_ Update pre-request and post-response hooks to handle binary data
+    - _Variable System:_ Ensure binary responses don't break variable resolution for subsequent steps
+    - _Post-Response Plugins:_ Verify plugins like xmlToJsonPlugin handle binary data gracefully
+    - _Error Handling:_ Proper error messages when plugins try to process binary data inappropriately
+    - _Testable Outcome:_ Plugin system works correctly with both binary and text responses
+  - [ ] **T16.6:** **[CHAIN EXECUTION]** Update chain execution to handle binary data in steps.
+    - _Step Data Storage:_ Ensure binary responses are stored correctly for chain data passing
+    - _Variable Resolution:_ Prevent binary data from being used in template variables (would be meaningless)
+    - _Chain Output:_ Handle binary data in final chain output (last step's response)
+    - _JSON Output:_ For `--chain-output full`, represent binary data appropriately in JSON (base64 or metadata)
+    - _Testable Outcome:_ Chains work correctly when steps return binary data
+  - [ ] **T16.7:** **[VERBOSE AND DRY-RUN]** Update verbose and dry-run modes for binary data.
+    - _Verbose Output:_ Show binary data metadata (size, content-type) instead of raw binary in stderr
+    - _Dry-Run Mode:_ Display binary response expectations without corrupting terminal output
+    - _Secret Masking:_ Ensure binary data doesn't interfere with secret masking functionality
+    - _Terminal Safety:_ Prevent binary data from corrupting terminal display in debug modes
+    - _Testable Outcome:_ Verbose and dry-run modes handle binary responses gracefully
+  - [ ] **T16.8:** **[COMPREHENSIVE TESTING]** Implement comprehensive test coverage for binary data handling.
+    - _Unit Tests:_ Test binary detection, response handling, and output formatting
+    - _Integration Tests:_ Test real binary file downloads (images, ZIP files) with shell redirection
+    - _Mock HTTP Server:_ Create test server that serves binary content for testing
+    - _Cross-Platform Testing:_ Ensure binary handling works on macOS, Linux, and Windows
+    - _Testable Outcome:_ Comprehensive test suite verifying binary data integrity through entire pipeline
+  - [ ] **T16.9:** **[DOCUMENTATION]** Document binary data handling capabilities and limitations.
+    - _Usage Examples:_ Show how to download files using shell redirection
+    - _Content-Type Behavior:_ Document how HttpCraft determines binary vs text responses
+    - _Plugin Development:_ Guide plugin developers on handling binary data
+    - _Troubleshooting:_ Common issues and solutions for binary data handling
+    - _Testable Outcome:_ Clear documentation enables users to successfully work with binary APIs
+  - [ ] **T16.10:** **[BACKWARD COMPATIBILITY]** Ensure changes don't break existing functionality.
+    - _Text Response Handling:_ Verify all existing text-based APIs continue to work identically
+    - _Plugin Compatibility:_ Ensure existing plugins continue to work without modification
+    - _Configuration Compatibility:_ All existing configurations work without changes
+    - _API Compatibility:_ HttpResponse interface changes maintain backward compatibility
+    - _Testable Outcome:_ All existing tests pass, no breaking changes for text-based usage
+
+- **Implementation Strategy:**
+
+  ```typescript
+  // Enhanced HttpResponse interface
+  interface HttpResponse {
+    status: number;
+    statusText: string;
+    headers: Record<string, string>;
+    body: string | Buffer; // Support both text and binary
+    isBinary: boolean; // Flag to indicate data type
+    contentType?: string; // Original Content-Type header
+  }
+
+  // Binary detection logic
+  function isBinaryContentType(contentType: string): boolean {
+    const binaryTypes = [
+      'application/octet-stream',
+      'application/zip',
+      'application/pdf',
+      'image/',
+      'audio/',
+      'video/',
+      // ... comprehensive list
+    ];
+    return binaryTypes.some((type) => contentType.toLowerCase().includes(type));
+  }
+
+  // Output handling
+  if (response.isBinary && response.body instanceof Buffer) {
+    process.stdout.write(response.body); // Raw binary output
+  } else {
+    console.log(response.body as string); // Text output
+  }
+  ```
+
+- **Expected Benefits:**
+
+  - **File Downloads:** ✅ Proper downloading of ZIP files, images, PDFs via shell redirection
+  - **API Integration:** ✅ Support for APIs that return binary data (file storage, image processing, etc.)
+  - **Data Integrity:** ✅ Binary files maintain exact byte-for-byte accuracy
+  - **Backward Compatibility:** ✅ All existing text-based functionality continues to work identically
+  - **Developer Experience:** ✅ Binary APIs work intuitively with standard Unix shell patterns
+
+- **Real-World Use Cases:**
+
+  - Download files: `httpcraft fileapi download --var fileId=123 > document.pdf`
+  - Image processing: `httpcraft imageapi thumbnail --var imageId=456 > thumb.jpg`
+  - Backup downloads: `httpcraft backupapi export --var date=2024-01-01 > backup.zip`
+  - Binary API testing: Shell redirection works correctly for any binary API response
+
+- **Priority Justification:**
+  - **User Pain Point:** Current behavior silently corrupts binary files, causing data loss
+  - **Enterprise Use Case:** File download APIs are common in enterprise environments
+  - **Unix Philosophy:** Shell redirection should work correctly for all data types
+  - **Data Integrity:** Critical for any workflow involving file downloads or binary APIs
 
 ---
