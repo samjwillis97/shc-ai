@@ -13,6 +13,7 @@ export class BinaryDetector {
     'application/x-tar',
     'application/x-bzip2',
     'application/x-xz',
+    'application/vnd.apple.pkpass',
 
     // Documents
     'application/pdf',
