@@ -13,7 +13,16 @@ export interface HttpResponse {
   status: number;
   statusText: string;
   headers: Record<string, string>;
-  body: string;
+  body: string | Buffer;
+  isBinary: boolean;
+  contentType?: string;
+  contentLength?: number;
+}
+
+export interface BinaryResponseMetadata {
+  size: number;
+  contentType: string;
+  encoding?: string;
 }
 
 // T14.1: Define SecretResolver interface for custom secret resolution

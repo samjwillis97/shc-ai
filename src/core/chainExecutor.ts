@@ -237,7 +237,10 @@ export class ChainExecutor {
       let resolvedStepWith: Record<string, unknown> | null = null;
       const stepOverrides = step.with || step.variables; // Support both new and legacy property names
       if (stepOverrides) {
-        resolvedStepWith = await variableResolver.resolveValue(stepOverrides, variableContext) as Record<string, unknown>;
+        resolvedStepWith = (await variableResolver.resolveValue(
+          stepOverrides,
+          variableContext
+        )) as Record<string, unknown>;
       }
 
       // If step.with provides pathParams, add them to the variable context
@@ -250,12 +253,18 @@ export class ChainExecutor {
       const resolvedApiBase: Pick<ApiDefinition, 'baseUrl' | 'headers' | 'params' | 'variables'> & {
         endpoints?: Record<string, EndpointDefinition>;
       } = {
-        baseUrl: await variableResolver.resolveValue(api.baseUrl, variableContext) as string,
+        baseUrl: (await variableResolver.resolveValue(api.baseUrl, variableContext)) as string,
         headers: api.headers
-          ? await variableResolver.resolveValue(api.headers, variableContext) as Record<string, unknown>
+          ? ((await variableResolver.resolveValue(api.headers, variableContext)) as Record<
+              string,
+              unknown
+            >)
           : undefined,
         params: api.params
-          ? await variableResolver.resolveValue(api.params, variableContext) as Record<string, unknown>
+          ? ((await variableResolver.resolveValue(api.params, variableContext)) as Record<
+              string,
+              unknown
+            >)
           : undefined,
         variables: api.variables, // Don't resolve variables themselves, just pass them through
         endpoints: {}, // Add empty endpoints to satisfy ApiDefinition interface
@@ -339,6 +348,8 @@ export class ChainExecutor {
           statusText: 'OK (DRY RUN)',
           headers: {},
           body: '{"message": "This is a dry run response"}',
+          isBinary: false,
+          contentType: 'application/json',
         };
 
         return {

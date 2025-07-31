@@ -10,6 +10,7 @@ import type {
   EndpointDefinition,
   PluginConfiguration,
 } from '../../types/config.js';
+import type { HttpResponse } from '../../types/plugin.js';
 import path from 'path';
 
 export interface ApiCommandArgs {
@@ -91,7 +92,9 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       // Show default profiles
       const defaultProfiles = config.config?.defaultProfile;
       if (defaultProfiles) {
-        const defaultProfilesList = Array.isArray(defaultProfiles) ? defaultProfiles : [defaultProfiles];
+        const defaultProfilesList = Array.isArray(defaultProfiles)
+          ? defaultProfiles
+          : [defaultProfiles];
         process.stderr.write(`[VERBOSE]   Default profiles: ${defaultProfilesList.join(', ')}\n`);
       } else {
         process.stderr.write(`[VERBOSE]   Default profiles: none\n`);
@@ -135,7 +138,11 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
         }
       }
 
-      mergedProfileVars = variableResolver.mergeProfiles(profileNames, config.profiles, args.verbose);
+      mergedProfileVars = variableResolver.mergeProfiles(
+        profileNames,
+        config.profiles,
+        args.verbose
+      );
     }
 
     // Create initial variable context for global plugin configuration resolution
@@ -174,7 +181,7 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
         // Enhanced dependency-aware loading: prioritize secret providers
         const secretProviders: PluginConfiguration[] = [];
         const secretConsumers: PluginConfiguration[] = [];
-        
+
         for (const config of configsToResolve) {
           const configStr = JSON.stringify(config.config || {});
           // Detect secret providers (plugins that likely register secret resolvers)
@@ -216,10 +223,13 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
               globalPluginManager.getParameterizedVariableSources()
             );
 
-            const resolvedConfig = await variableResolver.resolveValue(pluginConfig, updatedContext) as PluginConfiguration;
+            const resolvedConfig = (await variableResolver.resolveValue(
+              pluginConfig,
+              updatedContext
+            )) as PluginConfiguration;
             await globalPluginManager.loadPlugin(resolvedConfig, configDir);
             resolvedConfigs.push(resolvedConfig);
-            
+
             // Update the plugin manager on variable resolver after each plugin load
             variableResolver.setPluginManager(globalPluginManager);
           } catch (error) {
@@ -291,12 +301,18 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       const resolvedApiBase: Pick<ApiDefinition, 'baseUrl' | 'headers' | 'params' | 'variables'> & {
         endpoints?: Record<string, EndpointDefinition>;
       } = {
-        baseUrl: await variableResolver.resolveValue(api.baseUrl, variableContext) as string,
+        baseUrl: (await variableResolver.resolveValue(api.baseUrl, variableContext)) as string,
         headers: api.headers
-          ? await variableResolver.resolveValue(api.headers, variableContext) as Record<string, unknown>
+          ? ((await variableResolver.resolveValue(api.headers, variableContext)) as Record<
+              string,
+              unknown
+            >)
           : undefined,
         params: api.params
-          ? await variableResolver.resolveValue(api.params, variableContext) as Record<string, unknown>
+          ? ((await variableResolver.resolveValue(api.params, variableContext)) as Record<
+              string,
+              unknown
+            >)
           : undefined,
         variables: api.variables, // Don't resolve variables themselves, just pass them through
         endpoints: {}, // Add empty endpoints to satisfy ApiDefinition interface
@@ -381,7 +397,9 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       } catch {
         // If URL is invalid, just log the error but continue without query params
         if (args.verbose) {
-          process.stderr.write(`[WARNING] Invalid URL format, skipping query parameters: ${finalUrl}\n`);
+          process.stderr.write(
+            `[WARNING] Invalid URL format, skipping query parameters: ${finalUrl}\n`
+          );
         }
       }
     }
@@ -429,8 +447,14 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       }
     }
 
-    // Output response body to stdout (as per PRD requirement)
-    console.log(response.body);
+    // Output response body to stdout (handle binary data correctly for shell redirection)
+    if (response.isBinary && Buffer.isBuffer(response.body)) {
+      // Write raw binary data to stdout for shell redirection
+      process.stdout.write(response.body);
+    } else {
+      // Write text data normally
+      console.log(response.body as string);
+    }
 
     // If HTTP error status, print error info to stderr but exit 0 (as per T1.6) only when no exitOnHttpError is set
     if (response.status >= 400 && !args.exitOnHttpError) {
@@ -442,10 +466,12 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       const errorMessage = error.message;
 
       // Check for variable-related errors
-      if (errorMessage.includes('could not be resolved') ||
+      if (
+        errorMessage.includes('could not be resolved') ||
         errorMessage.includes('Variable ') ||
         errorMessage.includes('not defined') ||
-        errorMessage.includes('resolution failed')) {
+        errorMessage.includes('resolution failed')
+      ) {
         process.stderr.write(`Variable Error: ${errorMessage}\n`);
       } else {
         process.stderr.write(`Configuration Error: ${errorMessage}\n`);
@@ -517,10 +543,18 @@ interface ResponseDetails {
 }
 
 /**
- * Print response details to stderr
+ * Print response details to stderr (enhanced for binary data)
  */
-function printResponseDetails(response: ResponseDetails, duration: number): void {
+function printResponseDetails(response: HttpResponse, duration: number): void {
   process.stderr.write(`[RESPONSE] ${response.status} ${response.statusText} (${duration}ms)\n`);
+
+  // Handle binary response metadata
+  if (response.isBinary) {
+    process.stderr.write(`[RESPONSE] Binary Content-Type: ${response.contentType || 'unknown'}\n`);
+    const size =
+      response.contentLength || (Buffer.isBuffer(response.body) ? response.body.length : 0);
+    process.stderr.write(`[RESPONSE] Content-Length: ${size} bytes\n`);
+  }
 
   if (response.headers && Object.keys(response.headers).length > 0) {
     process.stderr.write('[RESPONSE] Headers:\n');

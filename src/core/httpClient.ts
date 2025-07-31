@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { HttpRequest, HttpResponse } from '../types/plugin.js';
 import { PluginManager } from './pluginManager.js';
+import { BinaryDetector } from './binaryDetector.js';
 
 export class HttpClient {
   private pluginManager?: PluginManager;
@@ -35,16 +36,39 @@ export class HttpClient {
         url: mutableRequest.url,
         headers: mutableRequest.headers,
         data: mutableRequest.body,
+        // Always get raw data to preserve binary content
+        responseType: 'arraybuffer',
         // Don't throw on HTTP error status codes - we'll handle them
         validateStatus: () => true,
       });
 
-      // Create response object
+      // Detect if response should be treated as binary
+      const isBinary = BinaryDetector.shouldTreatAsBinary(response.headers, response.data);
+      const contentType = response.headers['content-type'] || response.headers['Content-Type'];
+      const contentLength = response.headers['content-length']
+        ? parseInt(response.headers['content-length'])
+        : undefined;
+
+      // Process response data based on type
+      let body: string | Buffer;
+      if (isBinary) {
+        // Keep binary data as Buffer
+        body = Buffer.from(response.data as ArrayBuffer);
+      } else {
+        // Convert to string with proper encoding for text content
+        const encoding = BinaryDetector.detectTextEncoding(contentType);
+        body = Buffer.from(response.data as ArrayBuffer).toString(encoding);
+      }
+
+      // Create response object with binary support
       const httpResponse: HttpResponse = {
         status: response.status,
         statusText: response.statusText,
         headers: response.headers as Record<string, string>,
-        body: typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
+        body,
+        isBinary,
+        contentType,
+        contentLength,
       };
 
       // Execute post-response hooks from plugins (T10.1)

@@ -478,7 +478,9 @@ export class VariableResolver {
       );
     }
 
-    let targetData: import('../types/plugin.js').HttpResponse | import('../types/plugin.js').HttpRequest;
+    let targetData:
+      | import('../types/plugin.js').HttpResponse
+      | import('../types/plugin.js').HttpRequest;
 
     switch (dataType) {
       case 'response':
@@ -501,6 +503,16 @@ export class VariableResolver {
 
     // Special handling for response.body and request.body - parse JSON if it's a string
     if (pathParts.length > 0 && pathParts[0].startsWith('body')) {
+      // T16.6: Prevent binary data from being used in template variables
+      if (dataType === 'response' && (targetData as HttpResponse).isBinary) {
+        throw new VariableResolutionError(
+          `Cannot use binary response body from step '${stepId}' as template variable. ` +
+            `Binary data cannot be converted to string for variable substitution. ` +
+            `Use response metadata instead (e.g., contentType, contentLength).`,
+          variableName
+        );
+      }
+
       if (typeof targetData.body === 'string') {
         try {
           // Parse the JSON string to an object for JSONPath processing
@@ -509,6 +521,13 @@ export class VariableResolver {
           // If it's not valid JSON, treat it as a plain string
           // JSONPath will need to access it differently
         }
+      } else if (Buffer.isBuffer(targetData.body)) {
+        // Handle Buffer case for binary data
+        throw new VariableResolutionError(
+          `Cannot use binary response body from step '${stepId}' as template variable. ` +
+            `Binary data (Buffer) cannot be used in variable substitution.`,
+          variableName
+        );
       }
     }
 
@@ -560,7 +579,7 @@ export class VariableResolver {
       return cliVars[variableName];
     }
 
-    // 2. Step with overrides (for chains) - support both old and new names  
+    // 2. Step with overrides (for chains) - support both old and new names
     const stepWith = context.stepWith || {};
     if (stepWith && stepWith[variableName] !== undefined) {
       return stepWith[variableName];
@@ -798,7 +817,7 @@ export class VariableResolver {
    * T9.6: Generates a UUID v4 (simple implementation without external dependencies)
    */
   private generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
       const r = (Math.random() * 16) | 0;
       const v = c === 'x' ? r : (r & 0x3) | 0x8;
       return v.toString(16);
@@ -856,7 +875,10 @@ export class VariableResolver {
   ): Promise<string> {
     const functionCall = this.parseFunctionCall(variableName);
 
-    if (!context.parameterizedPluginSources || !context.parameterizedPluginSources[functionCall.pluginName]) {
+    if (
+      !context.parameterizedPluginSources ||
+      !context.parameterizedPluginSources[functionCall.pluginName]
+    ) {
       throw new VariableResolutionError(
         `Plugin '${functionCall.pluginName}' not found or has no parameterized functions`,
         variableName
@@ -1064,24 +1086,38 @@ export class VariableResolver {
 
   private extractVariableValue(response: HttpResponse, path: string): unknown {
     try {
-      const parsedBody = JSON.parse(response.body);
+      // T16.6: Handle binary data properly
+      if (response.isBinary || Buffer.isBuffer(response.body)) {
+        throw new Error('Cannot extract variables from binary response body');
+      }
+
+      const parsedBody = JSON.parse(response.body as string);
       return this.resolveArrayAccess(parsedBody, path.split('.'));
     } catch {
-      // If parsing fails, return the raw body
+      // If parsing fails, return the raw body (only if it's text)
+      if (response.isBinary || Buffer.isBuffer(response.body)) {
+        throw new Error('Cannot use binary response body as variable value');
+      }
       return response.body;
     }
   }
 
-  async resolveStepsVariable(stepPath: string, steps: import('./chainExecutor.js').StepExecutionResult[]): Promise<unknown> {
+  async resolveStepsVariable(
+    stepPath: string,
+    steps: import('./chainExecutor.js').StepExecutionResult[]
+  ): Promise<unknown> {
     const parts = stepPath.split('.');
     if (parts.length < 2) {
-      throw new VariableResolutionError(`Invalid steps path: ${stepPath}. Expected format: stepId.property[.subproperty...]`, stepPath);
+      throw new VariableResolutionError(
+        `Invalid steps path: ${stepPath}. Expected format: stepId.property[.subproperty...]`,
+        stepPath
+      );
     }
 
     const [stepId, property, ...subPath] = parts;
 
     // Find the step by ID
-    const step = steps.find(s => s.stepId === stepId);
+    const step = steps.find((s) => s.stepId === stepId);
     if (!step) {
       throw new VariableResolutionError(`Step '${stepId}' not found in executed steps`, stepPath);
     }
@@ -1101,7 +1137,10 @@ export class VariableResolver {
         value = step.error;
         break;
       default:
-        throw new VariableResolutionError(`Invalid step property '${property}'. Available: request, response, success, error`, stepPath);
+        throw new VariableResolutionError(
+          `Invalid step property '${property}'. Available: request, response, success, error`,
+          stepPath
+        );
     }
 
     // If there's a subpath, navigate into the object
@@ -1120,7 +1159,7 @@ export class VariableResolver {
     }
 
     if (Array.isArray(obj)) {
-      return obj.map(item => this.maskSecretInObject(item, secretPattern));
+      return obj.map((item) => this.maskSecretInObject(item, secretPattern));
     }
 
     if (obj && typeof obj === 'object') {
@@ -1137,7 +1176,10 @@ export class VariableResolver {
   /**
    * Process JSONPath expressions for step data access
    */
-  private static processStepVariableValue(stepData: Record<string, unknown>, path: string): unknown {
+  private static processStepVariableValue(
+    stepData: Record<string, unknown>,
+    path: string
+  ): unknown {
     try {
       // Use JSONPath to query the step data
       const result = JSONPath({ path: path, json: stepData });

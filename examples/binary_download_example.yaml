@@ -1,0 +1,40 @@
+# Example configuration demonstrating binary data handling
+# This configuration shows how HttpCraft handles binary file downloads
+
+apis:
+  fileApi:
+    baseUrl: 'https://httpbin.org'
+    endpoints:
+      downloadZip:
+        path: '/bytes/1024'
+        method: GET
+        headers:
+          Accept: 'application/octet-stream'
+
+      downloadImage:
+        path: '/image/png'
+        method: GET
+        headers:
+          Accept: 'image/png'
+
+      downloadPdf:
+        path: '/base64/{{content}}'
+        method: GET
+        headers:
+          Accept: 'application/pdf'
+        variables:
+          content: 'JVBERi0xLjQKJcfs' # PDF header in base64
+
+chains:
+  downloadFiles:
+    description: 'Download multiple file types to demonstrate binary handling'
+    steps:
+      - id: 'getBinary'
+        call: 'fileApi.downloadZip'
+
+      - id: 'getImage'
+        call: 'fileApi.downloadImage'
+# Usage examples:
+# httpcraft fileApi downloadZip > file.dat         # Downloads binary data
+# httpcraft fileApi downloadImage > image.png      # Downloads PNG image
+# httpcraft chain downloadFiles --chain-output full # Shows binary metadata in JSON

@@ -2,9 +2,8 @@ import { configLoader } from '../../core/configLoader.js';
 import { chainExecutor } from '../../core/chainExecutor.js';
 import { variableResolver } from '../../core/variableResolver.js';
 import { PluginManager } from '../../core/pluginManager.js';
-import type {
-  HttpCraftConfig,
-} from '../../types/config.js';
+import type { HttpCraftConfig } from '../../types/config.js';
+import type { HttpResponse } from '../../types/plugin.js';
 import path from 'path';
 
 /**
@@ -16,7 +15,7 @@ function parseJsonIfPossible(value: unknown): unknown {
   if (typeof value !== 'string') {
     return value;
   }
-  
+
   try {
     return JSON.parse(value);
   } catch {
@@ -83,14 +82,14 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
 
     // Determine which profiles to use - T13.1 & T13.2: Additive profile merging
     let profileNames: string[] = [];
-    
+
     // Always start with default profiles (if any)
     if (config.config?.defaultProfile) {
-      profileNames = Array.isArray(config.config.defaultProfile) 
-        ? [...config.config.defaultProfile] 
+      profileNames = Array.isArray(config.config.defaultProfile)
+        ? [...config.config.defaultProfile]
         : [config.config.defaultProfile];
     }
-    
+
     // Add CLI-specified profiles (unless --no-default-profile is used)
     if (args.profiles && args.profiles.length > 0) {
       if (args.noDefaultProfile) {
@@ -105,28 +104,30 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
     // T13.6: Enhanced verbose output for profile operations
     if (args.verbose) {
       process.stderr.write('[VERBOSE] Loading profiles:\n');
-      
+
       // Show default profiles
       const defaultProfiles = config.config?.defaultProfile;
       if (defaultProfiles) {
-        const defaultProfilesList = Array.isArray(defaultProfiles) ? defaultProfiles : [defaultProfiles];
+        const defaultProfilesList = Array.isArray(defaultProfiles)
+          ? defaultProfiles
+          : [defaultProfiles];
         process.stderr.write(`[VERBOSE]   Default profiles: ${defaultProfilesList.join(', ')}\n`);
       } else {
         process.stderr.write(`[VERBOSE]   Default profiles: none\n`);
       }
-      
+
       // Show CLI profiles
       if (args.profiles && args.profiles.length > 0) {
         process.stderr.write(`[VERBOSE]   CLI profiles: ${args.profiles.join(', ')}\n`);
       } else {
         process.stderr.write(`[VERBOSE]   CLI profiles: none\n`);
       }
-      
+
       // Show override behavior
       if (args.noDefaultProfile && args.profiles && args.profiles.length > 0) {
         process.stderr.write(`[VERBOSE]   --no-default-profile used: ignoring default profiles\n`);
       }
-      
+
       // Show final profile order
       if (profileNames.length > 0) {
         process.stderr.write(`[VERBOSE]   Final profile order: ${profileNames.join(', ')}\n`);
@@ -153,7 +154,11 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
         }
       }
 
-      mergedProfileVars = variableResolver.mergeProfiles(profileNames, config.profiles, args.verbose);
+      mergedProfileVars = variableResolver.mergeProfiles(
+        profileNames,
+        config.profiles,
+        args.verbose
+      );
     }
 
     // Execute chain
@@ -175,17 +180,21 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
       const structuredResult = {
         chainName: result.chainName,
         success: result.success,
-        steps: result.steps.map(step => ({
+        steps: result.steps.map((step) => ({
           ...step,
           request: {
             ...step.request,
-            body: parseJsonIfPossible(step.request.body)
+            body: parseJsonIfPossible(step.request.body),
           },
           response: {
             ...step.response,
-            body: parseJsonIfPossible(step.response.body)
-          }
-        }))
+            // T16.6: Handle binary data in JSON output - represent as metadata
+            body:
+              step.response.isBinary && Buffer.isBuffer(step.response.body)
+                ? `<BINARY_DATA:${step.response.contentType || 'unknown'}:${step.response.body.length}_bytes>`
+                : parseJsonIfPossible(step.response.body),
+          },
+        })),
       };
       console.log(JSON.stringify(structuredResult, null, 2));
     } else if (args.chainOutput !== 'full') {
@@ -193,7 +202,14 @@ export async function handleChainCommand(args: ChainCommandArgs): Promise<void> 
       if (result.success && result.steps.length > 0) {
         const lastStep = result.steps[result.steps.length - 1];
         if (lastStep.success && lastStep.response?.body) {
-          console.log(lastStep.response.body);
+          // T16.6: Handle binary data correctly for shell redirection
+          if (lastStep.response.isBinary && Buffer.isBuffer(lastStep.response.body)) {
+            // Write raw binary data to stdout for shell redirection
+            process.stdout.write(lastStep.response.body);
+          } else {
+            // Write text data normally
+            console.log(lastStep.response.body as string);
+          }
         }
       }
     }
