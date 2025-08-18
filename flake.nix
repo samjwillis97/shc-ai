@@ -32,12 +32,24 @@
           npmDepsHash = "sha256-h9Tyh0HAzLvn20mGIYHmKFyu/0nHWRa83XqC6HWd2+0=";
           # npmDepsHash = pkgs.lib.fakeHash;
 
+          
+          # Explicitly pin nodejs so wrapper works
+          nodejs = node;
+
           # Build script
           buildPhase = ''
             runHook preBuild
             npm run build
             runHook postBuild
           '';
+
+          nativeBuildInputs = [
+            pkgs.pkg-config
+          ];
+
+          buildInputs = [
+            pkgs.libsecret
+          ];
 
           # Install script
           installPhase = ''
@@ -82,8 +94,8 @@ EOF
         devShells = {
           default = pkgs.mkShell {
             packages = with pkgs; [
-              node
               git
+              node
               # Include our built httpcraft package
               httpcraft
             ];
@@ -92,18 +104,18 @@ EOF
             shellHook = ''
               # Ensure httpcraft is in PATH (should be automatic with packages above)
               export PATH="${httpcraft}/bin:$PATH"
-              
+
               # Set up ZSH completions if we're in ZSH
               if [ -n "$ZSH_VERSION" ]; then
                 echo "Setting up HttpCraft ZSH completions..."
-                
+
                 # Create a temporary completion script
                 eval "$(httpcraft completion zsh 2>/dev/null || echo '# HttpCraft completion failed')"
-                
+
                 echo "HttpCraft is ready! Try:"
                 echo "  httpcraft --help"
                 echo "  httpcraft completion zsh  # To see the completion script"
-                
+
                 # Check if we have a test config
                 if [ -f "./test-phase5-demo.yaml" ]; then
                   echo "  httpcraft --get-api-names --config ./test-phase5-demo.yaml  # Test API completion"
@@ -112,7 +124,7 @@ EOF
                 echo "HttpCraft is ready! (Note: ZSH completions only work in ZSH)"
                 echo "Try: httpcraft --help"
               fi
-              
+
               echo "HttpCraft version: $(httpcraft --version 2>/dev/null || echo 'unknown')"
             '';
           };
