@@ -880,3 +880,204 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **Data Integrity:** Critical for any workflow involving file downloads or binary APIs
 
 ---
+
+## Phase 17: Enhanced CLI Information Commands
+
+- **Goal:** Add comprehensive list and describe commands to improve CLI discoverability and provide detailed information about APIs, endpoints, and profiles with their descriptions and configuration details.
+- **Status:** [ ] **NOT STARTED**
+- **Priority:** **MEDIUM** - Enhances developer experience and configuration discoverability
+- **User Impact:** Enables users to explore and understand available APIs, endpoints, and profiles without opening configuration files
+- **Tasks:**
+
+  - [ ] **T17.1:** **[TYPE DEFINITIONS]** Update configuration types to support description fields.
+
+    - _Implementation:_ Add optional `description?: string` field to `ApiDefinition` interface in `src/types/config.ts`
+    - _Enhancement:_ Add optional `description?: string` field to `ProfileDefinition` interface (currently just extends Record<string, unknown>)
+    - _Verification:_ Ensure `EndpointDefinition` has `description?: string` field (already exists in examples)
+    - _Testable Outcome:_ ✅ All configuration entities (APIs, endpoints, profiles) support description fields
+
+  - [ ] **T17.2:** **[LIST COMMAND HANDLERS]** Create comprehensive list command handlers.
+
+    - _Implementation:_ Create `src/cli/commands/list.ts` with handlers for listing APIs, endpoints, and profiles
+    - _Features:_
+      - `handleListApisCommand()`: List all APIs with names and descriptions in table format
+      - `handleListEndpointsCommand()`: List endpoints (optionally filtered by API) with method, name, and description
+      - `handleListProfilesCommand()`: List profiles with names, descriptions, and default profile indicators
+    - _Output Format:_ Human-readable tables by default, JSON format with `--json` flag
+    - _Profile Indicators:_ Show which profiles are configured as default in `config.defaultProfile`
+    - _Testable Outcome:_ ✅ List commands display comprehensive information in both table and JSON formats
+
+  - [ ] **T17.3:** **[DESCRIBE COMMAND HANDLERS]** Create detailed describe command handlers.
+
+    - _Implementation:_ Create `src/cli/commands/describe.ts` with handlers for detailed entity descriptions
+    - _Features:_
+      - `handleDescribeApiCommand()`: Show API details (baseUrl, description, headers, variables, endpoint list)
+      - `handleDescribeProfileCommand()`: Show all variables/settings the profile defines with their values
+      - `handleDescribeEndpointCommand()`: Show comprehensive endpoint details with profile application
+    - _Profile Integration:_ `describe endpoint` supports `--profile` flag to show how profiles affect the endpoint
+    - _Variable Resolution:_ Show how default profiles and CLI profiles combine to generate final endpoint configuration
+    - _Testable Outcome:_ ✅ Describe commands provide comprehensive details with profile context
+
+  - [ ] **T17.4:** **[CLI INTEGRATION]** Integrate new commands into main CLI structure.
+
+    - _Implementation:_ Update `src/cli/main.ts` to add `list` and `describe` command groups
+    - _Command Structure:_
+      ```bash
+      httpcraft list apis [--json]
+      httpcraft list endpoints [api-name] [--json]
+      httpcraft list profiles [--json]
+      httpcraft describe api <api-name> [--json]
+      httpcraft describe profile <profile-name> [--json]
+      httpcraft describe endpoint <api-name> <endpoint-name> [--json] [--profile <name>]
+      ```
+    - _Option Integration:_ Support for `--config`, `--json`, and `--profile` flags as appropriate
+    - _Error Handling:_ Clear "not found" error messages for missing entities
+    - _Testable Outcome:_ ✅ All new commands accessible via CLI with proper argument validation
+
+  - [ ] **T17.5:** **[TABLE FORMATTING]** Implement consistent table formatting for human-readable output.
+
+    - _Implementation:_ Create table formatting utilities for consistent output across all list commands
+    - _Table Features:_
+      - Consistent column alignment and spacing
+      - Header rows with proper separation
+      - Automatic width adjustment based on content
+      - Unicode table characters for professional appearance
+    - _Output Examples:_
+
+      ```
+      APIs:
+      Name            Description
+      ────────────────────────────────────────────────
+      jsonplaceholder  A testing API for posts and todos
+      userservice     User management API
+
+      Endpoints (jsonplaceholder):
+      Name      Method  Description
+      ──────────────────────────────────────────────
+      getTodo   GET     Fetches a single todo item
+      createPost POST   Creates a new post
+      ```
+
+    - _Testable Outcome:_ ✅ Professional table formatting for all human-readable output
+
+  - [ ] **T17.6:** **[PROFILE RESOLUTION DISPLAY]** Implement profile resolution visualization for describe endpoint.
+
+    - _Implementation:_ Create comprehensive profile resolution display showing how variables are merged
+    - _Features:_
+      - Show active profile chain (default + CLI profiles)
+      - Display final resolved values for all endpoint configuration
+      - Indicate source of each variable (which profile/scope it comes from)
+      - Preview final HTTP request that would be generated
+    - _Profile Context:_ Use actual profile resolution logic from existing VariableResolver
+    - _Example Output:_
+
+      ```
+      Active Profiles: dev → api-auth → user-john
+      Final Configuration:
+        baseUrl: https://dev.api.com (from profile: dev)
+        apiKey: john-dev-key (from profile: user-john)
+        headers:
+          Authorization: Bearer [resolved] (from profile: api-auth)
+
+      Generated Request:
+        Method: GET
+        URL: https://dev.api.com/users/123
+        Headers: { Authorization: "Bearer [MASKED]", ... }
+      ```
+
+    - _Testable Outcome:_ ✅ Clear visualization of profile resolution and final endpoint configuration
+
+  - [ ] **T17.7:** **[JSON OUTPUT FORMAT]** Implement structured JSON output for programmatic use.
+
+    - _Implementation:_ Create consistent JSON output format for all list and describe commands
+    - _JSON Structure:_
+      - List commands: Array of objects with name, description, and relevant metadata
+      - Describe commands: Detailed object with all configuration and resolved values
+      - Profile resolution: Include active profiles, variable sources, and final configuration
+    - _Machine Readable:_ Structured format suitable for scripting and integration
+    - _Consistency:_ Standardized JSON schema across all commands
+    - _Testable Outcome:_ ✅ All commands support `--json` flag with consistent, parseable output
+
+  - [ ] **T17.8:** **[COMPREHENSIVE TESTING]** Implement comprehensive test coverage for new CLI commands.
+
+    - _Implementation:_ Create comprehensive test suites for all new functionality
+    - _Test Files:_
+      - `tests/unit/cli/commands/list.test.ts`: Unit tests for list command handlers
+      - `tests/unit/cli/commands/describe.test.ts`: Unit tests for describe command handlers
+      - `tests/integration/list-describe-commands.test.ts`: Integration tests with real configurations
+    - _Test Coverage:_
+      - All command handlers with various input scenarios
+      - Table formatting and JSON output modes
+      - Profile resolution and variable display
+      - Error handling for missing entities
+      - CLI argument parsing and validation
+    - _Test Scenarios:_ Missing configs, empty configs, complex profile hierarchies, API-specific overrides
+    - _Testable Outcome:_ ✅ Comprehensive test suite verifying all new CLI functionality
+
+  - [ ] **T17.9:** **[DOCUMENTATION]** Create comprehensive documentation for new CLI commands.
+
+    - _Implementation:_ Update README.md and create detailed command documentation
+    - _Documentation Sections:_
+      - README.md: Add "CLI Information Commands" section with usage examples
+      - Command reference: Complete documentation for all list and describe commands
+      - Usage patterns: Common workflows for exploring and understanding configurations
+      - Profile visualization: Examples of profile resolution output
+    - _Examples:_ Real-world usage examples with sample outputs
+    - _Integration:_ Update existing CLI documentation to reference new discoverability features
+    - _Testable Outcome:_ ✅ Complete documentation enables users to effectively use new CLI commands
+
+  - [ ] **T17.10:** **[INTEGRATION VALIDATION]** Validate functionality with real-world configurations.
+    - _Implementation:_ Test new commands against existing example configurations
+    - _Validation Scenarios:_
+      - Simple configurations (basic API definitions)
+      - Complex configurations (multiple profiles, plugins, chains)
+      - Modular configurations (imported APIs, profiles from files)
+      - Edge cases (missing descriptions, empty profiles, undefined entities)
+    - _Real Configuration Testing:_ Verify commands work with all existing examples in `examples/` directory
+    - _Performance:_ Ensure commands respond quickly even with large configurations
+    - _Testable Outcome:_ ✅ All new commands work correctly with existing HttpCraft configurations
+
+- **Implementation Benefits:**
+
+  - **Discoverability:** ✅ Users can explore available APIs, endpoints, and profiles without opening files
+  - **Understanding:** ✅ Clear descriptions help users understand what each component does
+  - **Profile Debugging:** ✅ Visualize how profiles combine to generate final configuration
+  - **Developer Experience:** ✅ Professional CLI tools with comprehensive information commands
+  - **Scripting Support:** ✅ JSON output enables integration with other tools and scripts
+
+- **Command Examples:**
+
+  ```bash
+  # List all available APIs
+  httpcraft list apis
+
+  # List endpoints for specific API
+  httpcraft list endpoints jsonplaceholder
+
+  # List all profiles with default indicators
+  httpcraft list profiles
+
+  # Get detailed API information
+  httpcraft describe api jsonplaceholder
+
+  # Show profile variables and settings
+  httpcraft describe profile development
+
+  # Show endpoint details with profile resolution
+  httpcraft describe endpoint jsonplaceholder getTodo --profile dev --profile user-admin
+
+  # Get machine-readable output
+  httpcraft list apis --json
+  httpcraft describe endpoint myapi endpoint --json --profile prod
+  ```
+
+- **Expected Output Quality:**
+
+  - **Professional Tables:** Clean, aligned table output with proper headers and spacing
+  - **Comprehensive Details:** All relevant configuration information displayed clearly
+  - **Profile Visualization:** Clear indication of how profiles affect final configuration
+  - **Error Handling:** Helpful error messages with suggestions for missing entities
+  - **Consistent Formatting:** Standardized output format across all commands
+
+---
+
