@@ -7,10 +7,11 @@ HttpCraft is a command-line interface (CLI) tool designed to simplify testing an
 ## ✨ Features
 
 - **🔧 Configuration-driven**: Define APIs, endpoints, and workflows in YAML files
-- **🔄 Variable substitution**: Dynamic variables with multiple scopes and precedence rules  
+- **🔄 Variable substitution**: Dynamic variables with multiple scopes and precedence rules
 - **📝 Profiles**: Switch between different environments (dev, staging, prod) or user contexts
 - **🔗 Request chaining**: Execute sequences of requests with data passing between steps
 - **🧩 Plugin system**: Extend functionality with custom JavaScript/TypeScript plugins
+- **📋 Configuration discovery**: List and describe APIs, endpoints, and profiles with `list` and `describe` commands
 - **⚡ Tab completion**: Full ZSH completion for commands, API names, and options
 - **🔍 Verbose output**: Detailed request/response information for debugging
 - **🏃 Dry run mode**: Preview requests without sending them
@@ -54,22 +55,22 @@ Create `.httpcraft.yaml` in your current directory:
 # .httpcraft.yaml
 apis:
   jsonplaceholder:
-    baseUrl: "https://jsonplaceholder.typicode.com"
+    baseUrl: 'https://jsonplaceholder.typicode.com'
     endpoints:
       getTodo:
-        description: "Fetches a single todo item."
+        description: 'Fetches a single todo item.'
         method: GET
-        path: "/todos/1"
-      
+        path: '/todos/1'
+
       createPost:
-        description: "Creates a new post."
+        description: 'Creates a new post.'
         method: POST
-        path: "/posts"
+        path: '/posts'
         headers:
-          Content-Type: "application/json; charset=UTF-8"
+          Content-Type: 'application/json; charset=UTF-8'
         body:
-          title: "My New Post"
-          body: "This is the post content."
+          title: 'My New Post'
+          body: 'This is the post content.'
           userId: 1
 ```
 
@@ -88,21 +89,21 @@ httpcraft jsonplaceholder createPost
 ```yaml
 profiles:
   dev:
-    baseUrl: "https://api-dev.example.com"
-    apiKey: "dev-key-123"
+    baseUrl: 'https://api-dev.example.com'
+    apiKey: 'dev-key-123'
   prod:
-    baseUrl: "https://api.example.com"
-    apiKey: "{{secret.PROD_API_KEY}}"
+    baseUrl: 'https://api.example.com'
+    apiKey: '{{secret.PROD_API_KEY}}'
 
 apis:
   myapi:
-    baseUrl: "{{profile.baseUrl}}"
+    baseUrl: '{{profile.baseUrl}}'
     headers:
-      Authorization: "Bearer {{profile.apiKey}}"
+      Authorization: 'Bearer {{profile.apiKey}}'
     endpoints:
       getUser:
         method: GET
-        path: "/users/{{userId}}"
+        path: '/users/{{userId}}'
 ```
 
 ```bash
@@ -127,20 +128,142 @@ httpcraft chain <chain_name>
 
 # Generate ZSH completion script
 httpcraft completion zsh
+
+# List available APIs, endpoints, or profiles
+httpcraft list apis
+httpcraft list endpoints [api-name]
+httpcraft list profiles
+
+# Describe configuration details
+httpcraft describe api <api-name>
+httpcraft describe profile <profile-name>
+httpcraft describe endpoint <api-name> <endpoint-name>
+```
+
+### CLI Information Commands
+
+HttpCraft provides comprehensive CLI commands to explore and understand your configuration without needing to open files.
+
+#### List Commands
+
+**List APIs:**
+
+```bash
+# Show all configured APIs in table format
+httpcraft list apis
+
+# Output as JSON for scripting
+httpcraft list apis --json
+```
+
+**List Endpoints:**
+
+```bash
+# Show all endpoints across all APIs
+httpcraft list endpoints
+
+# Show endpoints for a specific API
+httpcraft list endpoints jsonplaceholder
+
+# JSON output for programmatic use
+httpcraft list endpoints --json
+```
+
+**List Profiles:**
+
+```bash
+# Show all profiles with default indicators
+httpcraft list profiles
+
+# JSON output with profile metadata
+httpcraft list profiles --json
+```
+
+#### Describe Commands
+
+**Describe API:**
+
+```bash
+# Show detailed API information
+httpcraft describe api jsonplaceholder
+
+# Includes: description, base URL, headers, variables, endpoints
+httpcraft describe api userAPI --json
+```
+
+**Describe Profile:**
+
+```bash
+# Show profile variables and settings
+httpcraft describe profile development
+
+# Shows which profiles are loaded by default
+httpcraft describe profile base --json
+```
+
+**Describe Endpoint with Profile Resolution:**
+
+```bash
+# Show endpoint details with active profile resolution
+httpcraft describe endpoint userAPI getUser
+
+# See how profiles affect final configuration
+httpcraft describe endpoint userAPI getUser --profile dev --profile alice
+
+# Preview exact request that would be generated
+httpcraft describe endpoint userAPI createUser --var userId=123 --json
+```
+
+The describe endpoint command shows:
+
+- **Active Profiles**: Which profiles are being applied and their order
+- **Final Configuration**: Resolved headers, parameters, and body
+- **Inherited Settings**: What comes from the API vs endpoint level
+- **Variable Sources**: Which profile or scope provides each variable
+
+#### Information Command Options
+
+| Option          | Description                                              |
+| --------------- | -------------------------------------------------------- |
+| `--json`        | Output structured JSON instead of human-readable tables  |
+| `--profile, -p` | Apply profile(s) for endpoint resolution (describe only) |
+| `--var`         | Set variables for endpoint resolution (describe only)    |
+| `--config, -c`  | Specify configuration file (default: search hierarchy)   |
+
+#### Examples
+
+```bash
+# Explore an unknown configuration
+httpcraft list apis --config /path/to/config.yaml
+httpcraft list endpoints userAPI
+httpcraft describe api userAPI
+
+# Debug profile resolution
+httpcraft describe endpoint userAPI getUser --profile prod --profile admin --verbose
+
+# Generate documentation
+httpcraft list apis --json > apis.json
+httpcraft describe api userAPI --json | jq '.endpoints[].description'
+
+# Validate configuration
+httpcraft describe endpoint paymentAPI charge --var amount=100 --dry-run
 ```
 
 ### Command Options
 
-| Option | Description |
-|--------|-------------|
-| `--config, -c` | Path to configuration file |
-| `--var` | Set or override variables (can be used multiple times) |
-| `--profile, -p` | Select profile(s) to use (can be used multiple times) |
+| Option                 | Description                                               |
+| ---------------------- | --------------------------------------------------------- |
+| `--config, -c`         | Path to configuration file                                |
+| `--var`                | Set or override variables (can be used multiple times)    |
+| `--profile, -p`        | Select profile(s) to use (can be used multiple times)     |
 | `--no-default-profile` | Skip default profiles and use only CLI-specified profiles |
-| `--verbose` | Output detailed request/response information to stderr |
-| `--dry-run` | Preview request without sending it |
-| `--exit-on-http-error` | Exit with non-zero code for specified HTTP errors |
-| `--chain-output` | Output format for chains ("default" or "full") |
+| `--verbose`            | Output detailed request/response information to stderr    |
+| `--dry-run`            | Preview request without sending it                        |
+| `--exit-on-http-error` | Exit with non-zero code for specified HTTP errors         |
+| `--chain-output`       | Output format for chains ("default" or "full")            |
+| `--json`               | Output structured JSON (for list/describe commands)       |
+
+> **Note**: See [CLI Information Commands](#cli-information-commands) section for detailed documentation of the `list` and `describe` commands.
 
 ### Examples
 
@@ -181,23 +304,24 @@ httpcraft chain createAndGetUser --chain-output full
 HttpCraft now supports **additive profile merging**, making it easier to work with layered configurations:
 
 ### Default Behavior (Additive Merging)
+
 When you specify profiles via `--profile`, they are **combined** with your `config.defaultProfile`:
 
 ```yaml
 # .httpcraft.yaml
 config:
-  defaultProfile: ["base", "dev"]  # Base environment setup
+  defaultProfile: ['base', 'dev'] # Base environment setup
 
 profiles:
   base:
-    apiUrl: "https://api.example.com"
+    apiUrl: 'https://api.example.com'
     timeout: 30
   dev:
-    environment: "development"
+    environment: 'development'
     debug: true
   user-alice:
-    userId: "alice123"
-    apiKey: "alice-key"
+    userId: 'alice123'
+    apiKey: 'alice-key'
 ```
 
 ```bash
@@ -209,6 +333,7 @@ httpcraft --profile user-alice myapi getUser
 ```
 
 ### Override Behavior
+
 Use `--no-default-profile` when you want **only** the CLI-specified profiles:
 
 ```bash
@@ -217,7 +342,9 @@ httpcraft --no-default-profile --profile user-alice myapi getUser
 ```
 
 ### Profile Precedence
+
 Variables from later profiles override earlier ones:
+
 1. Default profiles (in order specified)
 2. CLI profiles (in order specified)
 
@@ -227,6 +354,7 @@ httpcraft --profile user-alice --profile admin myapi getUser
 ```
 
 ### Verbose Output
+
 See exactly which profiles are being merged:
 
 ```bash
@@ -234,6 +362,7 @@ httpcraft --verbose --profile user-alice myapi getUser
 ```
 
 Output:
+
 ```
 [VERBOSE] Loading profiles:
 [VERBOSE]   Default profiles: base, dev
@@ -246,6 +375,7 @@ Output:
 ```
 
 ### Migration from Previous Versions
+
 **No breaking changes** - existing configurations work unchanged:
 
 - If you don't use `config.defaultProfile`, behavior is identical
@@ -255,20 +385,21 @@ Output:
 ### Common Patterns
 
 **Environment + User Pattern:**
+
 ```yaml
 config:
-  defaultProfile: ["base", "production"]
+  defaultProfile: ['base', 'production']
 
 profiles:
   base:
-    apiUrl: "https://api.example.com"
+    apiUrl: 'https://api.example.com'
     timeout: 30
   production:
-    environment: "prod"
-    logLevel: "warn"
+    environment: 'prod'
+    logLevel: 'warn'
   user-alice:
-    userId: "alice"
-    apiKey: "{{secret.ALICE_API_KEY}}"
+    userId: 'alice'
+    apiKey: '{{secret.ALICE_API_KEY}}'
 ```
 
 ```bash
@@ -277,19 +408,20 @@ httpcraft --profile user-alice myapi getUser
 ```
 
 **Team + Environment Pattern:**
+
 ```yaml
 config:
-  defaultProfile: "team-defaults"
+  defaultProfile: 'team-defaults'
 
 profiles:
   team-defaults:
-    apiUrl: "https://api.company.com"
-    userAgent: "CompanyTool/1.0"
+    apiUrl: 'https://api.company.com'
+    userAgent: 'CompanyTool/1.0'
   staging:
-    environment: "staging"
-    apiUrl: "https://staging-api.company.com"
+    environment: 'staging'
+    apiUrl: 'https://staging-api.company.com'
   production:
-    environment: "production"
+    environment: 'production'
 ```
 
 ```bash
@@ -307,7 +439,7 @@ httpcraft --no-default-profile --profile staging myapi getUser
 HttpCraft searches for configuration files in this order:
 
 1. File specified via `--config <path>` (highest priority)
-2. `.httpcraft.yaml` or `.httpcraft.yml` in current directory  
+2. `.httpcraft.yaml` or `.httpcraft.yml` in current directory
 3. `$HOME/.config/httpcraft/config.yaml` (global default)
 
 ### Configuration Structure
@@ -315,63 +447,63 @@ HttpCraft searches for configuration files in this order:
 ```yaml
 # Global configuration
 config:
-  defaultProfile: "dev"
+  defaultProfile: 'dev'
 
-# Variable profiles  
+# Variable profiles
 profiles:
   dev:
-    baseUrl: "https://api-dev.example.com"
-    apiKey: "dev-key"
+    baseUrl: 'https://api-dev.example.com'
+    apiKey: 'dev-key'
   prod:
-    baseUrl: "https://api.example.com"
-    apiKey: "{{secret.PROD_API_KEY}}"
+    baseUrl: 'https://api.example.com'
+    apiKey: '{{secret.PROD_API_KEY}}'
 
 # Global variable files
 variables:
-  - "./vars/global.yaml"
+  - './vars/global.yaml'
 
 # Secret configuration
 secrets:
-  provider: "environment" # Default: OS environment variables
+  provider: 'environment' # Default: OS environment variables
 
 # Plugin configuration
 plugins:
-  - path: "./plugins/auth-plugin.js"
+  - path: './plugins/auth-plugin.js'
     config:
-      authEndpoint: "https://auth.example.com"
+      authEndpoint: 'https://auth.example.com'
 
 # API definitions
 apis:
   myapi:
-    baseUrl: "{{profile.baseUrl}}"
+    baseUrl: '{{profile.baseUrl}}'
     headers:
-      Authorization: "Bearer {{profile.apiKey}}"
+      Authorization: 'Bearer {{profile.apiKey}}'
     variables:
-      version: "v1"
+      version: 'v1'
     endpoints:
       getUser:
         method: GET
-        path: "/{{api.version}}/users/{{userId}}"
+        path: '/{{api.version}}/users/{{userId}}'
         variables:
-          format: "json"
+          format: 'json'
 
 # Request chains
 chains:
   userWorkflow:
-    description: "Create user and fetch profile"
+    description: 'Create user and fetch profile'
     vars:
-      userName: "Default User"
+      userName: 'Default User'
     steps:
       - id: createUser
         call: myapi.createUser
         with:
           body:
-            name: "{{userName}}"
+            name: '{{userName}}'
       - id: getUser
         call: myapi.getUser
         with:
           pathParams:
-            userId: "{{steps.createUser.response.body.id}}"
+            userId: '{{steps.createUser.response.body.id}}'
 ```
 
 ### Variable System
@@ -382,7 +514,7 @@ Variables use `{{variable_name}}` syntax and follow this precedence (highest to 
 2. Step `with` overrides (in chains)
 3. Chain variables (`chain.vars`)
 4. Endpoint variables
-5. API variables  
+5. API variables
 6. Profile variables
 7. Global variable files
 8. Secret variables (`{{secret.KEY}}`)
@@ -404,31 +536,32 @@ Chains allow you to execute sequences of requests with data passing:
 ```yaml
 chains:
   userOnboarding:
-    description: "Complete user registration flow"
+    description: 'Complete user registration flow'
     vars:
-      email: "user@example.com"
+      email: 'user@example.com'
     steps:
       - id: register
         call: auth.register
         with:
           body:
-            email: "{{email}}"
-            password: "temppass123"
-            
+            email: '{{email}}'
+            password: 'temppass123'
+
       - id: verify
         call: auth.verify
         with:
           body:
-            token: "{{steps.register.response.body.verificationToken}}"
-            
+            token: '{{steps.register.response.body.verificationToken}}'
+
       - id: getProfile
         call: users.getProfile
         with:
           pathParams:
-            userId: "{{steps.register.response.body.userId}}"
+            userId: '{{steps.register.response.body.userId}}'
 ```
 
 Access step data using:
+
 - `{{steps.stepId.response.body.field}}` - Response body data
 - `{{steps.stepId.response.headers['Header-Name']}}` - Response headers
 - `{{steps.stepId.response.status}}` - Response status code
@@ -449,37 +582,37 @@ Define plugins once in the global `plugins` section for reuse across multiple AP
 ```yaml
 # Global plugin definitions
 plugins:
-  - name: "sharedAuth"
-    path: "./plugins/shared-auth.js"
+  - name: 'sharedAuth'
+    path: './plugins/shared-auth.js'
     config:
-      baseUrl: "https://auth.example.com"
+      baseUrl: 'https://auth.example.com'
       timeout: 30000
-  
-  - name: "logging"
-    npmPackage: "httpcraft-logging-plugin"
+
+  - name: 'logging'
+    npmPackage: 'httpcraft-logging-plugin'
     config:
-      level: "info"
+      level: 'info'
 
 apis:
   userAPI:
-    baseUrl: "https://api.example.com"
+    baseUrl: 'https://api.example.com'
     plugins:
       # Reference global plugins with API-specific overrides
-      - name: "sharedAuth"
+      - name: 'sharedAuth'
         config:
-          scope: "user:read user:write"
-      - name: "logging"
+          scope: 'user:read user:write'
+      - name: 'logging'
 
   paymentAPI:
-    baseUrl: "https://payments.example.com"
+    baseUrl: 'https://payments.example.com'
     plugins:
       # Same global plugins, different configuration
-      - name: "sharedAuth"
+      - name: 'sharedAuth'
         config:
-          scope: "payment:read payment:write"
-      - name: "logging"
+          scope: 'payment:read payment:write'
+      - name: 'logging'
         config:
-          level: "debug"  # Override global config
+          level: 'debug' # Override global config
 ```
 
 ### Inline Plugin Definitions (API-Specific)
@@ -489,35 +622,35 @@ Define plugins directly within API configurations for API-specific functionality
 ```yaml
 apis:
   userAPI:
-    baseUrl: "https://api.example.com"
+    baseUrl: 'https://api.example.com'
     plugins:
       # Inline plugin with local file
-      - name: "userValidator"
-        path: "./plugins/user-validator.js"
+      - name: 'userValidator'
+        path: './plugins/user-validator.js'
         config:
           strictMode: true
-          requiredFields: ["email", "username"]
-      
+          requiredFields: ['email', 'username']
+
       # Inline plugin with npm package
-      - name: "userMetrics"
-        npmPackage: "@company/user-metrics-plugin"
+      - name: 'userMetrics'
+        npmPackage: '@company/user-metrics-plugin'
         config:
-          trackingId: "user-api-v1"
+          trackingId: 'user-api-v1'
 
   paymentAPI:
-    baseUrl: "https://payments.example.com"
+    baseUrl: 'https://payments.example.com'
     plugins:
       # Different inline plugins for payment API
-      - name: "fraudDetection"
-        path: "./plugins/fraud-detection.js"
+      - name: 'fraudDetection'
+        path: './plugins/fraud-detection.js'
         config:
           threshold: 0.85
-          
-      - name: "stripeIntegration"
-        npmPackage: "stripe-httpcraft-plugin"
+
+      - name: 'stripeIntegration'
+        npmPackage: 'stripe-httpcraft-plugin'
         config:
-          apiVersion: "2023-10-16"
-          webhookSecret: "{{secret.STRIPE_WEBHOOK_SECRET}}"
+          apiVersion: '2023-10-16'
+          webhookSecret: '{{secret.STRIPE_WEBHOOK_SECRET}}'
 ```
 
 ### Mixed Plugin Approach (Recommended)
@@ -527,37 +660,37 @@ Combine global and inline plugins for maximum flexibility:
 ```yaml
 # Global plugins for common functionality
 plugins:
-  - name: "oauth2"
+  - name: 'oauth2'
     config:
-      clientId: "{{env.OAUTH2_CLIENT_ID}}"
-      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
-      tokenUrl: "https://auth.example.com/oauth2/token"
+      clientId: '{{env.OAUTH2_CLIENT_ID}}'
+      clientSecret: '{{secret.OAUTH2_CLIENT_SECRET}}'
+      tokenUrl: 'https://auth.example.com/oauth2/token'
 
 apis:
   userAPI:
-    baseUrl: "https://api.example.com"
+    baseUrl: 'https://api.example.com'
     plugins:
       # Reference built-in global plugin
-      - name: "oauth2"
+      - name: 'oauth2'
         config:
-          scope: "user:read user:write"
-      
+          scope: 'user:read user:write'
+
       # API-specific inline plugin
-      - name: "userAudit"
-        path: "./plugins/user-audit.js"
+      - name: 'userAudit'
+        path: './plugins/user-audit.js'
         config:
-          auditLevel: "detailed"
-          logDestination: "user-api-logs"
+          auditLevel: 'detailed'
+          logDestination: 'user-api-logs'
 
   notificationAPI:
-    baseUrl: "https://notifications.example.com"
+    baseUrl: 'https://notifications.example.com'
     plugins:
       # Only inline plugins (no global dependencies)
-      - name: "twilioSMS"
-        npmPackage: "@httpcraft/twilio-plugin"
+      - name: 'twilioSMS'
+        npmPackage: '@httpcraft/twilio-plugin'
         config:
-          accountSid: "{{secret.TWILIO_ACCOUNT_SID}}"
-          authToken: "{{secret.TWILIO_AUTH_TOKEN}}"
+          accountSid: '{{secret.TWILIO_ACCOUNT_SID}}'
+          authToken: '{{secret.TWILIO_AUTH_TOKEN}}'
 ```
 
 ### Example Plugin Development
@@ -571,42 +704,45 @@ export default {
       const token = await getApiToken(context.config.apiKey);
       request.headers['Authorization'] = `Bearer ${token}`;
     });
-    
+
     // Custom variables
     context.registerVariableSource('apiToken', async () => {
       return await getApiToken(context.config.apiKey);
     });
-    
+
     // Parameterized functions
     context.registerParameterizedVariableSource('getTokenWithScope', async (scope) => {
       return await getApiToken(context.config.apiKey, scope);
     });
-    
+
     // Post-response hook
     context.registerPostResponseHook(async (request, response) => {
       if (response.headers['content-type']?.includes('xml')) {
         response.body = convertXmlToJson(response.body);
       }
     });
-  }
+  },
 };
 ```
 
 ### Plugin Benefits
 
 **Global Plugins:**
+
 - ✅ **Reusability** - Define once, use everywhere
 - ✅ **Consistency** - Same plugin version across APIs
 - ✅ **Maintenance** - Single place for updates
 - ✅ **Configuration sharing** - Base config with API overrides
 
 **Inline Plugins:**
+
 - ✅ **Simplicity** - No global definition required
 - ✅ **API-specific** - Tailored to specific API needs
 - ✅ **Reduced ceremony** - Direct definition where needed
 - ✅ **Experimentation** - Easy to test one-off plugins
 
 **Best Practices:**
+
 - Use **global plugins** for authentication, logging, and shared functionality
 - Use **inline plugins** for API-specific validation, transformations, and integrations
 - Combine both approaches in complex applications for optimal flexibility
@@ -732,7 +868,7 @@ Or add a schema reference directly to your config file:
 
 apis:
   myapi:
-    baseUrl: "https://api.example.com"
+    baseUrl: 'https://api.example.com'
     # Editor will provide autocompletion and validation here!
 ```
 
@@ -771,22 +907,22 @@ The schema enforces:
 ```yaml
 # This configuration is fully validated by the schema
 config:
-  defaultProfile: "development"
+  defaultProfile: 'development'
 
 profiles:
   development:
-    baseUrl: "https://jsonplaceholder.typicode.com"
-    apiKey: "dev-key-123"
+    baseUrl: 'https://jsonplaceholder.typicode.com'
+    apiKey: 'dev-key-123'
 
 apis:
   jsonplaceholder:
-    baseUrl: "{{profile.baseUrl}}"
+    baseUrl: '{{profile.baseUrl}}'
     headers:
-      Authorization: "Bearer {{profile.apiKey}}"
+      Authorization: 'Bearer {{profile.apiKey}}'
     endpoints:
       getTodo:
         method: GET
-        path: "/todos/{{todoId}}"
+        path: '/todos/{{todoId}}'
         variables:
           todoId: 1
 
@@ -854,24 +990,28 @@ For detailed Nix setup and usage instructions, see the [Nix Usage Guide](docs/ni
 ### Common Issues
 
 **Configuration file not found:**
+
 ```bash
 # Check config file search paths
 httpcraft --config ./my-config.yaml myapi endpoint
 ```
 
 **Variable resolution errors:**
+
 ```bash
 # Use dry-run to debug variable resolution
 httpcraft --dry-run myapi endpoint --var debug=true
 ```
 
 **Plugin loading issues:**
+
 ```bash
 # Check plugin syntax and exports
 node -c ./plugins/my-plugin.js
 ```
 
 **Completion not working:**
+
 ```bash
 # Verify completion script generation
 httpcraft completion zsh
@@ -905,29 +1045,29 @@ The OAuth2 plugin is included with HttpCraft - no need to install or reference e
 
 ```yaml
 plugins:
-  - name: "oauth2"
+  - name: 'oauth2'
     config:
-      grantType: "client_credentials"
-      tokenUrl: "https://auth.example.com/oauth2/token"
-      clientId: "{{env.OAUTH2_CLIENT_ID}}"
-      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
-      scope: "api:read api:write"
-      authMethod: "basic"
+      grantType: 'client_credentials'
+      tokenUrl: 'https://auth.example.com/oauth2/token'
+      clientId: '{{env.OAUTH2_CLIENT_ID}}'
+      clientSecret: '{{secret.OAUTH2_CLIENT_SECRET}}'
+      scope: 'api:read api:write'
+      authMethod: 'basic'
 
 apis:
   protectedApi:
-    baseUrl: "https://api.example.com/v1"
+    baseUrl: 'https://api.example.com/v1'
     endpoints:
       getUsers:
         method: GET
-        path: "/users"
+        path: '/users'
         # Authorization header automatically added by OAuth2 plugin
 ```
 
 ### OAuth2 Grant Types
 
 - **Client Credentials**: Server-to-server authentication
-- **Authorization Code**: User authentication with PKCE support  
+- **Authorization Code**: User authentication with PKCE support
 - **Refresh Token**: Automatic token renewal
 
 ### OAuth2 Providers
@@ -935,40 +1075,43 @@ apis:
 Ready-to-use configurations for major providers:
 
 #### Auth0
+
 ```yaml
 plugins:
-  - name: "oauth2"
+  - name: 'oauth2'
     config:
-      grantType: "client_credentials"
-      tokenUrl: "https://{{env.AUTH0_DOMAIN}}/oauth/token"
-      clientId: "{{env.AUTH0_CLIENT_ID}}"
-      clientSecret: "{{secret.AUTH0_CLIENT_SECRET}}"
-      scope: "read:users write:users"
-      authMethod: "post"
+      grantType: 'client_credentials'
+      tokenUrl: 'https://{{env.AUTH0_DOMAIN}}/oauth/token'
+      clientId: '{{env.AUTH0_CLIENT_ID}}'
+      clientSecret: '{{secret.AUTH0_CLIENT_SECRET}}'
+      scope: 'read:users write:users'
+      authMethod: 'post'
 ```
 
 #### Azure AD
+
 ```yaml
 plugins:
-  - name: "oauth2"
+  - name: 'oauth2'
     config:
-      grantType: "client_credentials"
-      tokenUrl: "https://login.microsoftonline.com/{{env.AZURE_TENANT_ID}}/oauth2/v2.0/token"
-      clientId: "{{env.AZURE_CLIENT_ID}}"
-      clientSecret: "{{secret.AZURE_CLIENT_SECRET}}"
-      scope: "https://graph.microsoft.com/.default"
+      grantType: 'client_credentials'
+      tokenUrl: 'https://login.microsoftonline.com/{{env.AZURE_TENANT_ID}}/oauth2/v2.0/token'
+      clientId: '{{env.AZURE_CLIENT_ID}}'
+      clientSecret: '{{secret.AZURE_CLIENT_SECRET}}'
+      scope: 'https://graph.microsoft.com/.default'
 ```
 
 #### Google OAuth2
+
 ```yaml
 plugins:
-  - name: "oauth2"
+  - name: 'oauth2'
     config:
-      grantType: "client_credentials"
-      tokenUrl: "https://oauth2.googleapis.com/token"
-      clientId: "{{env.GOOGLE_CLIENT_ID}}"
-      clientSecret: "{{secret.GOOGLE_CLIENT_SECRET}}"
-      scope: "https://www.googleapis.com/auth/cloud-platform"
+      grantType: 'client_credentials'
+      tokenUrl: 'https://oauth2.googleapis.com/token'
+      clientId: '{{env.GOOGLE_CLIENT_ID}}'
+      clientSecret: '{{secret.GOOGLE_CLIENT_SECRET}}'
+      scope: 'https://www.googleapis.com/auth/cloud-platform'
 ```
 
 ### Manual Token Access
@@ -978,18 +1121,18 @@ Access tokens directly in your configurations:
 ```yaml
 apis:
   manualApi:
-    baseUrl: "https://api.example.com"
+    baseUrl: 'https://api.example.com'
     endpoints:
       getData:
         method: GET
-        path: "/data"
+        path: '/data'
         headers:
           # Use plugin variables directly
-          Authorization: "{{plugins.oauth2.tokenType}} {{plugins.oauth2.accessToken}}"
-      
+          Authorization: '{{plugins.oauth2.tokenType}} {{plugins.oauth2.accessToken}}'
+
       getAdminData:
         method: GET
-        path: "/admin"
+        path: '/admin'
         headers:
           # Use parameterized functions for custom scopes
           Authorization: "Bearer {{plugins.oauth2.getTokenWithScope('admin:read')}}"
@@ -1014,21 +1157,21 @@ HttpCraft supports modern browser-based OAuth2 authentication similar to Insomni
 
 ```yaml
 plugins:
-  - name: "oauth2"
+  - name: 'oauth2'
     config:
       # Interactive Authorization Code Grant Flow
-      grantType: "authorization_code"
-      
+      grantType: 'authorization_code'
+
       # OAuth2 Provider Configuration
-      authorizationUrl: "https://auth.example.com/oauth2/authorize"
-      tokenUrl: "https://auth.example.com/oauth2/token"
-      clientId: "{{env.OAUTH2_CLIENT_ID}}"
-      clientSecret: "{{env.OAUTH2_CLIENT_SECRET}}"
-      
+      authorizationUrl: 'https://auth.example.com/oauth2/authorize'
+      tokenUrl: 'https://auth.example.com/oauth2/token'
+      clientId: '{{env.OAUTH2_CLIENT_ID}}'
+      clientSecret: '{{env.OAUTH2_CLIENT_SECRET}}'
+
       # Scopes and Audience
-      scope: "openid profile email api:read api:write"
-      audience: "https://api.example.com"
-      
+      scope: 'openid profile email api:read api:write'
+      audience: 'https://api.example.com'
+
       # Interactive Flow Options (all optional - auto-detected)
       # interactive: true              # Auto-detected when conditions are met
       # usePKCE: true                  # Enabled by default for security
@@ -1039,10 +1182,10 @@ plugins:
 
 apis:
   userApi:
-    baseUrl: "https://api.example.com"
+    baseUrl: 'https://api.example.com'
     endpoints:
       getProfile:
-        path: "/user/profile"
+        path: '/user/profile'
         method: GET
         # Authorization header automatically added by OAuth2 plugin
 ```
@@ -1050,6 +1193,7 @@ apis:
 #### User Experience
 
 **First-time authentication:**
+
 ```bash
 $ httpcraft userApi getProfile
 🔐 Authentication required...                        # stderr
@@ -1060,6 +1204,7 @@ $ httpcraft userApi getProfile
 ```
 
 **Subsequent requests:**
+
 ```bash
 $ httpcraft userApi getProfile
 🔑 Using stored access token                         # stderr
@@ -1067,6 +1212,7 @@ $ httpcraft userApi getProfile
 ```
 
 **Automatic token refresh:**
+
 ```bash
 $ httpcraft userApi getProfile
 🔄 Access token expired, refreshing...               # stderr
@@ -1086,24 +1232,27 @@ $ httpcraft userApi getProfile
 #### Provider Examples
 
 **Auth0:**
+
 ```yaml
-authorizationUrl: "https://your-tenant.auth0.com/authorize"
-tokenUrl: "https://your-tenant.auth0.com/oauth/token"
-audience: "https://api.your-app.com"
+authorizationUrl: 'https://your-tenant.auth0.com/authorize'
+tokenUrl: 'https://your-tenant.auth0.com/oauth/token'
+audience: 'https://api.your-app.com'
 ```
 
 **Azure AD:**
+
 ```yaml
-authorizationUrl: "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize"
-tokenUrl: "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
-scope: "https://graph.microsoft.com/.default"
+authorizationUrl: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize'
+tokenUrl: 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token'
+scope: 'https://graph.microsoft.com/.default'
 ```
 
 **Google OAuth2:**
+
 ```yaml
-authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth"
-tokenUrl: "https://oauth2.googleapis.com/token"
-scope: "https://www.googleapis.com/auth/userinfo.profile"
+authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth'
+tokenUrl: 'https://oauth2.googleapis.com/token'
+scope: 'https://www.googleapis.com/auth/userinfo.profile'
 ```
 
 See `examples/features/oauth2/interactive_oauth2.yaml` for complete working examples.
@@ -1117,29 +1266,29 @@ Create `.httpcraft.yaml` in your project directory:
 ```yaml
 profiles:
   dev:
-    baseUrl: "https://dev-api.example.com"
+    baseUrl: 'https://dev-api.example.com'
   prod:
-    baseUrl: "https://api.example.com"
+    baseUrl: 'https://api.example.com'
 
 apis:
   jsonplaceholder:
-    baseUrl: "{{profile.baseUrl}}/v1"
+    baseUrl: '{{profile.baseUrl}}/v1'
     endpoints:
       getTodos:
         method: GET
-        path: "/todos"
-      
+        path: '/todos'
+
       getTodo:
         method: GET
-        path: "/todos/{{todoId}}"
-      
+        path: '/todos/{{todoId}}'
+
       createTodo:
         method: POST
-        path: "/todos"
+        path: '/todos'
         headers:
-          Content-Type: "application/json"
+          Content-Type: 'application/json'
         body:
-          title: "{{title}}"
+          title: '{{title}}'
           completed: false
 ```
 
@@ -1174,46 +1323,46 @@ httpcraft --dry-run jsonplaceholder getTodos
 ```yaml
 # Global configuration
 config:
-  defaultProfile: "dev"
+  defaultProfile: 'dev'
 
 # Environment profiles
 profiles:
   dev:
-    api_base: "https://dev-api.example.com"
+    api_base: 'https://dev-api.example.com'
     debug: true
   prod:
-    api_base: "https://api.example.com"
+    api_base: 'https://api.example.com'
     debug: false
 
 # Global variables
 variables:
-  - "globals.yaml"
+  - 'globals.yaml'
 
 # Plugin configuration
 plugins:
-  - path: "./plugins/auth.js"
-    name: "customAuth"
+  - path: './plugins/auth.js'
+    name: 'customAuth'
     config:
-      apiKey: "{{secret.API_KEY}}"
+      apiKey: '{{secret.API_KEY}}'
 
 # API definitions
 apis:
   myService:
-    baseUrl: "{{profile.api_base}}"
+    baseUrl: '{{profile.api_base}}'
     headers:
-      User-Agent: "HttpCraft/1.0"
+      User-Agent: 'HttpCraft/1.0'
     variables:
-      version: "v1"
+      version: 'v1'
     endpoints:
       getUsers:
         method: GET
-        path: "/{{version}}/users"
+        path: '/{{version}}/users'
 
 # Request chains
 chains:
   userWorkflow:
     vars:
-      email: "test@example.com"
+      email: 'test@example.com'
     steps:
       - id: createUser
         call: myService.createUser
@@ -1221,7 +1370,7 @@ chains:
         call: myService.getUser
         with:
           pathParams:
-            userId: "{{steps.createUser.response.body.id}}"
+            userId: '{{steps.createUser.response.body.id}}'
 ```
 
 ## 🔗 Request Chaining
@@ -1231,39 +1380,39 @@ Chain multiple requests together with data passing:
 ```yaml
 chains:
   userRegistration:
-    description: "Complete user registration flow"
+    description: 'Complete user registration flow'
     vars:
-      email: "user@example.com"
-      password: "secure123"
-    
+      email: 'user@example.com'
+      password: 'secure123'
+
     steps:
       - id: register
         call: auth.register
         with:
           body:
-            email: "{{email}}"
-            password: "{{password}}"
-      
+            email: '{{email}}'
+            password: '{{password}}'
+
       - id: login
         call: auth.login
         with:
           body:
-            email: "{{email}}"
-            password: "{{password}}"
-      
+            email: '{{email}}'
+            password: '{{password}}'
+
       - id: getProfile
         call: users.getProfile
         with:
           headers:
-            Authorization: "Bearer {{steps.login.response.body.token}}"
-      
+            Authorization: 'Bearer {{steps.login.response.body.token}}'
+
       - id: updateProfile
         call: users.updateProfile
         with:
           headers:
-            Authorization: "Bearer {{steps.login.response.body.token}}"
+            Authorization: 'Bearer {{steps.login.response.body.token}}'
           body:
-            name: "{{steps.getProfile.response.body.name}}"
+            name: '{{steps.getProfile.response.body.name}}'
             verified: true
 ```
 
@@ -1280,6 +1429,7 @@ httpcraft chain userRegistration --chain-output full
 HttpCraft provides a powerful variable system with multiple scopes and precedence:
 
 ### Variable Precedence (highest to lowest)
+
 1. CLI arguments (`--var key=value`)
 2. Step `with` overrides (in chains)
 3. Chain variables
@@ -1293,6 +1443,7 @@ HttpCraft provides a powerful variable system with multiple scopes and precedenc
 11. Dynamic variables (`{{$timestamp}}`)
 
 ### Built-in Dynamic Variables
+
 - `{{$timestamp}}` - Unix timestamp
 - `{{$isoTimestamp}}` - ISO 8601 timestamp
 - `{{$randomInt}}` - Random integer
@@ -1327,37 +1478,37 @@ Define plugins once in the global `plugins` section for reuse across multiple AP
 ```yaml
 # Global plugin definitions
 plugins:
-  - name: "sharedAuth"
-    path: "./plugins/shared-auth.js"
+  - name: 'sharedAuth'
+    path: './plugins/shared-auth.js'
     config:
-      baseUrl: "https://auth.example.com"
+      baseUrl: 'https://auth.example.com'
       timeout: 30000
-  
-  - name: "logging"
-    npmPackage: "httpcraft-logging-plugin"
+
+  - name: 'logging'
+    npmPackage: 'httpcraft-logging-plugin'
     config:
-      level: "info"
+      level: 'info'
 
 apis:
   userAPI:
-    baseUrl: "https://api.example.com"
+    baseUrl: 'https://api.example.com'
     plugins:
       # Reference global plugins with API-specific overrides
-      - name: "sharedAuth"
+      - name: 'sharedAuth'
         config:
-          scope: "user:read user:write"
-      - name: "logging"
+          scope: 'user:read user:write'
+      - name: 'logging'
 
   paymentAPI:
-    baseUrl: "https://payments.example.com"
+    baseUrl: 'https://payments.example.com'
     plugins:
       # Same global plugins, different configuration
-      - name: "sharedAuth"
+      - name: 'sharedAuth'
         config:
-          scope: "payment:read payment:write"
-      - name: "logging"
+          scope: 'payment:read payment:write'
+      - name: 'logging'
         config:
-          level: "debug"  # Override global config
+          level: 'debug' # Override global config
 ```
 
 ### Inline Plugin Definitions (API-Specific)
@@ -1367,35 +1518,35 @@ Define plugins directly within API configurations for API-specific functionality
 ```yaml
 apis:
   userAPI:
-    baseUrl: "https://api.example.com"
+    baseUrl: 'https://api.example.com'
     plugins:
       # Inline plugin with local file
-      - name: "userValidator"
-        path: "./plugins/user-validator.js"
+      - name: 'userValidator'
+        path: './plugins/user-validator.js'
         config:
           strictMode: true
-          requiredFields: ["email", "username"]
-      
+          requiredFields: ['email', 'username']
+
       # Inline plugin with npm package
-      - name: "userMetrics"
-        npmPackage: "@company/user-metrics-plugin"
+      - name: 'userMetrics'
+        npmPackage: '@company/user-metrics-plugin'
         config:
-          trackingId: "user-api-v1"
+          trackingId: 'user-api-v1'
 
   paymentAPI:
-    baseUrl: "https://payments.example.com"
+    baseUrl: 'https://payments.example.com'
     plugins:
       # Different inline plugins for payment API
-      - name: "fraudDetection"
-        path: "./plugins/fraud-detection.js"
+      - name: 'fraudDetection'
+        path: './plugins/fraud-detection.js'
         config:
           threshold: 0.85
-          
-      - name: "stripeIntegration"
-        npmPackage: "stripe-httpcraft-plugin"
+
+      - name: 'stripeIntegration'
+        npmPackage: 'stripe-httpcraft-plugin'
         config:
-          apiVersion: "2023-10-16"
-          webhookSecret: "{{secret.STRIPE_WEBHOOK_SECRET}}"
+          apiVersion: '2023-10-16'
+          webhookSecret: '{{secret.STRIPE_WEBHOOK_SECRET}}'
 ```
 
 ### Mixed Plugin Approach (Recommended)
@@ -1405,37 +1556,37 @@ Combine global and inline plugins for maximum flexibility:
 ```yaml
 # Global plugins for common functionality
 plugins:
-  - name: "oauth2"
+  - name: 'oauth2'
     config:
-      clientId: "{{env.OAUTH2_CLIENT_ID}}"
-      clientSecret: "{{secret.OAUTH2_CLIENT_SECRET}}"
-      tokenUrl: "https://auth.example.com/oauth2/token"
+      clientId: '{{env.OAUTH2_CLIENT_ID}}'
+      clientSecret: '{{secret.OAUTH2_CLIENT_SECRET}}'
+      tokenUrl: 'https://auth.example.com/oauth2/token'
 
 apis:
   userAPI:
-    baseUrl: "https://api.example.com"
+    baseUrl: 'https://api.example.com'
     plugins:
       # Reference built-in global plugin
-      - name: "oauth2"
+      - name: 'oauth2'
         config:
-          scope: "user:read user:write"
-      
+          scope: 'user:read user:write'
+
       # API-specific inline plugin
-      - name: "userAudit"
-        path: "./plugins/user-audit.js"
+      - name: 'userAudit'
+        path: './plugins/user-audit.js'
         config:
-          auditLevel: "detailed"
-          logDestination: "user-api-logs"
+          auditLevel: 'detailed'
+          logDestination: 'user-api-logs'
 
   notificationAPI:
-    baseUrl: "https://notifications.example.com"
+    baseUrl: 'https://notifications.example.com'
     plugins:
       # Only inline plugins (no global dependencies)
-      - name: "twilioSMS"
-        npmPackage: "@httpcraft/twilio-plugin"
+      - name: 'twilioSMS'
+        npmPackage: '@httpcraft/twilio-plugin'
         config:
-          accountSid: "{{secret.TWILIO_ACCOUNT_SID}}"
-          authToken: "{{secret.TWILIO_AUTH_TOKEN}}"
+          accountSid: '{{secret.TWILIO_ACCOUNT_SID}}'
+          authToken: '{{secret.TWILIO_AUTH_TOKEN}}'
 ```
 
 ### Example Plugin Development
@@ -1449,42 +1600,45 @@ export default {
       const token = await getApiToken(context.config.apiKey);
       request.headers['Authorization'] = `Bearer ${token}`;
     });
-    
+
     // Custom variables
     context.registerVariableSource('apiToken', async () => {
       return await getApiToken(context.config.apiKey);
     });
-    
+
     // Parameterized functions
     context.registerParameterizedVariableSource('getTokenWithScope', async (scope) => {
       return await getApiToken(context.config.apiKey, scope);
     });
-    
+
     // Post-response hook
     context.registerPostResponseHook(async (request, response) => {
       if (response.headers['content-type']?.includes('xml')) {
         response.body = convertXmlToJson(response.body);
       }
     });
-  }
+  },
 };
 ```
 
 ### Plugin Benefits
 
 **Global Plugins:**
+
 - ✅ **Reusability** - Define once, use everywhere
 - ✅ **Consistency** - Same plugin version across APIs
 - ✅ **Maintenance** - Single place for updates
 - ✅ **Configuration sharing** - Base config with API overrides
 
 **Inline Plugins:**
+
 - ✅ **Simplicity** - No global definition required
 - ✅ **API-specific** - Tailored to specific API needs
 - ✅ **Reduced ceremony** - Direct definition where needed
 - ✅ **Experimentation** - Easy to test one-off plugins
 
 **Best Practices:**
+
 - Use **global plugins** for authentication, logging, and shared functionality
 - Use **inline plugins** for API-specific validation, transformations, and integrations
 - Combine both approaches in complex applications for optimal flexibility
@@ -1528,6 +1682,7 @@ httpcraft chain <TAB>        # Complete chain names
 ## 📊 Output Options
 
 ### Default Output
+
 Raw response body sent to `stdout` (perfect for piping):
 
 ```bash
@@ -1535,6 +1690,7 @@ httpcraft api getUsers | jq '.[] | .name'
 ```
 
 ### Verbose Output
+
 Detailed request/response information to `stderr`:
 
 ```bash
@@ -1542,6 +1698,7 @@ httpcraft --verbose api getUsers
 ```
 
 ### Dry Run
+
 See what would be sent without making the request:
 
 ```bash
@@ -1549,6 +1706,7 @@ httpcraft --dry-run api getUsers
 ```
 
 ### Chain Output
+
 Structured JSON output for chains:
 
 ```bash
@@ -1558,16 +1716,19 @@ httpcraft chain workflow --chain-output full | jq .
 ## 🐛 Error Handling
 
 ### Exit Codes
+
 - `0`: Success (including HTTP 4xx/5xx by default)
 - `1`: Tool errors, configuration errors, network failures
 
 ### Custom Exit Codes
+
 ```bash
 # Exit with non-zero for HTTP errors
 httpcraft --exit-on-http-error 4xx,5xx api getUsers
 ```
 
 ### Debugging
+
 ```bash
 # Verbose mode shows request/response details
 httpcraft --verbose api getUsers
@@ -1600,10 +1761,12 @@ variables/               # Global variables
 ## 🔧 Development
 
 ### Prerequisites
+
 - Node.js 18+
 - npm
 
 ### Setup
+
 ```bash
 git clone <repository>
 cd httpcraft
@@ -1612,12 +1775,14 @@ npm run build
 ```
 
 ### Testing
+
 ```bash
 npm test
 npm run test:integration
 ```
 
 ### Development Environment (Nix)
+
 ```bash
 nix develop
 ```
@@ -1631,27 +1796,27 @@ For detailed Nix setup and usage instructions, see the [Nix Usage Guide](docs/ni
 ```yaml
 profiles:
   dev:
-    auth_url: "https://dev-auth.example.com"
-    api_url: "https://dev-api.example.com"
+    auth_url: 'https://dev-auth.example.com'
+    api_url: 'https://dev-api.example.com'
   staging:
-    auth_url: "https://staging-auth.example.com"
-    api_url: "https://staging-api.example.com"
+    auth_url: 'https://staging-auth.example.com'
+    api_url: 'https://staging-api.example.com'
   prod:
-    auth_url: "https://auth.example.com"
-    api_url: "https://api.example.com"
+    auth_url: 'https://auth.example.com'
+    api_url: 'https://api.example.com'
 
 plugins:
-  - name: "oauth2"
+  - name: 'oauth2'
     config:
-      tokenUrl: "{{profile.auth_url}}/oauth2/token"
-      clientId: "{{env.CLIENT_ID}}"
-      clientSecret: "{{secret.CLIENT_SECRET}}"
+      tokenUrl: '{{profile.auth_url}}/oauth2/token'
+      clientId: '{{env.CLIENT_ID}}'
+      clientSecret: '{{secret.CLIENT_SECRET}}'
 
 apis:
   users:
-    baseUrl: "{{profile.api_url}}/v1"
+    baseUrl: '{{profile.api_url}}/v1'
     plugins:
-      - name: "oauth2"
+      - name: 'oauth2'
 ```
 
 ### Complex Workflow Chain
@@ -1659,41 +1824,41 @@ apis:
 ```yaml
 chains:
   deploymentTest:
-    description: "End-to-end deployment testing"
+    description: 'End-to-end deployment testing'
     vars:
-      version: "1.2.3"
-      environment: "staging"
-    
+      version: '1.2.3'
+      environment: 'staging'
+
     steps:
       - id: healthCheck
         call: monitoring.health
-      
+
       - id: deploy
         call: deployment.deploy
         with:
           body:
-            version: "{{version}}"
-            environment: "{{environment}}"
-      
+            version: '{{version}}'
+            environment: '{{environment}}'
+
       - id: waitForDeployment
         call: deployment.status
         with:
           pathParams:
-            deployId: "{{steps.deploy.response.body.id}}"
-      
+            deployId: '{{steps.deploy.response.body.id}}'
+
       - id: smokeTest
         call: testing.smokeTest
         with:
           body:
-            deploymentId: "{{steps.deploy.response.body.id}}"
-            tests: ["api", "database", "cache"]
-      
+            deploymentId: '{{steps.deploy.response.body.id}}'
+            tests: ['api', 'database', 'cache']
+
       - id: notifySuccess
         call: notifications.slack
         with:
           body:
-            message: "Deployment {{version}} to {{environment}} completed successfully"
-            results: "{{steps.smokeTest.response.body}}"
+            message: 'Deployment {{version}} to {{environment}} completed successfully'
+            results: '{{steps.smokeTest.response.body}}'
 ```
 
 ## 🤝 Contributing
@@ -1716,7 +1881,7 @@ chains:
 
 ---
 
-**HttpCraft** - Making HTTP testing simple, powerful, and enjoyable! 🚀 
+**HttpCraft** - Making HTTP testing simple, powerful, and enjoyable! 🚀
 
 ## Testing
 
@@ -1742,14 +1907,16 @@ npm run test:coverage:ui
 ```
 
 Coverage reports are generated in the `coverage/` directory:
+
 - **Text report**: Displayed in terminal during test run
 - **HTML report**: Open `coverage/index.html` in your browser for interactive coverage exploration
 - **JSON report**: `coverage/coverage-final.json` for programmatic access
 
 The project maintains coverage thresholds of 80% for:
+
 - **Branches**: Decision points in code
 - **Functions**: Function coverage
-- **Lines**: Line coverage  
+- **Lines**: Line coverage
 - **Statements**: Statement coverage
 
-Coverage excludes test files, configuration files, examples, and documentation to focus on source code quality. 
+Coverage excludes test files, configuration files, examples, and documentation to focus on source code quality.

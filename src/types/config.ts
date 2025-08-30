@@ -9,9 +9,9 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 
  * Cache configuration
  */
 export interface CacheConfig {
-  baseDir?: string;      // Base directory for cache files (default: ~/.httpcraft/cache)
-  defaultTtl?: number;   // Default TTL in milliseconds (default: 1 hour)
-  maxSize?: number;      // Maximum cache size per namespace (default: 1000 items)
+  baseDir?: string; // Base directory for cache files (default: ~/.httpcraft/cache)
+  defaultTtl?: number; // Default TTL in milliseconds (default: 1 hour)
+  maxSize?: number; // Maximum cache size per namespace (default: 1000 items)
   cleanupInterval?: number; // Cleanup interval in milliseconds (default: 5 minutes)
 }
 
@@ -49,6 +49,7 @@ export interface HttpCraftConfig extends Omit<RawHttpCraftConfig, 'apis' | 'chai
 
 export interface ApiDefinition {
   baseUrl: string;
+  description?: string;
   headers?: Record<string, unknown>;
   params?: Record<string, unknown>;
   variables?: Record<string, unknown>;
@@ -59,6 +60,7 @@ export interface ApiDefinition {
 export interface EndpointDefinition {
   method: HttpMethod;
   path: string;
+  description?: string;
   headers?: Record<string, unknown>;
   params?: Record<string, unknown>;
   body?: unknown;
@@ -98,6 +100,7 @@ export interface ChainStepAction {
 }
 
 export interface ProfileDefinition {
+  description?: string;
   [key: string]: unknown;
 }
 

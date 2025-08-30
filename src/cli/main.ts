@@ -19,6 +19,16 @@ import {
   handleCacheClearCommand,
   handleCacheStatsCommand,
 } from './commands/cache.js';
+import {
+  handleListApisCommand,
+  handleListEndpointsCommand,
+  handleListProfilesCommand,
+} from './commands/list.js';
+import {
+  handleDescribeApiCommand,
+  handleDescribeProfileCommand,
+  handleDescribeEndpointCommand,
+} from './commands/describe.js';
 
 async function main(): Promise<void> {
   try {
@@ -204,6 +214,195 @@ async function main(): Promise<void> {
           return;
         }
       )
+      .command(
+        'list',
+        'List available APIs, endpoints, or profiles',
+        (yargs) => {
+          return yargs
+            .command(
+              'apis',
+              'List all APIs',
+              (yargs) => {
+                yargs.option('json', {
+                  describe: 'Output as JSON',
+                  type: 'boolean',
+                  default: false,
+                });
+              },
+              async (argv) => {
+                await handleListApisCommand({
+                  config: argv.config as string | undefined,
+                  json: argv.json as boolean,
+                });
+              }
+            )
+            .command(
+              'endpoints [api-name]',
+              'List endpoints (optionally for a specific API)',
+              (yargs) => {
+                yargs
+                  .positional('api-name', {
+                    describe: 'API name to list endpoints for',
+                    type: 'string',
+                  })
+                  .option('json', {
+                    describe: 'Output as JSON',
+                    type: 'boolean',
+                    default: false,
+                  });
+              },
+              async (argv) => {
+                await handleListEndpointsCommand({
+                  apiName: argv['api-name'] as string | undefined,
+                  config: argv.config as string | undefined,
+                  json: argv.json as boolean,
+                });
+              }
+            )
+            .command(
+              'profiles',
+              'List all profiles',
+              (yargs) => {
+                yargs.option('json', {
+                  describe: 'Output as JSON',
+                  type: 'boolean',
+                  default: false,
+                });
+              },
+              async (argv) => {
+                await handleListProfilesCommand({
+                  config: argv.config as string | undefined,
+                  json: argv.json as boolean,
+                });
+              }
+            )
+            .demandCommand(1, 'You must specify what to list (apis, endpoints, or profiles)');
+        },
+        async () => {
+          // This handler ensures list commands are properly handled and don't fall through
+          return;
+        }
+      )
+      .command(
+        'describe',
+        'Show detailed information about APIs, endpoints, or profiles',
+        (yargs) => {
+          return yargs
+            .command(
+              'api <api-name>',
+              'Describe an API',
+              (yargs) => {
+                yargs
+                  .positional('api-name', {
+                    describe: 'API name to describe',
+                    type: 'string',
+                    demandOption: true,
+                  })
+                  .option('json', {
+                    describe: 'Output as JSON',
+                    type: 'boolean',
+                    default: false,
+                  });
+              },
+              async (argv) => {
+                await handleDescribeApiCommand({
+                  apiName: argv['api-name'] as string,
+                  config: argv.config as string | undefined,
+                  json: argv.json as boolean,
+                });
+              }
+            )
+            .command(
+              'profile <profile-name>',
+              'Describe a profile',
+              (yargs) => {
+                yargs
+                  .positional('profile-name', {
+                    describe: 'Profile name to describe',
+                    type: 'string',
+                    demandOption: true,
+                  })
+                  .option('json', {
+                    describe: 'Output as JSON',
+                    type: 'boolean',
+                    default: false,
+                  });
+              },
+              async (argv) => {
+                await handleDescribeProfileCommand({
+                  profileName: argv['profile-name'] as string,
+                  config: argv.config as string | undefined,
+                  json: argv.json as boolean,
+                });
+              }
+            )
+            .command(
+              'endpoint <api-name> <endpoint-name>',
+              'Describe an endpoint with profile resolution',
+              (yargs) => {
+                yargs
+                  .positional('api-name', {
+                    describe: 'API name',
+                    type: 'string',
+                    demandOption: true,
+                  })
+                  .positional('endpoint-name', {
+                    describe: 'Endpoint name',
+                    type: 'string',
+                    demandOption: true,
+                  })
+                  .option('json', {
+                    describe: 'Output as JSON',
+                    type: 'boolean',
+                    default: false,
+                  });
+              },
+              async (argv) => {
+                // Parse --var options into key-value pairs
+                const variables: Record<string, string> = {};
+                if (argv.var && Array.isArray(argv.var)) {
+                  for (const varStr of argv.var) {
+                    if (typeof varStr === 'string') {
+                      const [key, ...valueParts] = varStr.split('=');
+                      if (key && valueParts.length > 0) {
+                        variables[key] = valueParts.join('=');
+                      } else {
+                        console.error(
+                          `Error: Invalid variable format '${varStr}'. Use --var key=value`
+                        );
+                        process.exit(1);
+                      }
+                    }
+                  }
+                }
+
+                // Parse --profile options into array of profile names
+                const profiles: string[] = [];
+                if (argv.profile && Array.isArray(argv.profile)) {
+                  for (const profileName of argv.profile) {
+                    if (typeof profileName === 'string') {
+                      profiles.push(profileName);
+                    }
+                  }
+                }
+
+                await handleDescribeEndpointCommand({
+                  apiName: argv['api-name'] as string,
+                  endpointName: argv['endpoint-name'] as string,
+                  config: argv.config as string | undefined,
+                  json: argv.json as boolean,
+                  profiles,
+                  variables,
+                });
+              }
+            )
+            .demandCommand(1, 'You must specify what to describe (api, profile, or endpoint)');
+        },
+        async () => {
+          // This handler ensures describe commands are properly handled and don't fall through
+          return;
+        }
+      )
       .option('config', {
         describe: 'Path to configuration file',
         type: 'string',
@@ -221,7 +420,8 @@ async function main(): Promise<void> {
         alias: 'p',
       })
       .option('no-default-profile', {
-        describe: 'Ignore default profiles from configuration and use only profiles specified via --profile',
+        describe:
+          'Ignore default profiles from configuration and use only profiles specified via --profile',
         type: 'boolean',
         default: false,
       })
@@ -327,10 +527,15 @@ async function main(): Promise<void> {
 
     // Handle API command pattern: httpcraft <api_name> <endpoint_name>
     // But first check if this is a known command that was already handled
-    const knownCommands = ['request', 'chain', 'completion', 'cache'];
+    const knownCommands = ['request', 'chain', 'completion', 'cache', 'list', 'describe'];
     const isKnownCommand = argv._.length > 0 && knownCommands.includes(argv._[0] as string);
 
-    if (!isKnownCommand && argv._.length === 2 && typeof argv._[0] === 'string' && typeof argv._[1] === 'string') {
+    if (
+      !isKnownCommand &&
+      argv._.length === 2 &&
+      typeof argv._[0] === 'string' &&
+      typeof argv._[1] === 'string'
+    ) {
       const apiName = argv._[0];
       const endpointName = argv._[1];
 
