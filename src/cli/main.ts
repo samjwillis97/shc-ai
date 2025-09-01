@@ -447,6 +447,11 @@ async function main(): Promise<void> {
         choices: ['default', 'full'],
         default: 'default',
       })
+      .option('json', {
+        describe: 'Output response as machine-readable JSON including headers, data, and timings',
+        type: 'boolean',
+        default: false,
+      })
       // Hidden options for completion
       .option('get-api-names', {
         describe: 'Get list of API names (hidden, for completion)',
@@ -549,6 +554,7 @@ async function main(): Promise<void> {
         verbose: argv.verbose as boolean,
         dryRun: argv['dry-run'] as boolean,
         exitOnHttpError: argv['exit-on-http-error'] as string | undefined,
+        json: argv.json as boolean,
       });
     } else if (argv._.length === 0) {
       // No command provided, show help

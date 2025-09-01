@@ -23,6 +23,7 @@ export interface ApiCommandArgs {
   verbose?: boolean;
   dryRun?: boolean;
   exitOnHttpError?: string;
+  json?: boolean;
 }
 
 export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
@@ -157,7 +158,6 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
 
     // T14.5: Apply two-pass loading strategy to global plugins (same as API-level plugins)
     // This resolves the issue where global plugins depend on other global plugins for secret resolution
-    let resolvedGlobalPluginConfigs: PluginConfiguration[] | undefined;
     if (config.plugins && config.plugins.length > 0) {
       try {
         // IMPORTANT: Store global plugin configurations for later merging with API-level configs
@@ -238,8 +238,6 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
             );
           }
         }
-
-        resolvedGlobalPluginConfigs = resolvedConfigs;
       } catch (error) {
         if (error instanceof VariableResolutionError) {
           console.error(
@@ -254,7 +252,6 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       // No global plugins to load
       await globalPluginManager.loadPlugins([], configDir);
     }
-
     // T14.3: Set global plugin manager on variable resolver for secret resolution
     // This needs to happen BEFORE resolving API-level plugin configurations
     // so that {{secret.*}} variables in API-level plugin configs can be resolved
@@ -439,16 +436,40 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     if (args.exitOnHttpError && response.status >= 400) {
       const shouldExit = shouldExitOnHttpError(response.status, args.exitOnHttpError);
       if (shouldExit) {
-        process.stderr.write(`HTTP ${response.status} ${response.statusText}\n`);
+        if (!args.json) {
+          process.stderr.write(`HTTP ${response.status} ${response.statusText}\n`);
+        }
         process.exit(1);
       } else {
         // If exit pattern doesn't match but we have an error status, still write to stderr
-        process.stderr.write(`HTTP ${response.status} ${response.statusText}\n`);
+        if (!args.json) {
+          process.stderr.write(`HTTP ${response.status} ${response.statusText}\n`);
+        }
       }
     }
 
     // Output response body to stdout (handle binary data correctly for shell redirection)
-    if (response.isBinary && Buffer.isBuffer(response.body)) {
+    if (args.json) {
+      // JSON output format with headers, data, and timings
+      const jsonResponse = {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers || {},
+        timing: {
+          duration: duration,
+          startTime: startTime,
+          endTime: endTime,
+        },
+        data:
+          response.isBinary && Buffer.isBuffer(response.body)
+            ? `<binary data: ${response.body.length} bytes>`
+            : response.body,
+        isBinary: response.isBinary,
+        contentType: response.contentType,
+        contentLength: response.contentLength,
+      };
+      console.log(JSON.stringify(jsonResponse, null, 2));
+    } else if (response.isBinary && Buffer.isBuffer(response.body)) {
       // Write raw binary data to stdout for shell redirection
       process.stdout.write(response.body);
     } else {
@@ -457,7 +478,7 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
     }
 
     // If HTTP error status, print error info to stderr but exit 0 (as per T1.6) only when no exitOnHttpError is set
-    if (response.status >= 400 && !args.exitOnHttpError) {
+    if (response.status >= 400 && !args.exitOnHttpError && !args.json) {
       process.stderr.write(`HTTP ${response.status} ${response.statusText}\n`);
     }
   } catch (error: unknown) {
@@ -534,12 +555,6 @@ function printRequestDetails(
   }
 
   process.stderr.write('\n');
-}
-
-interface ResponseDetails {
-  status: number;
-  statusText: string;
-  headers?: Record<string, unknown>;
 }
 
 /**

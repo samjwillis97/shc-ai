@@ -11,23 +11,23 @@ import { ApiCommandArgs } from '../../../../src/cli/commands/api.js';
 vi.mock('../../../../src/core/configLoader.js', () => ({
   configLoader: {
     loadConfig: vi.fn(),
-    loadDefaultConfig: vi.fn()
-  }
+    loadDefaultConfig: vi.fn(),
+  },
 }));
 
 vi.mock('../../../../src/core/urlBuilder.js', () => ({
   urlBuilder: {
     buildUrl: vi.fn(),
     mergeHeaders: vi.fn(),
-    mergeParams: vi.fn()
-  }
+    mergeParams: vi.fn(),
+  },
 }));
 
 vi.mock('../../../../src/core/httpClient.js', () => ({
   httpClient: {
     executeRequest: vi.fn(),
-    setPluginManager: vi.fn()
-  }
+    setPluginManager: vi.fn(),
+  },
 }));
 
 vi.mock('../../../../src/core/variableResolver.js', () => ({
@@ -37,9 +37,9 @@ vi.mock('../../../../src/core/variableResolver.js', () => ({
     mergeProfiles: vi.fn(),
     setPluginManager: vi.fn(),
     maskSecrets: vi.fn((text: string) => text),
-    createContext: vi.fn()
+    createContext: vi.fn(),
   },
-  VariableResolutionError: class extends Error {}
+  VariableResolutionError: class extends Error {},
 }));
 
 vi.mock('../../../../src/core/pluginManager.js', () => ({
@@ -52,7 +52,7 @@ vi.mock('../../../../src/core/pluginManager.js', () => ({
       executePreRequestHooks: vi.fn().mockResolvedValue(undefined),
       executePostResponseHooks: vi.fn().mockResolvedValue(undefined),
       clear: vi.fn(),
-      getPlugins: vi.fn().mockReturnValue([])
+      getPlugins: vi.fn().mockReturnValue([]),
     }),
     getVariableSources: vi.fn().mockReturnValue({}),
     getParameterizedVariableSources: vi.fn().mockReturnValue({}),
@@ -60,8 +60,8 @@ vi.mock('../../../../src/core/pluginManager.js', () => ({
     executePreRequestHooks: vi.fn().mockResolvedValue(undefined),
     executePostResponseHooks: vi.fn().mockResolvedValue(undefined),
     clear: vi.fn(),
-    getPlugins: vi.fn().mockReturnValue([])
-  }))
+    getPlugins: vi.fn().mockReturnValue([]),
+  })),
 }));
 
 const mockConfigLoader = vi.mocked(configLoaderModule.configLoader);
@@ -86,7 +86,7 @@ function setupCommonMocks() {
         },
       },
     },
-    path: '/test/.httpcraft.yaml'
+    path: '/test/.httpcraft.yaml',
   });
 
   // HTTP client mock
@@ -109,7 +109,7 @@ function setupCommonMocks() {
     profiles: {},
     api: {},
     endpoint: {},
-    plugins: {}
+    plugins: {},
   });
 
   // URL builder mocks - complete setup
@@ -154,7 +154,9 @@ describe('API Command Phase 5 Features', () => {
         verbose: true,
       });
 
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[REQUEST] GET https://api.test.com/test'));
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[REQUEST] GET https://api.test.com/test')
+      );
       expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[RESPONSE] 200 OK'));
       expect(consoleLogSpy).toHaveBeenCalledWith('{"result": "success"}');
     });
@@ -166,7 +168,9 @@ describe('API Command Phase 5 Features', () => {
         verbose: true,
       });
 
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringMatching(/\[RESPONSE\] 200 OK \(\d+ms\)/));
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\[RESPONSE\] 200 OK \(\d+ms\)/)
+      );
     });
 
     it('should print headers and params when verbose is enabled and they exist', async () => {
@@ -176,19 +180,19 @@ describe('API Command Phase 5 Features', () => {
             testapi: {
               baseUrl: 'https://api.test.com',
               headers: { 'X-API-Key': 'test123' },
-              params: { 'version': 'v1' },
+              params: { version: 'v1' },
               endpoints: {
                 getTest: {
                   method: 'GET',
                   path: '/test',
-                  headers: { 'Accept': 'application/json' },
-                  params: { 'limit': '10' },
+                  headers: { Accept: 'application/json' },
+                  params: { limit: '10' },
                 },
               },
             },
           },
         },
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       await handleApiCommand({
@@ -199,8 +203,12 @@ describe('API Command Phase 5 Features', () => {
 
       expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[REQUEST] Headers:'));
       expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('X-API-Key: test123'));
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('Accept: application/json'));
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[REQUEST] Query Parameters:'));
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Accept: application/json')
+      );
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[REQUEST] Query Parameters:')
+      );
       expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('version: v1'));
       expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('limit: 10'));
     });
@@ -221,7 +229,7 @@ describe('API Command Phase 5 Features', () => {
             },
           },
         },
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       await handleApiCommand({
@@ -256,7 +264,9 @@ describe('API Command Phase 5 Features', () => {
         dryRun: true,
       });
 
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[DRY RUN] GET https://api.test.com/test'));
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[DRY RUN] GET https://api.test.com/test')
+      );
       expect(mockHttpClient.executeRequest).not.toHaveBeenCalled();
       expect(consoleLogSpy).not.toHaveBeenCalled();
     });
@@ -268,20 +278,20 @@ describe('API Command Phase 5 Features', () => {
             testapi: {
               baseUrl: 'https://api.test.com',
               headers: { 'X-API-Key': 'test123' },
-              params: { 'version': 'v1' },
+              params: { version: 'v1' },
               endpoints: {
                 postTest: {
                   method: 'POST',
                   path: '/test',
                   headers: { 'Content-Type': 'application/json' },
-                  params: { 'format': 'json' },
+                  params: { format: 'json' },
                   body: '{"test": true}',
                 },
               },
             },
           },
         },
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       await handleApiCommand({
@@ -290,11 +300,17 @@ describe('API Command Phase 5 Features', () => {
         dryRun: true,
       });
 
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[DRY RUN] POST https://api.test.com/test'));
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[DRY RUN] POST https://api.test.com/test')
+      );
       expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[DRY RUN] Headers:'));
       expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('X-API-Key: test123'));
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('Content-Type: application/json'));
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[DRY RUN] Query Parameters:'));
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Content-Type: application/json')
+      );
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[DRY RUN] Query Parameters:')
+      );
       expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('version: v1'));
       expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('format: json'));
       expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[DRY RUN] Body:'));
@@ -309,7 +325,9 @@ describe('API Command Phase 5 Features', () => {
         dryRun: true,
       });
 
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[DRY RUN] GET https://api.test.com/test'));
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[DRY RUN] GET https://api.test.com/test')
+      );
       expect(mockHttpClient.executeRequest).not.toHaveBeenCalled();
       expect(consoleLogSpy).not.toHaveBeenCalled();
     });
@@ -324,11 +342,13 @@ describe('API Command Phase 5 Features', () => {
         body: 'Not found',
       });
 
-      await expect(handleApiCommand({
-        apiName: 'testapi',
-        endpointName: 'getTest',
-        exitOnHttpError: '4xx',
-      })).rejects.toThrow('process.exit called');
+      await expect(
+        handleApiCommand({
+          apiName: 'testapi',
+          endpointName: 'getTest',
+          exitOnHttpError: '4xx',
+        })
+      ).rejects.toThrow('process.exit called');
 
       expect(processExitSpy).toHaveBeenCalledWith(1);
       expect(stderrWriteSpy).toHaveBeenCalledWith('HTTP 404 Not Found\n');
@@ -342,11 +362,13 @@ describe('API Command Phase 5 Features', () => {
         body: 'Server error',
       });
 
-      await expect(handleApiCommand({
-        apiName: 'testapi',
-        endpointName: 'getTest',
-        exitOnHttpError: '5xx',
-      })).rejects.toThrow('process.exit called');
+      await expect(
+        handleApiCommand({
+          apiName: 'testapi',
+          endpointName: 'getTest',
+          exitOnHttpError: '5xx',
+        })
+      ).rejects.toThrow('process.exit called');
 
       expect(processExitSpy).toHaveBeenCalledWith(1);
       expect(stderrWriteSpy).toHaveBeenCalledWith('HTTP 500 Internal Server Error\n');
@@ -360,11 +382,13 @@ describe('API Command Phase 5 Features', () => {
         body: 'Unauthorized',
       });
 
-      await expect(handleApiCommand({
-        apiName: 'testapi',
-        endpointName: 'getTest',
-        exitOnHttpError: '401,403',
-      })).rejects.toThrow('process.exit called');
+      await expect(
+        handleApiCommand({
+          apiName: 'testapi',
+          endpointName: 'getTest',
+          exitOnHttpError: '401,403',
+        })
+      ).rejects.toThrow('process.exit called');
 
       expect(processExitSpy).toHaveBeenCalledWith(1);
       expect(stderrWriteSpy).toHaveBeenCalledWith('HTTP 401 Unauthorized\n');
@@ -434,15 +458,21 @@ describe('API Command Phase 5 Features', () => {
         body: 'Server error',
       });
 
-      await expect(handleApiCommand({
-        apiName: 'testapi',
-        endpointName: 'getTest',
-        verbose: true,
-        exitOnHttpError: '5xx',
-      })).rejects.toThrow('process.exit called');
+      await expect(
+        handleApiCommand({
+          apiName: 'testapi',
+          endpointName: 'getTest',
+          verbose: true,
+          exitOnHttpError: '5xx',
+        })
+      ).rejects.toThrow('process.exit called');
 
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[REQUEST] GET https://api.test.com/test'));
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringMatching(/\[RESPONSE\] 500 Internal Server Error \(\d+ms\)/));
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[REQUEST] GET https://api.test.com/test')
+      );
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\[RESPONSE\] 500 Internal Server Error \(\d+ms\)/)
+      );
       expect(processExitSpy).toHaveBeenCalledWith(1);
     });
 
@@ -462,7 +492,7 @@ describe('API Command Phase 5 Features', () => {
             },
           },
         },
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       // Mock environment variable
@@ -476,14 +506,14 @@ describe('API Command Phase 5 Features', () => {
             return {
               ...value,
               baseUrl: 'https://api.{{env.ENVIRONMENT}}.com', // Keep template for this test
-              headers: { 'X-API-Key': '{{api_key}}' }
+              headers: { 'X-API-Key': '{{api_key}}' },
             };
           }
           // Handle endpoint object resolution - resolve the user_id variable
           if ('method' in value && 'path' in value && value.path === '/test/{{user_id}}') {
             return {
               ...value,
-              path: '/test/456'
+              path: '/test/456',
             };
           }
         }
@@ -498,10 +528,16 @@ describe('API Command Phase 5 Features', () => {
       });
 
       // Check that verbose profile loading output appears
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[VERBOSE] Loading profiles:'));
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[VERBOSE] Loading profiles:')
+      );
       // Check that the request output appears with partial variable resolution
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('[REQUEST] GET https://api.{{env.ENVIRONMENT}}.com/test/456'));
-      expect(stderrWriteSpy).toHaveBeenCalledWith(expect.stringContaining('X-API-Key: {{api_key}}'));
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[REQUEST] GET https://api.{{env.ENVIRONMENT}}.com/test/456')
+      );
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining('X-API-Key: {{api_key}}')
+      );
 
       // Clean up
       delete process.env.ENVIRONMENT;
@@ -538,33 +574,33 @@ describe('API Command Query Parameters', () => {
           testApi: {
             baseUrl: 'https://api.test.com',
             params: {
-              'api_key': 'test123',
-              'version': 'v1'
+              api_key: 'test123',
+              version: 'v1',
             },
             endpoints: {
               getData: {
                 method: 'GET',
-                path: '/data'
-              }
-            }
-          }
-        }
+                path: '/data',
+              },
+            },
+          },
+        },
       };
 
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
         config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       await handleApiCommand({
         apiName: 'testApi',
-        endpointName: 'getData'
+        endpointName: 'getData',
       });
 
       // Verify the request was made with query parameters in the URL
       expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: expect.stringMatching(/\?.*api_key=test123.*version=v1|version=v1.*api_key=test123/)
+          url: expect.stringMatching(/\?.*api_key=test123.*version=v1|version=v1.*api_key=test123/),
         })
       );
     });
@@ -579,29 +615,29 @@ describe('API Command Query Parameters', () => {
                 method: 'GET',
                 path: '/data',
                 params: {
-                  'limit': '10',
-                  'sort': 'name'
-                }
-              }
-            }
-          }
-        }
+                  limit: '10',
+                  sort: 'name',
+                },
+              },
+            },
+          },
+        },
       };
 
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
         config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       await handleApiCommand({
         apiName: 'testApi',
-        endpointName: 'getData'
+        endpointName: 'getData',
       });
 
       // Verify the request was made with query parameters in the URL
       expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: expect.stringMatching(/\?.*limit=10.*sort=name|sort=name.*limit=10/)
+          url: expect.stringMatching(/\?.*limit=10.*sort=name|sort=name.*limit=10/),
         })
       );
     });
@@ -612,47 +648,47 @@ describe('API Command Query Parameters', () => {
           testApi: {
             baseUrl: 'https://api.test.com',
             params: {
-              'api_key': 'api_value',
-              'version': 'v1'
+              api_key: 'api_value',
+              version: 'v1',
             },
             endpoints: {
               getData: {
                 method: 'GET',
                 path: '/data',
                 params: {
-                  'api_key': 'endpoint_value', // Should override API value
-                  'limit': '10'
-                }
-              }
-            }
-          }
-        }
+                  api_key: 'endpoint_value', // Should override API value
+                  limit: '10',
+                },
+              },
+            },
+          },
+        },
       };
 
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
         config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       await handleApiCommand({
         apiName: 'testApi',
-        endpointName: 'getData'
+        endpointName: 'getData',
       });
 
       // Verify endpoint param overrides API param and both API and endpoint params are included
       expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: expect.stringContaining('api_key=endpoint_value')
+          url: expect.stringContaining('api_key=endpoint_value'),
         })
       );
       expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: expect.stringContaining('version=v1')
+          url: expect.stringContaining('version=v1'),
         })
       );
       expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: expect.stringContaining('limit=10')
+          url: expect.stringContaining('limit=10'),
         })
       );
     });
@@ -665,28 +701,28 @@ describe('API Command Query Parameters', () => {
             endpoints: {
               getData: {
                 method: 'GET',
-                path: '/data'
+                path: '/data',
                 // No params defined
-              }
-            }
-          }
-        }
+              },
+            },
+          },
+        },
       };
 
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
         config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       await handleApiCommand({
         apiName: 'testApi',
-        endpointName: 'getData'
+        endpointName: 'getData',
       });
 
       // Verify the request was made with clean URL (no query parameters)
       expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: 'https://api.test.com/data'
+          url: 'https://api.test.com/data',
         })
       );
     });
@@ -697,24 +733,24 @@ describe('API Command Query Parameters', () => {
           testApi: {
             baseUrl: 'https://api.test.com',
             params: {
-              'api_key': '{{env.API_KEY}}'
+              api_key: '{{env.API_KEY}}',
             },
             endpoints: {
               getData: {
                 method: 'GET',
                 path: '/data',
                 params: {
-                  'user_id': '{{userId}}'
-                }
-              }
-            }
-          }
-        }
+                  user_id: '{{userId}}',
+                },
+              },
+            },
+          },
+        },
       };
 
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
         config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       // Mock variable resolution to resolve the template variables
@@ -736,7 +772,7 @@ describe('API Command Query Parameters', () => {
           if ('method' in value && 'path' in value) {
             return {
               ...value,
-              params: { user_id: '123' } // Resolve the params inside endpoint
+              params: { user_id: '123' }, // Resolve the params inside endpoint
             };
           }
         }
@@ -745,25 +781,25 @@ describe('API Command Query Parameters', () => {
 
       // Mock mergeParams to return the resolved values
       mockUrlBuilder.mergeParams.mockReturnValue({
-        'api_key': 'resolved_api_key',
-        'user_id': '123'
+        api_key: 'resolved_api_key',
+        user_id: '123',
       });
 
       await handleApiCommand({
         apiName: 'testApi',
         endpointName: 'getData',
-        variables: { userId: '123' }
+        variables: { userId: '123' },
       });
 
       // Verify the request was made with resolved variables in query parameters
       expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: expect.stringContaining('api_key=resolved_api_key')
+          url: expect.stringContaining('api_key=resolved_api_key'),
         })
       );
       expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: expect.stringContaining('user_id=123')
+          url: expect.stringContaining('user_id=123'),
         })
       );
     });
@@ -774,45 +810,45 @@ describe('API Command Query Parameters', () => {
           testApi: {
             baseUrl: 'https://api.test.com',
             params: {
-              'api_key': 'test123'
+              api_key: 'test123',
             },
             endpoints: {
               getData: {
                 method: 'GET',
                 path: '/data',
                 params: {
-                  'limit': '10'
-                }
-              }
-            }
-          }
-        }
+                  limit: '10',
+                },
+              },
+            },
+          },
+        },
       };
 
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
         config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       // Override mergeParams for this test to return the expected values
       mockUrlBuilder.mergeParams.mockReturnValue({
-        'api_key': 'test123',
-        'limit': '10'
+        api_key: 'test123',
+        limit: '10',
       });
 
       await handleApiCommand({
         apiName: 'testApi',
         endpointName: 'getData',
-        verbose: true
+        verbose: true,
       });
 
       // Verify that the HTTP request was made with query parameters in the URL
       expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: expect.stringContaining('?api_key=test123&limit=10')
+          url: expect.stringContaining('?api_key=test123&limit=10'),
         })
       );
-      
+
       // Verify that verbose output was generated (at least the query parameters section)
       expect(stderrWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining('[REQUEST] Query Parameters:')
@@ -825,41 +861,41 @@ describe('API Command Query Parameters', () => {
           testApi: {
             baseUrl: 'https://api.test.com',
             params: {
-              'api_key': 'test123'
+              api_key: 'test123',
             },
             endpoints: {
               getData: {
                 method: 'GET',
                 path: '/data',
                 params: {
-                  'limit': '10'
-                }
-              }
-            }
-          }
-        }
+                  limit: '10',
+                },
+              },
+            },
+          },
+        },
       };
 
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
         config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       // Override mergeParams for this test to return the expected values
       mockUrlBuilder.mergeParams.mockReturnValue({
-        'api_key': 'test123',
-        'limit': '10'
+        api_key: 'test123',
+        limit: '10',
       });
 
       await handleApiCommand({
         apiName: 'testApi',
         endpointName: 'getData',
-        dryRun: true
+        dryRun: true,
       });
 
       // Verify no actual HTTP request was made
       expect(mockHttpClient.executeRequest).not.toHaveBeenCalled();
-      
+
       // Verify that dry-run output was generated (at least the query parameters section)
       expect(stderrWriteSpy).toHaveBeenCalledWith(
         expect.stringContaining('[DRY RUN] Query Parameters:')
@@ -876,24 +912,24 @@ describe('API Command Query Parameters', () => {
                 method: 'GET',
                 path: '/data',
                 params: {
-                  'query': 'hello world',
-                  'filter': 'name=John&age>25',
-                  'special': 'test@example.com'
-                }
-              }
-            }
-          }
-        }
+                  query: 'hello world',
+                  filter: 'name=John&age>25',
+                  special: 'test@example.com',
+                },
+              },
+            },
+          },
+        },
       };
 
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
         config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       await handleApiCommand({
         apiName: 'testApi',
-        endpointName: 'getData'
+        endpointName: 'getData',
       });
 
       // Verify special characters are properly URL encoded
@@ -914,32 +950,34 @@ describe('API Command Query Parameters', () => {
                 method: 'GET',
                 path: '/data',
                 params: {
-                  'test': 'value'
-                }
-              }
-            }
-          }
-        }
+                  test: 'value',
+                },
+              },
+            },
+          },
+        },
       };
 
       mockConfigLoader.loadDefaultConfig.mockResolvedValue({
         config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       await handleApiCommand({
         apiName: 'testApi',
         endpointName: 'getData',
-        verbose: true
+        verbose: true,
       });
 
       // Should continue without query params and show warning in verbose mode
       expect(stderrWriteSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[WARNING] Invalid URL format, skipping query parameters: not-a-valid-url/data')
+        expect.stringContaining(
+          '[WARNING] Invalid URL format, skipping query parameters: not-a-valid-url/data'
+        )
       );
       expect(mockHttpClient.executeRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: 'not-a-valid-url/data' // No query parameters added
+          url: 'not-a-valid-url/data', // No query parameters added
         })
       );
     });
@@ -972,37 +1010,37 @@ describe('Phase 13: Enhanced Profile Merging', () => {
     it('should combine default profiles with CLI profiles', async () => {
       const config: HttpCraftConfig = {
         config: {
-          defaultProfile: ['base', 'env']
+          defaultProfile: ['base', 'env'],
         },
         profiles: {
           base: { baseUrl: 'https://api.example.com' },
           env: { environment: 'dev' },
-          user: { userId: '123' }
+          user: { userId: '123' },
         },
         apis: {
           testApi: {
             baseUrl: '{{profile.baseUrl}}',
             endpoints: {
-              test: { method: 'GET', path: '/test' }
-            }
-          }
-        }
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
       };
 
       vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
         config: config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
       vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({
         baseUrl: 'https://api.example.com',
         environment: 'dev',
-        userId: '123'
+        userId: '123',
       });
 
       const args: ApiCommandArgs = {
         apiName: 'testApi',
         endpointName: 'test',
-        profiles: ['user']
+        profiles: ['user'],
       };
 
       await handleApiCommand(args);
@@ -1018,36 +1056,36 @@ describe('Phase 13: Enhanced Profile Merging', () => {
     it('should use only CLI profiles when --no-default-profile is used', async () => {
       const config: HttpCraftConfig = {
         config: {
-          defaultProfile: ['base', 'env']
+          defaultProfile: ['base', 'env'],
         },
         profiles: {
           base: { baseUrl: 'https://api.example.com' },
           env: { environment: 'dev' },
-          user: { userId: '123' }
+          user: { userId: '123' },
         },
         apis: {
           testApi: {
             baseUrl: '{{profile.baseUrl}}',
             endpoints: {
-              test: { method: 'GET', path: '/test' }
-            }
-          }
-        }
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
       };
 
       vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
         config: config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
       vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({
-        userId: '123'
+        userId: '123',
       });
 
       const args: ApiCommandArgs = {
         apiName: 'testApi',
         endpointName: 'test',
         profiles: ['user'],
-        noDefaultProfile: true
+        noDefaultProfile: true,
       };
 
       await handleApiCommand(args);
@@ -1063,34 +1101,34 @@ describe('Phase 13: Enhanced Profile Merging', () => {
     it('should use only default profiles when no CLI profiles specified', async () => {
       const config: HttpCraftConfig = {
         config: {
-          defaultProfile: ['base', 'env']
+          defaultProfile: ['base', 'env'],
         },
         profiles: {
           base: { baseUrl: 'https://api.example.com' },
-          env: { environment: 'dev' }
+          env: { environment: 'dev' },
         },
         apis: {
           testApi: {
             baseUrl: '{{profile.baseUrl}}',
             endpoints: {
-              test: { method: 'GET', path: '/test' }
-            }
-          }
-        }
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
       };
 
       vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
         config: config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
       vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({
         baseUrl: 'https://api.example.com',
-        environment: 'dev'
+        environment: 'dev',
       });
 
       const args: ApiCommandArgs = {
         apiName: 'testApi',
-        endpointName: 'test'
+        endpointName: 'test',
       };
 
       await handleApiCommand(args);
@@ -1106,35 +1144,35 @@ describe('Phase 13: Enhanced Profile Merging', () => {
     it('should handle single default profile (string)', async () => {
       const config: HttpCraftConfig = {
         config: {
-          defaultProfile: 'base' // Single profile as string
+          defaultProfile: 'base', // Single profile as string
         },
         profiles: {
           base: { baseUrl: 'https://api.example.com' },
-          user: { userId: '123' }
+          user: { userId: '123' },
         },
         apis: {
           testApi: {
             baseUrl: '{{profile.baseUrl}}',
             endpoints: {
-              test: { method: 'GET', path: '/test' }
-            }
-          }
-        }
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
       };
 
       vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
         config: config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
       vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({
         baseUrl: 'https://api.example.com',
-        userId: '123'
+        userId: '123',
       });
 
       const args: ApiCommandArgs = {
         apiName: 'testApi',
         endpointName: 'test',
-        profiles: ['user']
+        profiles: ['user'],
       };
 
       await handleApiCommand(args);
@@ -1150,30 +1188,30 @@ describe('Phase 13: Enhanced Profile Merging', () => {
     it('should handle no default profiles', async () => {
       const config: HttpCraftConfig = {
         profiles: {
-          user: { userId: '123' }
+          user: { userId: '123' },
         },
         apis: {
           testApi: {
             baseUrl: 'https://api.example.com',
             endpoints: {
-              test: { method: 'GET', path: '/test' }
-            }
-          }
-        }
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
       };
 
       vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
         config: config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
       vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({
-        userId: '123'
+        userId: '123',
       });
 
       const args: ApiCommandArgs = {
         apiName: 'testApi',
         endpointName: 'test',
-        profiles: ['user']
+        profiles: ['user'],
       };
 
       await handleApiCommand(args);
@@ -1201,26 +1239,26 @@ describe('Phase 13: Enhanced Profile Merging', () => {
     it('should show profile loading information in verbose mode', async () => {
       const config: HttpCraftConfig = {
         config: {
-          defaultProfile: ['base', 'env']
+          defaultProfile: ['base', 'env'],
         },
         profiles: {
           base: { baseUrl: 'https://api.example.com' },
           env: { environment: 'dev' },
-          user: { userId: '123' }
+          user: { userId: '123' },
         },
         apis: {
           testApi: {
             baseUrl: '{{profile.baseUrl}}',
             endpoints: {
-              test: { method: 'GET', path: '/test' }
-            }
-          }
-        }
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
       };
 
       vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
         config: config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
       vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({});
 
@@ -1228,7 +1266,7 @@ describe('Phase 13: Enhanced Profile Merging', () => {
         apiName: 'testApi',
         endpointName: 'test',
         profiles: ['user'],
-        verbose: true
+        verbose: true,
       };
 
       await handleApiCommand(args);
@@ -1243,25 +1281,25 @@ describe('Phase 13: Enhanced Profile Merging', () => {
     it('should show --no-default-profile usage in verbose mode', async () => {
       const config: HttpCraftConfig = {
         config: {
-          defaultProfile: ['base']
+          defaultProfile: ['base'],
         },
         profiles: {
           base: { baseUrl: 'https://api.example.com' },
-          user: { userId: '123' }
+          user: { userId: '123' },
         },
         apis: {
           testApi: {
             baseUrl: '{{profile.baseUrl}}',
             endpoints: {
-              test: { method: 'GET', path: '/test' }
-            }
-          }
-        }
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
       };
 
       vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
         config: config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
       vi.mocked(mockVariableResolver.mergeProfiles).mockReturnValue({});
 
@@ -1270,13 +1308,15 @@ describe('Phase 13: Enhanced Profile Merging', () => {
         endpointName: 'test',
         profiles: ['user'],
         noDefaultProfile: true,
-        verbose: true
+        verbose: true,
       };
 
       await handleApiCommand(args);
 
       // Check verbose output shows override behavior
-      expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   --no-default-profile used: ignoring default profiles\n');
+      expect(stderrSpy).toHaveBeenCalledWith(
+        '[VERBOSE]   --no-default-profile used: ignoring default profiles\n'
+      );
       expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   Final profile order: user\n');
     });
 
@@ -1286,21 +1326,21 @@ describe('Phase 13: Enhanced Profile Merging', () => {
           testApi: {
             baseUrl: 'https://api.example.com',
             endpoints: {
-              test: { method: 'GET', path: '/test' }
-            }
-          }
-        }
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
       };
 
       vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
         config: config,
-        path: '/test/.httpcraft.yaml'
+        path: '/test/.httpcraft.yaml',
       });
 
       const args: ApiCommandArgs = {
         apiName: 'testApi',
         endpointName: 'test',
-        verbose: true
+        verbose: true,
       };
 
       await handleApiCommand(args);
@@ -1311,4 +1351,184 @@ describe('Phase 13: Enhanced Profile Merging', () => {
       expect(stderrSpy).toHaveBeenCalledWith('[VERBOSE]   Final profile order: none\n');
     });
   });
-}); 
+
+  describe('JSON output', () => {
+    let consoleLogSpy: any;
+
+    beforeEach(() => {
+      consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should output response as JSON when --json flag is used', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            endpoints: {
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml',
+      });
+
+      const mockResponse = {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        body: { message: 'success' },
+        isBinary: false,
+        contentType: 'application/json',
+        contentLength: undefined,
+      };
+
+      vi.mocked(mockHttpClient.executeRequest).mockResolvedValue(mockResponse);
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        json: true,
+      };
+
+      await handleApiCommand(args);
+
+      // Should output structured JSON with headers, data, and timings
+      expect(consoleLogSpy).toHaveBeenCalledOnce();
+      const outputCall = consoleLogSpy.mock.calls[0][0];
+      const jsonOutput = JSON.parse(outputCall);
+
+      expect(jsonOutput).toMatchObject({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        timing: {
+          duration: expect.any(Number),
+          startTime: expect.any(Number),
+          endTime: expect.any(Number),
+        },
+        data: { message: 'success' },
+        isBinary: false,
+        contentType: 'application/json',
+      });
+    });
+
+    it('should handle binary data in JSON output', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            endpoints: {
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml',
+      });
+
+      const binaryData = Buffer.from('binary content');
+      const mockResponse = {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: binaryData,
+        isBinary: true,
+        contentType: 'application/octet-stream',
+        contentLength: binaryData.length,
+      };
+
+      vi.mocked(mockHttpClient.executeRequest).mockResolvedValue(mockResponse);
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        json: true,
+      };
+
+      await handleApiCommand(args);
+
+      // Should output JSON with binary data info
+      expect(consoleLogSpy).toHaveBeenCalledOnce();
+      const outputCall = consoleLogSpy.mock.calls[0][0];
+      const jsonOutput = JSON.parse(outputCall);
+
+      expect(jsonOutput).toMatchObject({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/octet-stream' },
+        timing: {
+          duration: expect.any(Number),
+          startTime: expect.any(Number),
+          endTime: expect.any(Number),
+        },
+        data: `<binary data: ${binaryData.length} bytes>`,
+        isBinary: true,
+        contentType: 'application/octet-stream',
+        contentLength: binaryData.length,
+      });
+    });
+
+    it('should not output error messages to stderr when --json flag is used', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            endpoints: {
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml',
+      });
+
+      const mockResponse = {
+        status: 404,
+        statusText: 'Not Found',
+        headers: {},
+        body: 'Not found',
+        isBinary: false,
+        contentType: 'text/plain',
+        contentLength: undefined,
+      };
+
+      vi.mocked(mockHttpClient.executeRequest).mockResolvedValue(mockResponse);
+
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        json: true,
+      };
+
+      await handleApiCommand(args);
+
+      // Should not output HTTP error to stderr when using JSON format
+      expect(stderrSpy).not.toHaveBeenCalledWith('HTTP 404 Not Found\n');
+
+      // Should still output JSON with error status
+      expect(consoleLogSpy).toHaveBeenCalledOnce();
+      const outputCall = consoleLogSpy.mock.calls[0][0];
+      const jsonOutput = JSON.parse(outputCall);
+      expect(jsonOutput.status).toBe(404);
+      expect(jsonOutput.statusText).toBe('Not Found');
+
+      stderrSpy.mockRestore();
+    });
+  });
+});
