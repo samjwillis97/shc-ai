@@ -1024,7 +1024,6 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
     - _Performance:_ Ensure commands respond quickly even with large configurations
     - _Testable Outcome:_ ✅ All new commands work correctly with existing HttpCraft configurations
 
-
   - **[BONUS]** **T17.12:** **[CHAIN COMMANDS]** Add chain listing and description commands.
     - _Implementation:_ Add `httpcraft list chains` and `httpcraft describe chain <name>` commands
     - _Status:_ Not in original Phase 17 spec but would be logical completion
@@ -1099,5 +1098,123 @@ This document tracks the implementation progress of HttpCraft based on the [Phas
   - **🎯 PRIORITY:** T17.11 (variable listing) is the most valuable remaining feature
 
 - **V1 Ready:** ✅ Phase 17 core functionality is production-ready and significantly enhances HttpCraft's usability. The implemented list/describe commands provide comprehensive CLI discoverability that was missing from v1.0. Only the variable listing command and documentation updates remain to complete the full vision.
+
+---
+
+## Phase 18: Optional Parameter Syntax Enhancement
+
+- **Goal:** Implement special syntax for optional parameters that are excluded when their variables are undefined, improving API call flexibility.
+- **Status:** [ ] **NOT STARTED**
+- **Priority:** **MEDIUM** - Improves user experience for APIs with optional parameters
+- **User Impact:** Enables cleaner configurations where optional parameters are automatically excluded when not needed
+- **Problem Statement:** Currently, setting `pageKey: undefined` in variables results in the literal string "undefined" being sent as a parameter value. Users need a way to conditionally include parameters only when they have meaningful values.
+- **Proposed Solution:** Implement special syntax `{{variable?}}` (with question mark suffix) that excludes the entire parameter when the variable resolves to `undefined`.
+
+- **Tasks:**
+
+  - [ ] **T18.1:** **[SYNTAX DESIGN]** Design and document the optional parameter syntax.
+    - _Implementation:_ Add support for `{{variable?}}` syntax in variable resolution
+    - _Behavior:_ Parameters with `{{variable?}}` syntax are excluded entirely when variable is undefined
+    - _Documentation:_ Clear examples showing the difference between `{{variable}}` and `{{variable?}}`
+    - _Testable Outcome:_ `{{pageKey?}}` excludes the `paging-key` parameter when `pageKey` is undefined
+  - [ ] **T18.2:** **[VARIABLE RESOLVER]** Enhance VariableResolver to detect optional syntax.
+    - _Implementation:_ Update variable detection regex to identify optional parameters
+    - _Processing:_ Track which parameters are optional during variable resolution
+    - _Return Value:_ Return both resolved value and whether parameter should be included
+    - _Testable Outcome:_ VariableResolver can distinguish between `{{var}}` and `{{var?}}` syntax
+  - [ ] **T18.3:** **[URL BUILDER]** Update UrlBuilder to handle optional parameters.
+    - _Implementation:_ Modify parameter building logic to conditionally include/exclude parameters
+    - _Query Parameters:_ Skip optional parameters when their values are undefined
+    - _Path Parameters:_ Handle optional path parameters appropriately (likely error if undefined)
+    - _Headers:_ Skip optional headers when their values are undefined
+    - _Testable Outcome:_ URLs built without optional parameters when variables are undefined
+  - [ ] **T18.4:** **[HTTP CLIENT]** Ensure HTTP client works correctly with optional parameters.
+    - _Implementation:_ Verify HTTP client handles reduced parameter sets correctly
+    - _Request Body:_ Handle optional body parameters for JSON requests
+    - _Validation:_ Ensure optional parameter exclusion doesn't break request structure
+    - _Testable Outcome:_ HTTP requests work correctly with conditionally included parameters
+  - [ ] **T18.5:** **[CHAIN EXECUTION]** Support optional parameters in chain execution.
+    - _Implementation:_ Ensure chain steps can use optional parameter syntax
+    - _Step Overrides:_ Optional syntax works in step `with` parameter overrides
+    - _Chain Variables:_ Optional syntax works with chain-level variables
+    - _Testable Outcome:_ Chain steps conditionally include parameters based on optional syntax
+  - [ ] **T18.6:** **[CONFIGURATION VALIDATION]** Update configuration validation for optional syntax.
+    - _JSON Schema:_ Update schema to document optional parameter syntax
+    - _Validation:_ Ensure configuration validation accepts `{{variable?}}` syntax
+    - _Error Messages:_ Clear error messages for malformed optional syntax
+    - _Testable Outcome:_ Configuration files with optional syntax validate correctly
+  - [ ] **T18.7:** **[COMPREHENSIVE TESTING]** Implement comprehensive test coverage for optional parameters.
+    - _Unit Tests:_ Test variable resolution, URL building, and parameter exclusion
+    - _Integration Tests:_ Test real API calls with optional parameters
+    - _Edge Cases:_ Test nested optional syntax, multiple optional parameters, mixed syntax
+    - _Testable Outcome:_ Complete test coverage for optional parameter functionality
+  - [ ] **T18.8:** **[DOCUMENTATION]** Create comprehensive documentation for optional parameter syntax.
+    - _README Update:_ Add section explaining optional parameter syntax with examples
+    - _Use Cases:_ Document common scenarios like pagination, filtering, optional authentication
+    - _Best Practices:_ Guidelines for when to use optional vs required parameters
+    - _Migration Guide:_ How to update existing configurations to use optional syntax
+    - _Testable Outcome:_ Clear documentation enables users to effectively use optional parameters
+
+- **Implementation Design:**
+
+  ```yaml
+  # Current behavior (sends "undefined" as string)
+  endpoints:
+    getPHIClaims:
+      params:
+        paging-key: "{{pageKey}}"  # Sends "undefined" when pageKey is undefined
+
+  # New optional syntax (excludes parameter entirely)
+  endpoints:
+    getPHIClaims:
+      params:
+        paging-key: "{{pageKey?}}"  # Excludes paging-key when pageKey is undefined
+        role: "online_services"      # Always included
+        filter-status: "{{status?}}" # Optional filtering
+  ```
+
+- **Variable Resolution Logic:**
+
+  ```typescript
+  // Enhanced variable detection
+  interface VariableMatch {
+    fullMatch: string; // "{{pageKey?}}"
+    variableName: string; // "pageKey"
+    isOptional: boolean; // true if ends with ?
+  }
+
+  // Parameter building logic
+  if (match.isOptional && (value === undefined)) {
+    // Skip this parameter entirely
+    continue;
+  } else {
+    // Include parameter with resolved value
+    params[paramName] = resolvedValue;
+  }
+  ```
+
+- **Expected Benefits:**
+
+  - **Cleaner Configurations:** ✅ No need to manage undefined values manually
+  - **API Flexibility:** ✅ Easy to make parameters conditionally optional
+  - **Better UX:** ✅ Variables can be permanently defined but conditionally used
+  - **Backward Compatible:** ✅ Existing `{{variable}}` syntax continues to work identically
+
+- **User Workflow Improvement:**
+
+  ```bash
+  # Before: pageKey="undefined" sent as string parameter
+  httpcraft aion getPHIClaims --var pageKey=undefined
+
+  # After: paging-key parameter excluded entirely when pageKey undefined
+  httpcraft aion getPHIClaims  # pageKey remains undefined, parameter excluded
+  httpcraft aion getPHIClaims --var pageKey=abc123  # paging-key included with value
+  ```
+
+- **Priority Justification:**
+  - **Common Use Case:** Pagination, filtering, and optional authentication parameters
+  - **User Pain Point:** Current undefined handling is unintuitive and error-prone
+  - **Clean Solution:** Special syntax is discoverable and self-documenting
+  - **API Best Practices:** Many APIs expect optional parameters to be omitted rather than sent as empty/undefined
 
 ---
