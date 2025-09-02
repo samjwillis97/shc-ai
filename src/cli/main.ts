@@ -23,6 +23,7 @@ import {
   handleListApisCommand,
   handleListEndpointsCommand,
   handleListProfilesCommand,
+  handleListVariablesCommand,
 } from './commands/list.js';
 import {
   handleDescribeApiCommand,
@@ -276,7 +277,44 @@ async function main(): Promise<void> {
                 });
               }
             )
-            .demandCommand(1, 'You must specify what to list (apis, endpoints, or profiles)');
+            .command(
+              'variables',
+              'List all available variables',
+              (yargs) => {
+                yargs
+                  .option('json', {
+                    describe: 'Output as JSON',
+                    type: 'boolean',
+                    default: false,
+                  })
+                  .option('profile', {
+                    describe: 'Profile to show variables for',
+                    type: 'array',
+                    string: true,
+                  })
+                  .option('api', {
+                    describe: 'API to show variables for',
+                    type: 'string',
+                  })
+                  .option('endpoint', {
+                    describe: 'Endpoint to show variables for (requires --api)',
+                    type: 'string',
+                  });
+              },
+              async (argv) => {
+                await handleListVariablesCommand({
+                  config: argv.config as string | undefined,
+                  json: argv.json as boolean,
+                  profiles: argv.profile as string[] | undefined,
+                  api: argv.api as string | undefined,
+                  endpoint: argv.endpoint as string | undefined,
+                });
+              }
+            )
+            .demandCommand(
+              1,
+              'You must specify what to list (apis, endpoints, profiles, or variables)'
+            );
         },
         async () => {
           // This handler ensures list commands are properly handled and don't fall through

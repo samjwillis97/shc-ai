@@ -3,6 +3,7 @@ import {
   handleListApisCommand,
   handleListEndpointsCommand,
   handleListProfilesCommand,
+  handleListVariablesCommand,
 } from '../../../../src/cli/commands/list.js';
 import {
   handleDescribeApiCommand,
@@ -315,6 +316,147 @@ apis:
       process.exit = originalExit;
       expect(exitCode).toBe(1);
       expect(capturedError).toContain('Error:');
+    });
+  });
+
+  describe('List Variables Command', () => {
+    test('should list all variables in table format', async () => {
+      await handleListVariablesCommand({ config: testConfigPath });
+
+      // Should show profile variables (with default profiles active)
+      expect(capturedOutput).toContain('Variables with profiles: base, dev:');
+      expect(capturedOutput).toContain('Name');
+      expect(capturedOutput).toContain('Value');
+      expect(capturedOutput).toContain('Source');
+
+      // Should show profile variables from test config
+      expect(capturedOutput).toContain('apiUrl');
+      expect(capturedOutput).toContain('Profile: base (active)');
+      expect(capturedOutput).toContain('environment');
+      expect(capturedOutput).toContain('Profile: dev (active)');
+
+      // Should show dynamic variables
+      expect(capturedOutput).toContain('$timestamp');
+      expect(capturedOutput).toContain('Built-in Dynamic Variable');
+
+      // Should show usage examples
+      expect(capturedOutput).toContain('Usage examples:');
+      expect(capturedOutput).toContain('{{variableName}}');
+      expect(capturedOutput).toContain('{{env.VARIABLE_NAME}}');
+    });
+    test('should list variables in JSON format', async () => {
+      await handleListVariablesCommand({ config: testConfigPath, json: true });
+
+      const output = JSON.parse(capturedOutput);
+      expect(Array.isArray(output)).toBe(true);
+      expect(output.length).toBeGreaterThan(0);
+
+      // Check structure of variable objects
+      const sampleVar = output.find((v: any) => v.name === 'apiUrl');
+      expect(sampleVar).toBeDefined();
+      expect(sampleVar).toHaveProperty('name');
+      expect(sampleVar).toHaveProperty('value');
+      expect(sampleVar).toHaveProperty('source');
+      expect(sampleVar).toHaveProperty('scope');
+      expect(sampleVar).toHaveProperty('active');
+      expect(sampleVar.scope).toBe('profile');
+      expect(typeof sampleVar.active).toBe('boolean');
+
+      // Check that profile variables have the correct source format in JSON
+      expect(sampleVar.source).toMatch(/^Profile: /);
+      expect(sampleVar.source).not.toContain('(active)'); // Should not contain active indicator in JSON
+    });
+
+    test('should filter variables by profiles', async () => {
+      await handleListVariablesCommand({
+        config: testConfigPath,
+        profiles: ['base', 'prod'],
+      });
+
+      expect(capturedOutput).toContain('with profiles: base, prod');
+      expect(capturedOutput).toContain('Profile: base (active)');
+      expect(capturedOutput).toContain('Profile: prod (active)');
+      expect(capturedOutput).toContain('Profile: dev'); // Should still show inactive profiles
+    });
+
+    test('should show active flag correctly in JSON format', async () => {
+      await handleListVariablesCommand({
+        config: testConfigPath,
+        profiles: ['base', 'prod'],
+        json: true,
+      });
+
+      const output = JSON.parse(capturedOutput);
+      expect(Array.isArray(output)).toBe(true);
+
+      // Check that active profiles have active: true
+      const baseVar = output.find((v: any) => v.source === 'Profile: base');
+      const prodVar = output.find((v: any) => v.source === 'Profile: prod');
+      const devVar = output.find((v: any) => v.source === 'Profile: dev');
+
+      expect(baseVar?.active).toBe(true);
+      expect(prodVar?.active).toBe(true);
+      expect(devVar?.active).toBe(false);
+    });
+
+    test('should not show environment variables but they remain available', async () => {
+      // Set env vars that would have been shown previously
+      process.env.TEST_API_KEY = 'secret123';
+      process.env.TEST_API_URL = 'https://api.test.com';
+      process.env.RANDOM_VAR = 'should_not_show';
+
+      await handleListVariablesCommand({ config: testConfigPath });
+
+      // Should NOT show any environment variables in the output
+      expect(capturedOutput).not.toContain('env.TEST_API_KEY');
+      expect(capturedOutput).not.toContain('env.TEST_API_URL');
+      expect(capturedOutput).not.toContain('env.RANDOM_VAR');
+      expect(capturedOutput).not.toContain('Environment Variable');
+
+      // But should still show profile and dynamic variables
+      expect(capturedOutput).toContain('apiUrl');
+      expect(capturedOutput).toContain('Profile: base (active)');
+      expect(capturedOutput).toContain('$timestamp');
+      expect(capturedOutput).toContain('Built-in Dynamic Variable');
+
+      // Should still mention environment variables are available in usage examples
+      expect(capturedOutput).toContain('{{env.VARIABLE_NAME}}     - Environment variable');
+
+      // Clean up
+      delete process.env.TEST_API_KEY;
+      delete process.env.TEST_API_URL;
+      delete process.env.RANDOM_VAR;
+    });
+    test('should handle missing configuration file', async () => {
+      let exitCode = 0;
+      const originalExit = process.exit;
+      process.exit = ((code: number) => {
+        exitCode = code;
+        throw new Error('Process exit called');
+      }) as any;
+
+      try {
+        await handleListVariablesCommand({ config: '/nonexistent/config.yaml' });
+      } catch (error) {
+        // Expected to throw due to process.exit mock
+      }
+
+      process.exit = originalExit;
+      expect(exitCode).toBe(1);
+      expect(capturedError).toContain('Error:');
+    });
+
+    test('should handle empty configuration gracefully', async () => {
+      // Create minimal config
+      const minimalConfigPath = path.join(tempDir, 'minimal-config.yaml');
+      await fs.writeFile(minimalConfigPath, 'apis: {}');
+
+      await handleListVariablesCommand({ config: minimalConfigPath });
+
+      // Should still show built-in variables
+      expect(capturedOutput).toContain('Variables:');
+      expect(capturedOutput).toContain('$timestamp');
+      expect(capturedOutput).toContain('Built-in Dynamic Variable');
     });
   });
 });

@@ -56,9 +56,16 @@ export class ConfigLoader {
         : {};
 
       // Load global variable files (T9.3)
-      const globalVariables = rawConfig.variables
+      const importedGlobalVariables = rawConfig.variables
         ? await this.loadGlobalVariables(rawConfig.variables, path.dirname(fullPath))
         : {};
+
+      // Merge imported variables with directly defined globalVariables
+      // Direct globalVariables take precedence over imported ones
+      const globalVariables = {
+        ...importedGlobalVariables,
+        ...(rawConfig.globalVariables || {}),
+      };
 
       // Convert to processed config
       const config: HttpCraftConfig = {
