@@ -1576,5 +1576,228 @@ describe('Phase 13: Enhanced Profile Merging', () => {
 
       stderrSpy.mockRestore();
     });
+
+    it('should output configuration errors as JSON when --json flag is used', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            endpoints: {
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml',
+      });
+
+      // Mock executeRequest to throw a configuration error
+      vi.mocked(mockHttpClient.executeRequest).mockRejectedValue(
+        new Error('Invalid configuration: missing required field')
+      );
+
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        json: true,
+      };
+
+      try {
+        await handleApiCommand(args);
+      } catch (error) {
+        // Expected due to process.exit
+      }
+
+      // Should not output error to stderr when using JSON format
+      expect(stderrSpy).not.toHaveBeenCalledWith(
+        'Configuration Error: Invalid configuration: missing required field\n'
+      );
+
+      // Should output JSON error to stdout
+      expect(consoleLogSpy).toHaveBeenCalledOnce();
+      const outputCall = consoleLogSpy.mock.calls[0][0];
+      const jsonOutput = JSON.parse(outputCall);
+      expect(jsonOutput.error).toBe(true);
+      expect(jsonOutput.message).toBe('Invalid configuration: missing required field');
+      expect(jsonOutput.type).toBe('configuration');
+
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+
+      stderrSpy.mockRestore();
+      processExitSpy.mockRestore();
+    });
+
+    it('should output variable errors as JSON when --json flag is used', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            endpoints: {
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml',
+      });
+
+      // Mock executeRequest to throw a variable resolution error
+      vi.mocked(mockHttpClient.executeRequest).mockRejectedValue(
+        new Error('Variable myVar could not be resolved')
+      );
+
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        json: true,
+      };
+
+      try {
+        await handleApiCommand(args);
+      } catch (error) {
+        // Expected due to process.exit
+      }
+
+      // Should not output error to stderr when using JSON format
+      expect(stderrSpy).not.toHaveBeenCalledWith(
+        'Variable Error: Variable myVar could not be resolved\n'
+      );
+
+      // Should output JSON error to stdout
+      expect(consoleLogSpy).toHaveBeenCalledOnce();
+      const outputCall = consoleLogSpy.mock.calls[0][0];
+      const jsonOutput = JSON.parse(outputCall);
+      expect(jsonOutput.error).toBe(true);
+      expect(jsonOutput.message).toBe('Variable myVar could not be resolved');
+      expect(jsonOutput.type).toBe('variable');
+
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+
+      stderrSpy.mockRestore();
+      processExitSpy.mockRestore();
+    });
+
+    it('should output non-Error exceptions as JSON when --json flag is used', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            endpoints: {
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml',
+      });
+
+      // Mock executeRequest to throw a non-Error exception
+      vi.mocked(mockHttpClient.executeRequest).mockRejectedValue('String error message');
+
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        json: true,
+      };
+
+      try {
+        await handleApiCommand(args);
+      } catch (error) {
+        // Expected due to process.exit
+      }
+
+      // Should not output error to stderr when using JSON format
+      expect(stderrSpy).not.toHaveBeenCalledWith('Configuration Error: String error message\n');
+
+      // Should output JSON error to stdout
+      expect(consoleLogSpy).toHaveBeenCalledOnce();
+      const outputCall = consoleLogSpy.mock.calls[0][0];
+      const jsonOutput = JSON.parse(outputCall);
+      expect(jsonOutput.error).toBe(true);
+      expect(jsonOutput.message).toBe('String error message');
+      expect(jsonOutput.type).toBe('configuration');
+
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+
+      stderrSpy.mockRestore();
+      processExitSpy.mockRestore();
+    });
+
+    it('should still output errors to stderr when --json flag is NOT used', async () => {
+      const config: HttpCraftConfig = {
+        apis: {
+          testApi: {
+            baseUrl: 'https://api.example.com',
+            endpoints: {
+              test: { method: 'GET', path: '/test' },
+            },
+          },
+        },
+      };
+
+      vi.mocked(mockConfigLoader.loadDefaultConfig).mockResolvedValue({
+        config: config,
+        path: '/test/.httpcraft.yaml',
+      });
+
+      // Mock executeRequest to throw a configuration error
+      vi.mocked(mockHttpClient.executeRequest).mockRejectedValue(
+        new Error('Invalid configuration: missing required field')
+      );
+
+      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+
+      const args: ApiCommandArgs = {
+        apiName: 'testApi',
+        endpointName: 'test',
+        json: false, // Explicitly test non-JSON mode
+      };
+
+      try {
+        await handleApiCommand(args);
+      } catch (error) {
+        // Expected due to process.exit
+      }
+
+      // Should output error to stderr when NOT using JSON format
+      expect(stderrSpy).toHaveBeenCalledWith(
+        'Configuration Error: Invalid configuration: missing required field\n'
+      );
+
+      // Should NOT output JSON to stdout
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+
+      stderrSpy.mockRestore();
+      processExitSpy.mockRestore();
+    });
   });
 });

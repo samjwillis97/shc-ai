@@ -506,23 +506,41 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       process.stderr.write(`HTTP ${response.status} ${response.statusText}\n`);
     }
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      // Check for variable resolution errors by message content
-      const errorMessage = error.message;
-
-      // Check for variable-related errors
-      if (
-        errorMessage.includes('could not be resolved') ||
-        errorMessage.includes('Variable ') ||
-        errorMessage.includes('not defined') ||
-        errorMessage.includes('resolution failed')
-      ) {
-        process.stderr.write(`Variable Error: ${errorMessage}\n`);
-      } else {
-        process.stderr.write(`Configuration Error: ${errorMessage}\n`);
-      }
+    if (args.json) {
+      // JSON output format for errors
+      const errorResponse = {
+        error: true,
+        message: error instanceof Error ? error.message : String(error),
+        type:
+          error instanceof Error
+            ? error.message.includes('could not be resolved') ||
+              error.message.includes('Variable ') ||
+              error.message.includes('not defined') ||
+              error.message.includes('resolution failed')
+              ? 'variable'
+              : 'configuration'
+            : 'configuration',
+      };
+      console.log(JSON.stringify(errorResponse, null, 2));
     } else {
-      process.stderr.write(`Configuration Error: ${String(error)}\n`);
+      if (error instanceof Error) {
+        // Check for variable resolution errors by message content
+        const errorMessage = error.message;
+
+        // Check for variable-related errors
+        if (
+          errorMessage.includes('could not be resolved') ||
+          errorMessage.includes('Variable ') ||
+          errorMessage.includes('not defined') ||
+          errorMessage.includes('resolution failed')
+        ) {
+          process.stderr.write(`Variable Error: ${errorMessage}\n`);
+        } else {
+          process.stderr.write(`Configuration Error: ${errorMessage}\n`);
+        }
+      } else {
+        process.stderr.write(`Configuration Error: ${String(error)}\n`);
+      }
     }
     process.exit(1);
   }
