@@ -20,6 +20,8 @@ vi.mock('../../../../src/core/urlBuilder.js', () => ({
     buildUrl: vi.fn(),
     mergeHeaders: vi.fn(),
     mergeParams: vi.fn(),
+    mergeHeadersWithOptional: vi.fn(),
+    mergeParamsWithOptional: vi.fn(),
   },
 }));
 
@@ -122,6 +124,32 @@ function setupCommonMocks() {
   mockUrlBuilder.mergeParams.mockImplementation((api, endpoint) => {
     return { ...(api.params || {}), ...(endpoint.params || {}) };
   });
+
+  // T18: Add optional parameter methods with proper signatures
+  mockUrlBuilder.mergeHeadersWithOptional.mockImplementation(
+    async (api, endpoint, variableResolver, context) => {
+      // For tests, just merge normally without optional handling
+      return { ...(api.headers || {}), ...(endpoint.headers || {}) };
+    }
+  );
+  mockUrlBuilder.mergeParamsWithOptional.mockImplementation(
+    async (api, endpoint, variableResolver, context) => {
+      // For tests, merge and apply basic variable resolution if mockVariableResolver.resolveValue is set up
+      const merged = { ...(api.params || {}), ...(endpoint.params || {}) };
+      const resolved: Record<string, string> = {};
+
+      for (const [key, value] of Object.entries(merged)) {
+        // Use the variable resolver mock if it's configured to resolve values
+        try {
+          resolved[key] = (await variableResolver.resolveValue(value, context)) as string;
+        } catch {
+          resolved[key] = value as string;
+        }
+      }
+
+      return resolved;
+    }
+  );
 }
 
 describe('API Command Phase 5 Features', () => {
@@ -142,6 +170,9 @@ describe('API Command Phase 5 Features', () => {
     setupCommonMocks();
   });
 
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
   afterEach(() => {
     vi.clearAllMocks();
   });
@@ -517,6 +548,12 @@ describe('API Command Phase 5 Features', () => {
             };
           }
         }
+        // Handle string resolution - needed for individual path resolution
+        if (typeof value === 'string') {
+          if (value === '/test/{{user_id}}') {
+            return '/test/456';
+          }
+        }
         return value;
       });
 
@@ -774,6 +811,15 @@ describe('API Command Query Parameters', () => {
               ...value,
               params: { user_id: '123' }, // Resolve the params inside endpoint
             };
+          }
+        }
+        // Handle string values for individual parameter resolution
+        if (typeof value === 'string') {
+          if (value === '{{env.API_KEY}}') {
+            return 'resolved_api_key';
+          }
+          if (value === '{{userId}}') {
+            return '123';
           }
         }
         return value;

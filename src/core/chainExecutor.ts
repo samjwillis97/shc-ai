@@ -283,7 +283,7 @@ export class ChainExecutor {
         url = this.applyPathParams(url, resolvedStepWith.pathParams as Record<string, string>);
       }
 
-      // T8.5: Merge headers with step.with overrides (step.with has highest precedence)
+      // T8.5: Merge headers with step.with overrides
       const baseHeaders = urlBuilder.mergeHeaders(
         resolvedApiBase as ApiDefinition,
         resolvedEndpoint
@@ -292,7 +292,7 @@ export class ChainExecutor {
         ? { ...baseHeaders, ...resolvedStepWith.headers }
         : baseHeaders;
 
-      // T8.5: Merge params with step.with overrides (step.with has highest precedence)
+      // T8.5: Merge params with step.with overrides
       const baseParams = urlBuilder.mergeParams(resolvedApiBase as ApiDefinition, resolvedEndpoint);
       const params = resolvedStepWith?.params
         ? { ...baseParams, ...resolvedStepWith.params }

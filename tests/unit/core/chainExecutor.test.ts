@@ -4,7 +4,11 @@ import { httpClient } from '../../../src/core/httpClient.js';
 import { variableResolver, VariableResolutionError } from '../../../src/core/variableResolver.js';
 import { urlBuilder } from '../../../src/core/urlBuilder.js';
 import { PluginManager } from '../../../src/core/pluginManager.js';
-import type { HttpCraftConfig, ChainDefinition, PluginConfiguration } from '../../../src/types/config.js';
+import type {
+  HttpCraftConfig,
+  ChainDefinition,
+  PluginConfiguration,
+} from '../../../src/types/config.js';
 import type { HttpRequest, HttpResponse } from '../../../src/types/plugin.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -13,8 +17,8 @@ import path from 'path';
 vi.mock('../../../src/core/httpClient.js', () => ({
   httpClient: {
     executeRequest: vi.fn(),
-    setPluginManager: vi.fn()
-  }
+    setPluginManager: vi.fn(),
+  },
 }));
 
 vi.mock('../../../src/core/variableResolver.js', () => ({
@@ -22,22 +26,27 @@ vi.mock('../../../src/core/variableResolver.js', () => ({
     createContext: vi.fn(),
     resolveValue: vi.fn(),
     setPluginManager: vi.fn(),
-    maskSecrets: vi.fn((text: string) => text.replace(/secret/gi, '[SECRET]'))
+    maskSecrets: vi.fn((text: string) => text.replace(/secret/gi, '[SECRET]')),
   },
   VariableResolutionError: class VariableResolutionError extends Error {
-    constructor(message: string, public variableName: string) {
+    constructor(
+      message: string,
+      public variableName: string
+    ) {
       super(message);
       this.name = 'VariableResolutionError';
     }
-  }
+  },
 }));
 
 vi.mock('../../../src/core/urlBuilder.js', () => ({
   urlBuilder: {
     buildUrl: vi.fn(),
     mergeHeaders: vi.fn(),
-    mergeParams: vi.fn()
-  }
+    mergeParams: vi.fn(),
+    mergeHeadersWithOptional: vi.fn(),
+    mergeParamsWithOptional: vi.fn(),
+  },
 }));
 
 vi.mock('../../../src/core/pluginManager.js', () => ({
@@ -50,7 +59,7 @@ vi.mock('../../../src/core/pluginManager.js', () => ({
       executePreRequestHooks: vi.fn().mockResolvedValue(undefined),
       executePostResponseHooks: vi.fn().mockResolvedValue(undefined),
       clear: vi.fn(),
-      getPlugins: vi.fn().mockReturnValue([])
+      getPlugins: vi.fn().mockReturnValue([]),
     }),
     getVariableSources: vi.fn().mockReturnValue({}),
     getParameterizedVariableSources: vi.fn().mockReturnValue({}),
@@ -58,8 +67,8 @@ vi.mock('../../../src/core/pluginManager.js', () => ({
     executePreRequestHooks: vi.fn().mockResolvedValue(undefined),
     executePostResponseHooks: vi.fn().mockResolvedValue(undefined),
     clear: vi.fn(),
-    getPlugins: vi.fn().mockReturnValue([])
-  }))
+    getPlugins: vi.fn().mockReturnValue([]),
+  })),
 }));
 
 describe('ChainExecutor', () => {
@@ -77,22 +86,24 @@ describe('ChainExecutor', () => {
 
     // Setup default mocks
     vi.mocked(variableResolver.createContext).mockReturnValue({
-      cli: {},
+      cliVariables: {},
       env: {},
       profiles: {},
       api: {},
       endpoint: {},
-      chainVars: {}
+      chainVars: {},
     });
 
     vi.mocked(urlBuilder.buildUrl).mockReturnValue('https://api.test.com/users/123');
     vi.mocked(urlBuilder.mergeHeaders).mockReturnValue({});
     vi.mocked(urlBuilder.mergeParams).mockReturnValue({});
+    vi.mocked(urlBuilder.mergeHeadersWithOptional).mockResolvedValue({});
+    vi.mocked(urlBuilder.mergeParamsWithOptional).mockResolvedValue({});
   });
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    
+
     // Clean up temporary directory
     try {
       await fs.rm(tempDir, { recursive: true, force: true });
@@ -108,19 +119,19 @@ describe('ChainExecutor', () => {
         endpoints: {
           getUser: {
             method: 'GET',
-            path: '/users/{{userId}}'
+            path: '/users/{{userId}}',
           },
           createUser: {
             method: 'POST',
             path: '/users',
             body: {
               name: '{{name}}',
-              email: '{{email}}'
-            }
-          }
-        }
-      }
-    }
+              email: '{{email}}',
+            },
+          },
+        },
+      },
+    },
   };
 
   describe('parseStepCall', () => {
@@ -128,7 +139,7 @@ describe('ChainExecutor', () => {
       const result = (chainExecutor as any).parseStepCall('testApi.getUser');
       expect(result).toEqual({
         apiName: 'testApi',
-        endpointName: 'getUser'
+        endpointName: 'getUser',
       });
     });
 
@@ -157,16 +168,16 @@ describe('ChainExecutor', () => {
         steps: [
           {
             id: 'getUser',
-            call: 'testApi.getUser'
-          }
-        ]
+            call: 'testApi.getUser',
+          },
+        ],
       };
 
       const mockResponse: HttpResponse = {
         status: 200,
         statusText: 'OK',
         headers: {},
-        body: '{"id": 123, "name": "John Doe"}'
+        body: '{"id": 123, "name": "John Doe"}',
       };
 
       // Mock successful resolution and request
@@ -194,32 +205,32 @@ describe('ChainExecutor', () => {
       const chain: ChainDefinition = {
         description: 'Create and get user',
         vars: {
-          userName: 'testuser'
+          userName: 'testuser',
         },
         steps: [
           {
             id: 'createUser',
-            call: 'testApi.createUser'
+            call: 'testApi.createUser',
           },
           {
             id: 'getUser',
-            call: 'testApi.getUser'
-          }
-        ]
+            call: 'testApi.getUser',
+          },
+        ],
       };
 
       const createResponse: HttpResponse = {
         status: 201,
         statusText: 'Created',
         headers: {},
-        body: '{"id": 456, "name": "testuser"}'
+        body: '{"id": 456, "name": "testuser"}',
       };
 
       const getResponse: HttpResponse = {
         status: 200,
         statusText: 'OK',
         headers: {},
-        body: '{"id": 456, "name": "testuser", "email": "test@example.com"}'
+        body: '{"id": 456, "name": "testuser", "email": "test@example.com"}',
       };
 
       // Mock successful resolutions and requests
@@ -252,20 +263,20 @@ describe('ChainExecutor', () => {
         steps: [
           {
             id: 'failingStep',
-            call: 'testApi.getUser'
+            call: 'testApi.getUser',
           },
           {
             id: 'neverExecuted',
-            call: 'testApi.createUser'
-          }
-        ]
+            call: 'testApi.createUser',
+          },
+        ],
       };
 
       const errorResponse: HttpResponse = {
         status: 404,
         statusText: 'Not Found',
         headers: {},
-        body: '{"error": "User not found"}'
+        body: '{"error": "User not found"}',
       };
 
       // Mock failing request
@@ -296,9 +307,9 @@ describe('ChainExecutor', () => {
         steps: [
           {
             id: 'step1',
-            call: 'nonexistentApi.getUser'
-          }
-        ]
+            call: 'nonexistentApi.getUser',
+          },
+        ],
       };
 
       const result = await chainExecutor.executeChain(
@@ -322,9 +333,9 @@ describe('ChainExecutor', () => {
         steps: [
           {
             id: 'step1',
-            call: 'testApi.nonexistentEndpoint'
-          }
-        ]
+            call: 'testApi.nonexistentEndpoint',
+          },
+        ],
       };
 
       const result = await chainExecutor.executeChain(
@@ -340,7 +351,9 @@ describe('ChainExecutor', () => {
       expect(result.success).toBe(false);
       expect(result.steps).toHaveLength(1);
       expect(result.steps[0].success).toBe(false);
-      expect(result.steps[0].error).toBe("Endpoint 'nonexistentEndpoint' not found in API 'testApi'");
+      expect(result.steps[0].error).toBe(
+        "Endpoint 'nonexistentEndpoint' not found in API 'testApi'"
+      );
     });
 
     it('should support dry run mode', async () => {
@@ -348,9 +361,9 @@ describe('ChainExecutor', () => {
         steps: [
           {
             id: 'getUser',
-            call: 'testApi.getUser'
-          }
-        ]
+            call: 'testApi.getUser',
+          },
+        ],
       };
 
       // Mock successful resolution
@@ -378,35 +391,27 @@ describe('ChainExecutor', () => {
       const chain: ChainDefinition = {
         vars: {
           userId: 123,
-          active: true
+          active: true,
         },
         steps: [
           {
             id: 'getUser',
-            call: 'testApi.getUser'
-          }
-        ]
+            call: 'testApi.getUser',
+          },
+        ],
       };
 
       const mockResponse: HttpResponse = {
         status: 200,
         statusText: 'OK',
         headers: {},
-        body: '{"id": 123}'
+        body: '{"id": 123}',
       };
 
       vi.mocked(variableResolver.resolveValue).mockResolvedValue(mockConfig.apis.testApi);
       vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
 
-      await chainExecutor.executeChain(
-        'testChain',
-        chain,
-        mockConfig,
-        {},
-        {},
-        false,
-        false
-      );
+      await chainExecutor.executeChain('testChain', chain, mockConfig, {}, {}, false, false);
 
       // Verify that chain variables were added to context
       expect(variableResolver.createContext).toHaveBeenCalled();
@@ -420,16 +425,16 @@ describe('ChainExecutor', () => {
         steps: [
           {
             id: 'getUser',
-            call: 'testApi.getUser'
-          }
-        ]
+            call: 'testApi.getUser',
+          },
+        ],
       };
 
       const mockResponse: HttpResponse = {
         status: 200,
         statusText: 'OK',
         headers: {},
-        body: '{"id": 123}'
+        body: '{"id": 123}',
       };
 
       vi.mocked(variableResolver.resolveValue).mockResolvedValue(mockConfig.apis.testApi);
@@ -445,12 +450,18 @@ describe('ChainExecutor', () => {
         false
       );
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith('[CHAIN] Starting execution of chain: testChain');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('[CHAIN] Description: Test chain with description');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[CHAIN] Starting execution of chain: testChain'
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[CHAIN] Description: Test chain with description'
+      );
       expect(consoleErrorSpy).toHaveBeenCalledWith('[CHAIN] Steps to execute: 1');
       expect(consoleErrorSpy).toHaveBeenCalledWith('[CHAIN] Executing step 1/1: getUser');
       expect(consoleErrorSpy).toHaveBeenCalledWith('[CHAIN] Step getUser completed successfully');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('[CHAIN] Chain execution completed successfully');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[CHAIN] Chain execution completed successfully'
+      );
     });
 
     it('should handle variable resolution errors', async () => {
@@ -458,9 +469,9 @@ describe('ChainExecutor', () => {
         steps: [
           {
             id: 'getUser',
-            call: 'testApi.getUser'
-          }
-        ]
+            call: 'testApi.getUser',
+          },
+        ],
       };
 
       // Mock variable resolution error
@@ -489,16 +500,16 @@ describe('ChainExecutor', () => {
         steps: [
           {
             id: 'getUser',
-            call: 'testApi.getUser'
-          }
-        ]
+            call: 'testApi.getUser',
+          },
+        ],
       };
 
       const mockResponse: HttpResponse = {
         status: 200,
         statusText: 'OK',
         headers: {},
-        body: '{"id": 123}'
+        body: '{"id": 123}',
       };
 
       // Mock with query parameters
@@ -506,15 +517,7 @@ describe('ChainExecutor', () => {
       vi.mocked(urlBuilder.mergeParams).mockReturnValue({ limit: '10', active: 'true' });
       vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
 
-      await chainExecutor.executeChain(
-        'testChain',
-        chain,
-        mockConfig,
-        {},
-        {},
-        false,
-        false
-      );
+      await chainExecutor.executeChain('testChain', chain, mockConfig, {}, {}, false, false);
 
       // Verify that the request was made with parameters in the URL
       expect(httpClient.executeRequest).toHaveBeenCalledWith(
@@ -534,19 +537,19 @@ describe('ChainExecutor', () => {
               call: 'testApi.createUser',
               with: {
                 headers: {
-                  'Authorization': 'Bearer custom-token',
-                  'X-Custom': 'override-value'
-                }
-              }
-            }
-          ]
+                  Authorization: 'Bearer custom-token',
+                  'X-Custom': 'override-value',
+                },
+              },
+            },
+          ],
         };
 
         const mockResponse: HttpResponse = {
           status: 201,
           statusText: 'Created',
           headers: {},
-          body: '{"id": 123}'
+          body: '{"id": 123}',
         };
 
         // Mock variableResolver.resolveValue to handle different inputs
@@ -568,24 +571,16 @@ describe('ChainExecutor', () => {
         vi.mocked(urlBuilder.mergeHeaders).mockReturnValue({ 'Content-Type': 'application/json' });
         vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
 
-        await chainExecutor.executeChain(
-          'testChain',
-          chain,
-          mockConfig,
-          {},
-          {},
-          false,
-          false
-        );
+        await chainExecutor.executeChain('testChain', chain, mockConfig, {}, {}, false, false);
 
         // Verify that step.with headers were merged with base headers
         expect(httpClient.executeRequest).toHaveBeenCalledWith(
           expect.objectContaining({
             headers: {
               'Content-Type': 'application/json', // From base
-              'Authorization': 'Bearer custom-token', // From step.with
-              'X-Custom': 'override-value' // From step.with
-            }
+              Authorization: 'Bearer custom-token', // From step.with
+              'X-Custom': 'override-value', // From step.with
+            },
           })
         );
       });
@@ -598,19 +593,19 @@ describe('ChainExecutor', () => {
               call: 'testApi.getUser',
               with: {
                 params: {
-                  'limit': '20',
-                  'include': 'profile'
-                }
-              }
-            }
-          ]
+                  limit: '20',
+                  include: 'profile',
+                },
+              },
+            },
+          ],
         };
 
         const mockResponse: HttpResponse = {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: '{"id": 123}'
+          body: '{"id": 123}',
         };
 
         // Mock variableResolver.resolveValue to handle different inputs
@@ -629,18 +624,10 @@ describe('ChainExecutor', () => {
           return value;
         });
 
-        vi.mocked(urlBuilder.mergeParams).mockReturnValue({ 'limit': '10' }); // Base params
+        vi.mocked(urlBuilder.mergeParams).mockReturnValue({ limit: '10' }); // Base params
         vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
 
-        await chainExecutor.executeChain(
-          'testChain',
-          chain,
-          mockConfig,
-          {},
-          {},
-          false,
-          false
-        );
+        await chainExecutor.executeChain('testChain', chain, mockConfig, {}, {}, false, false);
 
         // Verify that the request was made with merged parameters
         expect(httpClient.executeRequest).toHaveBeenCalledWith(
@@ -665,18 +652,18 @@ describe('ChainExecutor', () => {
                 body: {
                   name: 'Override Name',
                   email: 'override@example.com',
-                  customField: 'custom-value'
-                }
-              }
-            }
-          ]
+                  customField: 'custom-value',
+                },
+              },
+            },
+          ],
         };
 
         const mockResponse: HttpResponse = {
           status: 201,
           statusText: 'Created',
           headers: {},
-          body: '{"id": 123}'
+          body: '{"id": 123}',
         };
 
         // Mock variableResolver.resolveValue to handle different inputs
@@ -697,15 +684,7 @@ describe('ChainExecutor', () => {
 
         vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
 
-        await chainExecutor.executeChain(
-          'testChain',
-          chain,
-          mockConfig,
-          {},
-          {},
-          false,
-          false
-        );
+        await chainExecutor.executeChain('testChain', chain, mockConfig, {}, {}, false, false);
 
         // Verify that step.with body completely replaced the endpoint body
         expect(httpClient.executeRequest).toHaveBeenCalledWith(
@@ -713,8 +692,8 @@ describe('ChainExecutor', () => {
             body: {
               name: 'Override Name',
               email: 'override@example.com',
-              customField: 'custom-value'
-            }
+              customField: 'custom-value',
+            },
           })
         );
       });
@@ -727,32 +706,32 @@ describe('ChainExecutor', () => {
               call: 'testApi.getUser',
               with: {
                 pathParams: {
-                  'userId': '456',
-                  'orgId': 'org-123'
-                }
-              }
-            }
-          ]
+                  userId: '456',
+                  orgId: 'org-123',
+                },
+              },
+            },
+          ],
         };
 
         const mockResponse: HttpResponse = {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: '{"id": 456}'
+          body: '{"id": 456}',
         };
 
         // Mock endpoint with path parameters
         const mockEndpoint = {
           method: 'GET' as const,
-          path: '/users/{{userId}}/org/{{orgId}}'
+          path: '/users/{{userId}}/org/{{orgId}}',
         };
 
         const mockApiWithPathParams = {
           ...mockConfig.apis.testApi,
           endpoints: {
-            getUser: mockEndpoint
-          }
+            getUser: mockEndpoint,
+          },
         };
 
         // Mock variableResolver.resolveValue to handle different inputs
@@ -771,23 +750,17 @@ describe('ChainExecutor', () => {
           return value;
         });
 
-        vi.mocked(urlBuilder.buildUrl).mockReturnValue('https://api.test.com/users/{{userId}}/org/{{orgId}}');
+        vi.mocked(urlBuilder.buildUrl).mockReturnValue(
+          'https://api.test.com/users/{{userId}}/org/{{orgId}}'
+        );
         vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
 
-        await chainExecutor.executeChain(
-          'testChain',
-          chain,
-          mockConfig,
-          {},
-          {},
-          false,
-          false
-        );
+        await chainExecutor.executeChain('testChain', chain, mockConfig, {}, {}, false, false);
 
         // Verify that pathParams were substituted in the URL
         expect(httpClient.executeRequest).toHaveBeenCalledWith(
           expect.objectContaining({
-            url: 'https://api.test.com/users/456/org/org-123'
+            url: 'https://api.test.com/users/456/org/org-123',
           })
         );
       });
@@ -796,7 +769,7 @@ describe('ChainExecutor', () => {
         const chain: ChainDefinition = {
           vars: {
             customToken: 'chain-token-123',
-            userName: 'Chain User'
+            userName: 'Chain User',
           },
           steps: [
             {
@@ -804,22 +777,22 @@ describe('ChainExecutor', () => {
               call: 'testApi.createUser',
               with: {
                 headers: {
-                  'Authorization': 'Bearer {{customToken}}'
+                  Authorization: 'Bearer {{customToken}}',
                 },
                 body: {
                   name: '{{userName}}',
-                  source: 'chain'
-                }
-              }
-            }
-          ]
+                  source: 'chain',
+                },
+              },
+            },
+          ],
         };
 
         const mockResponse: HttpResponse = {
           status: 201,
           statusText: 'Created',
           headers: {},
-          body: '{"id": 123}'
+          body: '{"id": 123}',
         };
 
         vi.mocked(variableResolver.resolveValue).mockImplementation(async (value) => {
@@ -860,26 +833,18 @@ describe('ChainExecutor', () => {
 
         vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
 
-        await chainExecutor.executeChain(
-          'testChain',
-          chain,
-          mockConfig,
-          {},
-          {},
-          false,
-          false
-        );
+        await chainExecutor.executeChain('testChain', chain, mockConfig, {}, {}, false, false);
 
         // Verify that variables were resolved in step.with overrides
         expect(httpClient.executeRequest).toHaveBeenCalledWith(
           expect.objectContaining({
             headers: expect.objectContaining({
-              'Authorization': 'Bearer chain-token-123'
+              Authorization: 'Bearer chain-token-123',
             }),
             body: {
               name: 'Chain User',
-              source: 'chain'
-            }
+              source: 'chain',
+            },
           })
         );
       });
@@ -892,19 +857,19 @@ describe('ChainExecutor', () => {
               call: 'testApi.getUser',
               with: {
                 headers: {
-                  'X-Custom': 'custom-value'
-                }
+                  'X-Custom': 'custom-value',
+                },
                 // No params, pathParams, or body overrides
-              }
-            }
-          ]
+              },
+            },
+          ],
         };
 
         const mockResponse: HttpResponse = {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: '{"id": 123}'
+          body: '{"id": 123}',
         };
 
         // Mock variableResolver.resolveValue to handle different inputs
@@ -924,28 +889,20 @@ describe('ChainExecutor', () => {
         });
 
         vi.mocked(urlBuilder.mergeHeaders).mockReturnValue({ 'Content-Type': 'application/json' });
-        vi.mocked(urlBuilder.mergeParams).mockReturnValue({ 'limit': '10' });
+        vi.mocked(urlBuilder.mergeParams).mockReturnValue({ limit: '10' });
         vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
 
-        await chainExecutor.executeChain(
-          'testChain',
-          chain,
-          mockConfig,
-          {},
-          {},
-          false,
-          false
-        );
+        await chainExecutor.executeChain('testChain', chain, mockConfig, {}, {}, false, false);
 
         // Verify that only headers were overridden, other fields use defaults
         expect(httpClient.executeRequest).toHaveBeenCalledWith(
           expect.objectContaining({
             headers: {
               'Content-Type': 'application/json', // From base
-              'X-Custom': 'custom-value' // From step.with
+              'X-Custom': 'custom-value', // From step.with
             },
             url: expect.stringContaining('limit=10'), // Base params preserved
-            body: undefined // No body override, uses endpoint default
+            body: undefined, // No body override, uses endpoint default
           })
         );
       });
@@ -957,27 +914,27 @@ describe('ChainExecutor', () => {
           steps: [
             {
               id: 'createUser',
-              call: 'testApi.createUser'
+              call: 'testApi.createUser',
             },
             {
               id: 'getUser',
-              call: 'testApi.getUser'
-            }
-          ]
+              call: 'testApi.getUser',
+            },
+          ],
         };
 
         const createResponse: HttpResponse = {
           status: 201,
           statusText: 'Created',
-          headers: { 'location': '/users/456' },
-          body: '{"id": 456, "name": "testuser"}'
+          headers: { location: '/users/456' },
+          body: '{"id": 456, "name": "testuser"}',
         };
 
         const getResponse: HttpResponse = {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: '{"id": 456, "name": "testuser", "email": "test@example.com"}'
+          body: '{"id": 456, "name": "testuser", "email": "test@example.com"}',
         };
 
         // Mock successful resolutions and requests
@@ -1002,15 +959,15 @@ describe('ChainExecutor', () => {
         // Verify that createContext was called with step data for the second step
         const createContextCalls = vi.mocked(variableResolver.createContext).mock.calls;
         expect(createContextCalls).toHaveLength(2);
-        
+
         // First step should have no previous steps
         const firstStepContext = createContextCalls[0];
         expect(firstStepContext[0]).toEqual({}); // cliVars
-        
+
         // Second step should have access to first step's results
         const secondStepContext = createContextCalls[1];
         expect(secondStepContext[0]).toEqual({}); // cliVars
-        
+
         // Verify that the variable context gets the steps data added
         expect(vi.mocked(variableResolver.createContext)).toHaveBeenCalledTimes(2);
       });
@@ -1020,23 +977,23 @@ describe('ChainExecutor', () => {
           steps: [
             {
               id: 'step1',
-              call: 'testApi.createUser'
-            }
-          ]
+              call: 'testApi.createUser',
+            },
+          ],
         };
 
         const mockRequest: HttpRequest = {
           method: 'POST',
           url: 'https://api.test.com/users',
           headers: { 'Content-Type': 'application/json' },
-          body: { name: 'test', email: 'test@example.com' }
+          body: { name: 'test', email: 'test@example.com' },
         };
 
         const mockResponse: HttpResponse = {
           status: 201,
           statusText: 'Created',
-          headers: { 'location': '/users/456' },
-          body: '{"id": 456, "name": "test"}'
+          headers: { location: '/users/456' },
+          body: '{"id": 456, "name": "test"}',
         };
 
         // Mock successful resolution and request
@@ -1055,7 +1012,7 @@ describe('ChainExecutor', () => {
 
         expect(result.success).toBe(true);
         expect(result.steps).toHaveLength(1);
-        
+
         const step = result.steps[0];
         expect(step.stepId).toBe('step1');
         expect(step.request).toBeDefined();
@@ -1071,17 +1028,17 @@ describe('ChainExecutor', () => {
               call: 'testApi.createUser',
               with: {
                 headers: { 'X-Custom': 'value' },
-                body: { name: 'override' }
-              }
-            }
-          ]
+                body: { name: 'override' },
+              },
+            },
+          ],
         };
 
         const mockResponse: HttpResponse = {
           status: 201,
           statusText: 'Created',
           headers: {},
-          body: '{"id": 456}'
+          body: '{"id": 456}',
         };
 
         // Mock successful resolution and request
@@ -1104,7 +1061,7 @@ describe('ChainExecutor', () => {
 
         expect(result.success).toBe(true);
         expect(result.steps).toHaveLength(1);
-        
+
         // Verify that resolveValue was called for step.with
         expect(vi.mocked(variableResolver.resolveValue)).toHaveBeenCalledTimes(3);
       });
@@ -1124,13 +1081,14 @@ describe('ChainExecutor', () => {
               context.registerVariableSource('getAuthToken', () => {
                 return `token-${context.config.clientId}-${context.config.scope?.join('-') || 'default'}`;
               });
-              
+
               context.registerPreRequestHook(async (request: any) => {
-                request.headers['Authorization'] = `Bearer ${await context.registerVariableSource.mock?.calls?.[0]?.[1]?.() || 'test-token'}`;
+                request.headers['Authorization'] =
+                  `Bearer ${(await context.registerVariableSource.mock?.calls?.[0]?.[1]?.()) || 'test-token'}`;
               });
             }
             // If missing required config, plugin setup returns early (like the real cognito-auth plugin)
-          }
+          },
         };
 
         // Write the mock plugin to a file
@@ -1165,7 +1123,7 @@ export default {
             executePreRequestHooks: vi.fn().mockResolvedValue(undefined),
             executePostResponseHooks: vi.fn().mockResolvedValue(undefined),
             clear: vi.fn(),
-            getPlugins: vi.fn().mockReturnValue([])
+            getPlugins: vi.fn().mockReturnValue([]),
           }),
           getVariableSources: vi.fn().mockReturnValue({}),
           getParameterizedVariableSources: vi.fn().mockReturnValue({}),
@@ -1173,7 +1131,7 @@ export default {
           executePreRequestHooks: vi.fn().mockResolvedValue(undefined),
           executePostResponseHooks: vi.fn().mockResolvedValue(undefined),
           clear: vi.fn(),
-          getPlugins: vi.fn().mockReturnValue([])
+          getPlugins: vi.fn().mockReturnValue([]),
         } as any;
       });
 
@@ -1184,10 +1142,10 @@ export default {
               path: './auth-plugin.js',
               name: 'auth-plugin',
               config: {
-                stage: 'test'
+                stage: 'test',
                 // Note: Missing clientId and clientSecret, so plugin won't register variable sources
-              }
-            }
+              },
+            },
           ],
           apis: {
             protectedApi: {
@@ -1198,30 +1156,30 @@ export default {
                   config: {
                     clientId: 'test-client-id',
                     clientSecret: 'test-client-secret',
-                    scope: ['read', 'write']
-                  }
-                }
+                    scope: ['read', 'write'],
+                  },
+                },
               ],
               headers: {
-                'Authorization': 'Bearer {{plugins.auth-plugin.getAuthToken}}'
+                Authorization: 'Bearer {{plugins.auth-plugin.getAuthToken}}',
               },
               endpoints: {
                 getData: {
                   method: 'GET',
-                  path: '/data'
-                }
-              }
-            }
-          }
+                  path: '/data',
+                },
+              },
+            },
+          },
         };
 
         const chain: ChainDefinition = {
           steps: [
             {
               id: 'fetchData',
-              call: 'protectedApi.getData'
-            }
-          ]
+              call: 'protectedApi.getData',
+            },
+          ],
         };
 
         // Load global plugins first (with incomplete config)
@@ -1231,14 +1189,14 @@ export default {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: '{"data": "success"}'
+          body: '{"data": "success"}',
         };
 
         // Mock variable resolution to handle the API-level plugin configuration resolution
         let resolveValueCallCount = 0;
         vi.mocked(variableResolver.resolveValue).mockImplementation(async (value: any) => {
           resolveValueCallCount++;
-          
+
           if (resolveValueCallCount === 1) {
             // First call: resolving API-level plugin configurations
             return mockConfigWithApiPlugins.apis.protectedApi.plugins;
@@ -1247,23 +1205,23 @@ export default {
             return {
               baseUrl: 'https://api.protected.com',
               headers: {
-                'Authorization': 'Bearer token-test-client-id-read-write'
+                Authorization: 'Bearer token-test-client-id-read-write',
               },
               params: undefined,
               variables: undefined,
-              endpoints: {}
+              endpoints: {},
             };
           } else if (resolveValueCallCount === 3) {
             // Third call: resolving endpoint
             return mockConfigWithApiPlugins.apis.protectedApi.endpoints.getData;
           }
-          
+
           return value;
         });
 
         vi.mocked(urlBuilder.buildUrl).mockReturnValue('https://api.protected.com/data');
         vi.mocked(urlBuilder.mergeHeaders).mockReturnValue({
-          'Authorization': 'Bearer token-test-client-id-read-write'
+          Authorization: 'Bearer token-test-client-id-read-write',
         });
         vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
 
@@ -1288,7 +1246,7 @@ export default {
         // Note: With the new implementation, API plugin configs are resolved internally in PluginManager.loadApiPlugins
         // So we verify that the key methods were called to indicate the flow worked correctly
         expect(vi.mocked(variableResolver.resolveValue)).toHaveBeenCalled();
-        
+
         // Verify that the plugin manager loadApiPlugins was called
         expect(vi.mocked(mockPluginManager.loadApiPlugins)).toHaveBeenCalled();
 
@@ -1303,10 +1261,10 @@ export default {
               path: './auth-plugin.js',
               name: 'auth-plugin',
               config: {
-                stage: 'global'
+                stage: 'global',
                 // Missing clientId and clientSecret globally
-              }
-            }
+              },
+            },
           ],
           apis: {
             apiWithAuth: {
@@ -1317,30 +1275,30 @@ export default {
                   config: {
                     clientId: 'api-specific-client',
                     clientSecret: 'api-specific-secret',
-                    scope: ['api', 'access']
-                  }
-                }
+                    scope: ['api', 'access'],
+                  },
+                },
               ],
               headers: {
-                'Authorization': 'Bearer {{plugins.auth-plugin.getAuthToken}}'
+                Authorization: 'Bearer {{plugins.auth-plugin.getAuthToken}}',
               },
               endpoints: {
                 secureEndpoint: {
                   method: 'GET',
-                  path: '/secure'
-                }
-              }
-            }
-          }
+                  path: '/secure',
+                },
+              },
+            },
+          },
         };
 
         const chain: ChainDefinition = {
           steps: [
             {
               id: 'accessSecure',
-              call: 'apiWithAuth.secureEndpoint'
-            }
-          ]
+              call: 'apiWithAuth.secureEndpoint',
+            },
+          ],
         };
 
         // Load global plugins (incomplete config)
@@ -1350,12 +1308,12 @@ export default {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: '{"secure": "data"}'
+          body: '{"secure": "data"}',
         };
 
         // Mock variable context creation to simulate proper plugin variable resolution
         vi.mocked(variableResolver.createContext).mockReturnValue({
-          cli: {},
+          cliVariables: {},
           env: {},
           profiles: {},
           api: {},
@@ -1363,38 +1321,38 @@ export default {
           chainVars: {},
           plugins: {
             'auth-plugin': {
-              getAuthToken: () => 'token-api-specific-client-api-access'
-            }
-          }
+              getAuthToken: () => 'token-api-specific-client-api-access',
+            },
+          },
         });
 
         // Mock variable resolution
         let resolveValueCallCount = 0;
         vi.mocked(variableResolver.resolveValue).mockImplementation(async (value: any) => {
           resolveValueCallCount++;
-          
+
           if (resolveValueCallCount === 1) {
             // API resolution with resolved Authorization header
             return {
               baseUrl: 'https://api.secure.com',
               headers: {
-                'Authorization': 'Bearer token-api-specific-client-api-access'
+                Authorization: 'Bearer token-api-specific-client-api-access',
               },
               params: undefined,
               variables: undefined,
-              endpoints: {}
+              endpoints: {},
             };
           } else if (resolveValueCallCount === 2) {
             // Endpoint resolution
             return mockConfigWithApiPlugins.apis.apiWithAuth.endpoints.secureEndpoint;
           }
-          
+
           return value;
         });
 
         vi.mocked(urlBuilder.buildUrl).mockReturnValue('https://api.secure.com/secure');
         vi.mocked(urlBuilder.mergeHeaders).mockReturnValue({
-          'Authorization': 'Bearer token-api-specific-client-api-access'
+          Authorization: 'Bearer token-api-specific-client-api-access',
         });
         vi.mocked(httpClient.executeRequest).mockResolvedValue(mockResponse);
 
@@ -1415,12 +1373,12 @@ export default {
 
         // Verify that the authorization header was properly resolved with the API-specific plugin configuration
         expect(vi.mocked(urlBuilder.mergeHeaders)).toHaveBeenCalled();
-        
+
         // Verify that the HTTP client was called with the correct URL and method
         expect(vi.mocked(httpClient.executeRequest)).toHaveBeenCalledWith(
           expect.objectContaining({
             method: 'GET',
-            url: 'https://api.secure.com/secure'
+            url: 'https://api.secure.com/secure',
           })
         );
       });
@@ -1433,9 +1391,9 @@ export default {
               path: './auth-plugin.js',
               name: 'auth-plugin',
               config: {
-                defaultScope: ['global']
-              }
-            }
+                defaultScope: ['global'],
+              },
+            },
           ],
           apis: {
             api1: {
@@ -1446,16 +1404,16 @@ export default {
                   config: {
                     clientId: 'api1-client',
                     clientSecret: 'api1-secret',
-                    scope: ['api1']
-                  }
-                }
+                    scope: ['api1'],
+                  },
+                },
               ],
               endpoints: {
                 getData: {
                   method: 'GET',
-                  path: '/data'
-                }
-              }
+                  path: '/data',
+                },
+              },
             },
             api2: {
               baseUrl: 'https://api2.com',
@@ -1464,24 +1422,24 @@ export default {
                 postData: {
                   method: 'POST',
                   path: '/data',
-                  body: { message: 'test' }
-                }
-              }
-            }
-          }
+                  body: { message: 'test' },
+                },
+              },
+            },
+          },
         };
 
         const chain: ChainDefinition = {
           steps: [
             {
               id: 'step1',
-              call: 'api1.getData'
+              call: 'api1.getData',
             },
             {
               id: 'step2',
-              call: 'api2.postData'
-            }
-          ]
+              call: 'api2.postData',
+            },
+          ],
         };
 
         await mockPluginManager.loadPlugins(mockConfigWithMultipleApis.plugins!, tempDir);
@@ -1490,21 +1448,21 @@ export default {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: '{"message": "from api1"}'
+          body: '{"message": "from api1"}',
         };
 
         const api2Response: HttpResponse = {
           status: 201,
           statusText: 'Created',
           headers: {},
-          body: '{"result": "success"}'
+          body: '{"result": "success"}',
         };
 
         // Simplified variable resolution mock - now only handles API and endpoint resolution
         let resolveValueCallCount = 0;
         vi.mocked(variableResolver.resolveValue).mockImplementation(async (value: any) => {
           resolveValueCallCount++;
-          
+
           if (resolveValueCallCount === 1) {
             // Step 1: API1 resolution
             return mockConfigWithMultipleApis.apis.api1;
@@ -1518,17 +1476,15 @@ export default {
             // Step 2: Endpoint resolution
             return mockConfigWithMultipleApis.apis.api2.endpoints.postData;
           }
-          
+
           return value;
         });
 
         vi.mocked(urlBuilder.buildUrl)
           .mockReturnValueOnce('https://api1.com/data')
           .mockReturnValueOnce('https://api2.com/data');
-        
-        vi.mocked(urlBuilder.mergeHeaders)
-          .mockReturnValueOnce({})
-          .mockReturnValueOnce({});
+
+        vi.mocked(urlBuilder.mergeHeaders).mockReturnValueOnce({}).mockReturnValueOnce({});
 
         vi.mocked(httpClient.executeRequest)
           .mockResolvedValueOnce(api1Response)
@@ -1548,7 +1504,7 @@ export default {
 
         expect(result.success).toBe(true);
         expect(result.steps).toHaveLength(2);
-        
+
         // Verify both steps completed successfully
         expect(result.steps[0].stepId).toBe('step1');
         expect(result.steps[0].success).toBe(true);
@@ -1568,9 +1524,9 @@ export default {
               config: {
                 clientId: 'global-client',
                 clientSecret: 'global-secret',
-                scope: ['global']
-              }
-            }
+                scope: ['global'],
+              },
+            },
           ],
           apis: {
             apiWithPlugins: {
@@ -1581,19 +1537,19 @@ export default {
                   config: {
                     clientId: 'api-specific-client',
                     clientSecret: 'api-specific-secret',
-                    scope: ['api-specific']
-                  }
-                }
+                    scope: ['api-specific'],
+                  },
+                },
               ],
               headers: {
-                'Authorization': 'Bearer {{plugins.auth-plugin.getAuthToken}}'
+                Authorization: 'Bearer {{plugins.auth-plugin.getAuthToken}}',
               },
               endpoints: {
                 getData: {
                   method: 'GET',
-                  path: '/data'
-                }
-              }
+                  path: '/data',
+                },
+              },
             },
             apiWithoutPlugins: {
               baseUrl: 'https://api-without-plugins.com',
@@ -1601,24 +1557,24 @@ export default {
               endpoints: {
                 getInfo: {
                   method: 'GET',
-                  path: '/info'
-                }
-              }
-            }
-          }
+                  path: '/info',
+                },
+              },
+            },
+          },
         };
 
         const chain: ChainDefinition = {
           steps: [
             {
               id: 'step1',
-              call: 'apiWithPlugins.getData'
+              call: 'apiWithPlugins.getData',
             },
             {
               id: 'step2',
-              call: 'apiWithoutPlugins.getInfo'
-            }
-          ]
+              call: 'apiWithoutPlugins.getInfo',
+            },
+          ],
         };
 
         await mockPluginManager.loadPlugins(mockConfigMixed.plugins!, tempDir);
@@ -1627,28 +1583,28 @@ export default {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: '{"data": "from api with plugins"}'
+          body: '{"data": "from api with plugins"}',
         };
 
         const response2: HttpResponse = {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: '{"info": "from api without plugins"}'
+          body: '{"info": "from api without plugins"}',
         };
 
         let resolveValueCallCount = 0;
         vi.mocked(variableResolver.resolveValue).mockImplementation(async (value: any) => {
           resolveValueCallCount++;
-          
+
           if (resolveValueCallCount === 1) {
             // Step 1: API resolution
             return {
               baseUrl: 'https://api-with-plugins.com',
-              headers: { 'Authorization': 'Bearer token-api-specific-client-api-specific' },
+              headers: { Authorization: 'Bearer token-api-specific-client-api-specific' },
               params: undefined,
               variables: undefined,
-              endpoints: {}
+              endpoints: {},
             };
           } else if (resolveValueCallCount === 2) {
             // Step 1: Endpoint resolution
@@ -1660,22 +1616,22 @@ export default {
               headers: undefined,
               params: undefined,
               variables: undefined,
-              endpoints: {}
+              endpoints: {},
             };
           } else if (resolveValueCallCount === 4) {
             // Step 2: Endpoint resolution
             return mockConfigMixed.apis.apiWithoutPlugins.endpoints.getInfo;
           }
-          
+
           return value;
         });
 
         vi.mocked(urlBuilder.buildUrl)
           .mockReturnValueOnce('https://api-with-plugins.com/data')
           .mockReturnValueOnce('https://api-without-plugins.com/info');
-        
+
         vi.mocked(urlBuilder.mergeHeaders)
-          .mockReturnValueOnce({ 'Authorization': 'Bearer token-api-specific-client-api-specific' })
+          .mockReturnValueOnce({ Authorization: 'Bearer token-api-specific-client-api-specific' })
           .mockReturnValueOnce({});
 
         vi.mocked(httpClient.executeRequest)
@@ -1696,7 +1652,7 @@ export default {
 
         expect(result.success).toBe(true);
         expect(result.steps).toHaveLength(2);
-        
+
         // Verify both steps completed successfully
         expect(result.steps[0].stepId).toBe('step1');
         expect(result.steps[0].success).toBe(true);
@@ -1710,8 +1666,8 @@ export default {
             {
               path: './auth-plugin.js',
               name: 'auth-plugin',
-              config: {}
-            }
+              config: {},
+            },
           ],
           apis: {
             problematicApi: {
@@ -1722,34 +1678,36 @@ export default {
                   config: {
                     clientId: '{{undefinedVariable}}', // This will cause a variable resolution error
                     clientSecret: 'test-secret',
-                    scope: ['test']
-                  }
-                }
+                    scope: ['test'],
+                  },
+                },
               ],
               endpoints: {
                 getData: {
                   method: 'GET',
-                  path: '/data'
-                }
-              }
-            }
-          }
+                  path: '/data',
+                },
+              },
+            },
+          },
         };
 
         const chain: ChainDefinition = {
           steps: [
             {
               id: 'problematicStep',
-              call: 'problematicApi.getData'
-            }
-          ]
+              call: 'problematicApi.getData',
+            },
+          ],
         };
 
         await mockPluginManager.loadPlugins(mockConfigWithVariableError.plugins!, tempDir);
 
         // Mock loadApiPlugins to throw an error for variable resolution failure
         vi.mocked(mockPluginManager.loadApiPlugins).mockRejectedValueOnce(
-          new Error('Failed to resolve variables in API-level plugin configuration for \'auth-plugin\': Variable "undefinedVariable" is not defined')
+          new Error(
+            'Failed to resolve variables in API-level plugin configuration for \'auth-plugin\': Variable "undefinedVariable" is not defined'
+          )
         );
 
         const result = await chainExecutor.executeChain(
@@ -1765,10 +1723,12 @@ export default {
         );
 
         expect(result.success).toBe(false);
-        expect(result.error).toContain('Failed to resolve variables in API-level plugin configuration for \'auth-plugin\'');
+        expect(result.error).toContain(
+          "Failed to resolve variables in API-level plugin configuration for 'auth-plugin'"
+        );
         expect(result.steps).toHaveLength(1);
         expect(result.steps[0].success).toBe(false);
       });
     });
   });
-}); 
+});

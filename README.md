@@ -1449,6 +1449,91 @@ HttpCraft provides a powerful variable system with multiple scopes and precedenc
 - `{{$randomInt}}` - Random integer
 - `{{$guid}}` - UUID v4
 
+### Optional Parameter Syntax
+
+HttpCraft supports **optional parameters** using the `{{variable?}}` syntax (note the `?` suffix). Optional parameters are automatically excluded from requests when their variables are undefined, making APIs more flexible and reducing the need for conditional logic.
+
+#### How Optional Parameters Work
+
+- **Regular variables**: `{{variable}}` - Throws an error if undefined
+- **Optional variables**: `{{variable?}}` - Excluded from request if undefined
+
+#### Examples
+
+**Query Parameters:**
+
+```yaml
+apis:
+  myapi:
+    endpoints:
+      getUsers:
+        method: GET
+        path: '/users'
+        params:
+          limit: '10' # Always included
+          pageKey: '{{pageKey?}}' # Only included if pageKey is defined
+          includeMetadata: '{{includeMetadata?}}' # Only included if defined
+          format: 'json' # Always included
+```
+
+**Usage:**
+
+```bash
+# Without optional parameters - only limit and format are sent
+httpcraft myapi getUsers
+# Request: GET /users?limit=10&format=json
+
+# With optional parameters - all parameters are sent
+httpcraft myapi getUsers --var pageKey=abc123 --var includeMetadata=true
+# Request: GET /users?limit=10&pageKey=abc123&includeMetadata=true&format=json
+```
+
+**Headers:**
+
+```yaml
+apis:
+  myapi:
+    endpoints:
+      getUsers:
+        method: GET
+        path: '/users'
+        headers:
+          'User-Agent': 'HttpCraft/1.0' # Always included
+          'Authorization': 'Bearer {{token?}}' # Only included if token is defined
+          'X-Custom': '{{customHeader?}}' # Only included if defined
+          'Accept': 'application/json' # Always included
+```
+
+**Environment Variables:**
+
+```yaml
+headers:
+  'X-Debug-Mode': '{{env.DEBUG_MODE?}}' # Only included if DEBUG_MODE env var is set
+  'X-User-ID': '{{env.USER_ID?}}' # Only included if USER_ID env var is set
+```
+
+**In Chains:**
+
+```yaml
+chains:
+  userFlow:
+    steps:
+      - id: fetchUsers
+        call: myapi.getUsers
+        with:
+          params:
+            limit: '5'
+            pageKey: '{{previousPageKey?}}' # Optional pagination
+            filter: '{{userFilter?}}' # Optional filtering
+```
+
+#### Benefits
+
+- **Cleaner Configuration**: No need to manage undefined values manually
+- **API Flexibility**: Easy to make parameters conditionally optional
+- **Better UX**: Variables can be permanently defined but conditionally used
+- **Backward Compatibility**: Existing configurations continue to work unchanged
+
 ### Examples
 
 ```bash

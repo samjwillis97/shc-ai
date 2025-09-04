@@ -316,10 +316,22 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
       };
 
       resolvedApi = resolvedApiBase as ApiDefinition;
-      resolvedEndpoint = (await variableResolver.resolveValue(
-        endpoint,
-        variableContext
-      )) as EndpointDefinition;
+
+      // Resolve endpoint properties individually, excluding params and headers which are handled separately
+      const resolvedEndpointBase: EndpointDefinition = {
+        method: endpoint.method,
+        path: (await variableResolver.resolveValue(endpoint.path, variableContext)) as string,
+        // Don't resolve params/headers here - they're handled separately with optional parameter logic
+        params: endpoint.params,
+        headers: endpoint.headers,
+        body: endpoint.body
+          ? ((await variableResolver.resolveValue(endpoint.body, variableContext)) as unknown)
+          : undefined,
+        description: endpoint.description,
+        variables: endpoint.variables, // Don't resolve variables themselves, just pass them through
+      };
+
+      resolvedEndpoint = resolvedEndpointBase;
     } catch (error) {
       if (error instanceof VariableResolutionError) {
         // If it's a dry run, we still want to try to show what we can
@@ -379,8 +391,20 @@ export async function handleApiCommand(args: ApiCommandArgs): Promise<void> {
 
     // Build request
     const url = urlBuilder.buildUrl(resolvedApi, resolvedEndpoint);
-    const headers = urlBuilder.mergeHeaders(resolvedApi, resolvedEndpoint);
-    const params = urlBuilder.mergeParams(resolvedApi, resolvedEndpoint);
+
+    // T18.4: Use optional parameter handling for headers and params
+    const headers = await urlBuilder.mergeHeadersWithOptional(
+      resolvedApi,
+      resolvedEndpoint,
+      variableResolver,
+      variableContext
+    );
+    const params = await urlBuilder.mergeParamsWithOptional(
+      resolvedApi,
+      resolvedEndpoint,
+      variableResolver,
+      variableContext
+    );
 
     // Add query parameters to the URL if present (similar to ChainExecutor)
     let finalUrl = url;

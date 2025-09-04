@@ -20,6 +20,12 @@ export interface FunctionArgument {
   value: string;
 }
 
+// T18.2: Types for optional variable resolution
+export interface OptionalVariableResult {
+  value: string;
+  shouldInclude: boolean;
+}
+
 export interface VariableContext {
   cliVariables: Record<string, string>;
   profiles: Record<string, unknown>;
@@ -99,6 +105,123 @@ export class VariableResolver {
   }
 
   /**
+   * T18.2: Resolves variables in a string using {{variable}} syntax and returns information about optional parameters
+   * Returns both the resolved string and a map of which parameters should be included
+   */
+  async resolveWithOptionalInfo(
+    template: string,
+    context: VariableContext
+  ): Promise<{ resolved: string; optionalParameters: Map<string, boolean> }> {
+    let resolvedTemplate = template;
+    const optionalParameters = new Map<string, boolean>();
+    let iterationCount = 0;
+    const maxIterations = 10; // Prevent infinite loops
+
+    while (iterationCount < maxIterations) {
+      const originalTemplate = resolvedTemplate;
+
+      // T10.16: First pass - resolve any nested variables within variable names
+      resolvedTemplate = await this.resolveNestedVariables(resolvedTemplate, context);
+
+      // Process variables sequentially to handle async plugin variables
+      const matches = this.extractVariableMatches(resolvedTemplate);
+
+      for (const match of matches) {
+        const variableName = match.content.trim();
+
+        // Validate that variable name is not empty
+        if (!variableName) {
+          throw new VariableResolutionError('Variable name cannot be empty', variableName);
+        }
+
+        let resolvedValue: string;
+        let shouldInclude = true;
+
+        try {
+          // T10.15: Check if this is a parameterized function call
+          if (this.isParameterizedFunctionCall(variableName)) {
+            resolvedValue = await this.resolveParameterizedFunctionCall(variableName, context);
+          }
+          // Handle scoped variables (e.g., env.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable, steps.stepId.*)
+          else if (variableName.includes('.')) {
+            try {
+              resolvedValue = await this.resolveScopedVariable(variableName, context);
+              // Check if scoped variable resolved to null and handle optional case
+              if (resolvedValue === 'null' && match.isOptional) {
+                shouldInclude = false;
+                resolvedValue = '';
+              }
+            } catch (error) {
+              if (match.isOptional) {
+                shouldInclude = false;
+                resolvedValue = '';
+              } else {
+                throw error;
+              }
+            }
+          } else {
+            // T9.6: Handle built-in dynamic variables first (they start with $)
+            if (variableName.startsWith('$')) {
+              resolvedValue = this.resolveDynamicVariable(variableName, '', variableName);
+            } else {
+              // Handle unscoped variables with precedence
+              const value = this.resolveUnscopedVariable(variableName, context);
+              if (value !== undefined && value !== null) {
+                resolvedValue = this.stringifyValue(value);
+              } else {
+                // T18.2: For optional variables, mark as should not include if undefined or null
+                if (match.isOptional) {
+                  shouldInclude = false;
+                  resolvedValue = ''; // Use empty string as placeholder
+                } else {
+                  throw new VariableResolutionError(
+                    `Variable '${variableName}' could not be resolved`,
+                    variableName
+                  );
+                }
+              }
+            }
+          }
+        } catch (error) {
+          // T18.2: For optional variables, catch resolution errors and mark as should not include
+          if (match.isOptional) {
+            shouldInclude = false;
+            resolvedValue = ''; // Use empty string as placeholder
+          } else {
+            throw error;
+          }
+        }
+
+        // Store the inclusion decision for this variable
+        optionalParameters.set(match.fullMatch, shouldInclude);
+
+        // Replace this specific variable match
+        resolvedTemplate = resolvedTemplate.replace(match.fullMatch, resolvedValue);
+      }
+
+      // T10.16: Check if the resolved template contains new variables to resolve
+      // This handles cases where a variable's value is itself a variable reference
+      const hasVariables = this.extractVariableMatches(resolvedTemplate).length > 0;
+
+      // If no more variables or no change in this iteration, we're done
+      if (!hasVariables || resolvedTemplate === originalTemplate) {
+        break;
+      }
+
+      iterationCount++;
+    }
+
+    if (iterationCount >= maxIterations) {
+      throw new VariableResolutionError(
+        'Maximum variable resolution iterations reached. Check for circular references.',
+        template
+      );
+    }
+
+    return { resolved: resolvedTemplate, optionalParameters };
+  }
+
+  /**
    * Resolves variables in a string using {{variable}} syntax
    * Phase 8 precedence: CLI > Step with > Chain vars > Endpoint > API > Profile > Plugins > Environment
    * T10.15: Enhanced to support parameterized plugin function calls
@@ -134,7 +257,12 @@ export class VariableResolver {
         }
         // Handle scoped variables (e.g., env.VAR_NAME, profile.key, api.key, endpoint.key, plugins.name.variable, steps.stepId.*)
         else if (variableName.includes('.')) {
-          resolvedValue = await this.resolveScopedVariable(variableName, context);
+          try {
+            resolvedValue = await this.resolveScopedVariable(variableName, context);
+          } catch (error) {
+            // For regular resolve (non-optional), we still throw the error
+            throw error;
+          }
         } else {
           // T9.6: Handle built-in dynamic variables first (they start with $)
           if (variableName.startsWith('$')) {
@@ -142,7 +270,7 @@ export class VariableResolver {
           } else {
             // Handle unscoped variables with precedence
             const value = this.resolveUnscopedVariable(variableName, context);
-            if (value !== undefined) {
+            if (value !== undefined && value !== null) {
               resolvedValue = this.stringifyValue(value);
             } else {
               throw new VariableResolutionError(
@@ -263,7 +391,7 @@ export class VariableResolver {
         } else {
           // Handle unscoped variables with precedence
           const value = this.resolveUnscopedVariable(innerVariableName, context);
-          if (value !== undefined) {
+          if (value !== undefined && value !== null) {
             resolvedInnerValue = this.stringifyValue(value);
           } else {
             throw new VariableResolutionError(
@@ -282,11 +410,13 @@ export class VariableResolver {
   }
 
   /**
-   * T10.15: Extracts variable matches from a template, handling nested braces correctly
-   * Returns array of matches with full match string and content
+   * T10.15 & T18.2: Extracts variable matches from a template, handling nested braces correctly
+   * Returns array of matches with full match string, content, and optional flag
    */
-  private extractVariableMatches(template: string): Array<{ fullMatch: string; content: string }> {
-    const matches: Array<{ fullMatch: string; content: string }> = [];
+  private extractVariableMatches(
+    template: string
+  ): Array<{ fullMatch: string; content: string; isOptional: boolean }> {
+    const matches: Array<{ fullMatch: string; content: string; isOptional: boolean }> = [];
     let i = 0;
 
     while (i < template.length) {
@@ -319,7 +449,13 @@ export class VariableResolver {
         if (braceCount === 0) {
           // Found a complete variable
           const fullMatch = template.substring(startIndex, i);
-          matches.push({ fullMatch, content });
+
+          // T18.2: Check if the variable is optional (ends with ?)
+          const trimmedContent = content.trim();
+          const isOptional = trimmedContent.endsWith('?');
+          const cleanContent = isOptional ? trimmedContent.slice(0, -1).trim() : trimmedContent;
+
+          matches.push({ fullMatch, content: cleanContent, isOptional });
         } else {
           // Unclosed variable, treat as literal text
           i = startIndex + 1;
@@ -387,19 +523,31 @@ export class VariableResolver {
 
       case 'profile':
         if (context.profiles && context.profiles[key] !== undefined) {
-          return this.stringifyValue(context.profiles[key]);
+          const value = context.profiles[key];
+          if (value === null) {
+            throw new VariableResolutionError(`Profile variable '${key}' is null`, variableName);
+          }
+          return this.stringifyValue(value);
         }
         throw new VariableResolutionError(`Profile variable '${key}' is not defined`, variableName);
 
       case 'api':
         if (context.api && context.api[key] !== undefined) {
-          return this.stringifyValue(context.api[key]);
+          const value = context.api[key];
+          if (value === null) {
+            throw new VariableResolutionError(`API variable '${key}' is null`, variableName);
+          }
+          return this.stringifyValue(value);
         }
         throw new VariableResolutionError(`API variable '${key}' is not defined`, variableName);
 
       case 'endpoint':
         if (context.endpoint && context.endpoint[key] !== undefined) {
-          return this.stringifyValue(context.endpoint[key]);
+          const value = context.endpoint[key];
+          if (value === null) {
+            throw new VariableResolutionError(`Endpoint variable '${key}' is null`, variableName);
+          }
+          return this.stringifyValue(value);
         }
         throw new VariableResolutionError(
           `Endpoint variable '${key}' is not defined`,
@@ -659,6 +807,83 @@ export class VariableResolver {
     }
 
     return value;
+  }
+
+  /**
+   * T18.2: Resolves variables in an object, excluding optional parameters that are undefined
+   * Returns both the resolved object and information about which keys were excluded
+   */
+  async resolveValueWithOptionalHandling(
+    value: unknown,
+    context: VariableContext
+  ): Promise<{ resolved: unknown; excludedKeys: string[] }> {
+    const excludedKeys: string[] = [];
+
+    if (typeof value === 'string') {
+      const result = await this.resolveWithOptionalInfo(value, context);
+      return { resolved: result.resolved, excludedKeys };
+    }
+
+    if (Array.isArray(value)) {
+      const resolvedArray = [];
+      for (const item of value) {
+        const result = await this.resolveValueWithOptionalHandling(item, context);
+        resolvedArray.push(result.resolved);
+        excludedKeys.push(...result.excludedKeys);
+      }
+      return { resolved: resolvedArray, excludedKeys };
+    }
+
+    if (value && typeof value === 'object') {
+      const resolved: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(value)) {
+        if (typeof val === 'string') {
+          const result = await this.resolveWithOptionalInfo(val, context);
+
+          // T18.2: Check if this parameter should be excluded due to optional variables
+          // A parameter should be excluded if:
+          // 1. It contains optional variables that are undefined, AND
+          // 2. Those optional variables make up the entire meaningful content
+
+          let hasUndefinedOptional = false;
+          let hasDefinedContent = false;
+
+          // Check if any optional variables are undefined
+          for (const [, shouldInclude] of result.optionalParameters) {
+            if (!shouldInclude) {
+              hasUndefinedOptional = true;
+            } else {
+              hasDefinedContent = true;
+            }
+          }
+
+          // Also check if there's any non-variable content (static text)
+          const originalTemplate = val;
+          const matches = this.extractVariableMatches(originalTemplate);
+          let nonVariableContent = originalTemplate;
+          for (const match of matches) {
+            nonVariableContent = nonVariableContent.replace(match.fullMatch, '');
+          }
+          if (nonVariableContent.trim()) {
+            hasDefinedContent = true;
+          }
+
+          // Exclude parameter if it has undefined optional variables and no other defined content
+          if (hasUndefinedOptional && !hasDefinedContent) {
+            excludedKeys.push(key);
+          } else {
+            resolved[key] = result.resolved;
+          }
+        } else {
+          const result = await this.resolveValueWithOptionalHandling(val, context);
+          resolved[key] = result.resolved;
+          excludedKeys.push(...result.excludedKeys);
+        }
+      }
+      return { resolved, excludedKeys };
+    }
+
+    return { resolved: value, excludedKeys };
   }
 
   /**
